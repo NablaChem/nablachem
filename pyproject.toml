@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "nablachem"
+version = "24.1"
+description = "Easy access to research code."
+authors = ["von Rudorff, Guido Falk <vonrudorff@uni-kassel.de>"]
+license = "LGPL"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.0"
+findiff = "^0.10.0"
+numpy = "^1.26.3"
+scipy = "^1.12.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
