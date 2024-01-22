@@ -62,7 +62,33 @@ class Monomial:
 
 
 class MultiTaylor:
-    """Multi-dimensional multi-variate arbitrary order Taylor expansion from any evenly spaced finite difference stencil."""
+    """Multi-dimensional multi-variate arbitrary order Taylor expansion from any evenly spaced finite difference stencil.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> df = pd.read_csv("some_file.csv")
+    >>> df.columns
+    Index(['RX', 'RY', 'RZ', 'QX', 'QY', 'QZ', 'E', 'BETA1', 'BETA2',
+       'SIGMA'],
+      dtype='object')
+    >>> mt = MultiTaylor(df, outputs="BETA1 BETA2 SIGMA".split())
+    >>> spatial_center, electronic_center = 3, 2.5
+    >>> mt.reset_center(
+        RX=spatial_center,
+        RY=spatial_center,
+        RZ=spatial_center,
+        QX=electronic_center,
+        QY=electronic_center,
+        QZ=electronic_center,
+    )
+    >>> mt.reset_filter(E=4)
+    >>> mt.build_model(2)
+    >>> mt.query(RX=3.1, RY=3.1, RZ=3.1, QX=2.4, QY=2.4, QZ=2.4)
+    {'BETA1': 0.022412699999999976,
+    'BETA2': 0.014047600000000134,
+    'SIGMA': 0.0018744333333333316}
+    """
 
     def __init__(self, dataframe: pd.DataFrame, outputs: list[str]):
         """Initialize the Taylor expansion from a dataframe of data points forming the superset of stencils.
