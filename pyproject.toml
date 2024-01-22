@@ -5,6 +5,8 @@ description = "Easy access to research code."
 authors = ["von Rudorff, Guido Falk <vonrudorff@uni-kassel.de>"]
 license = "LGPL"
 readme = "README.md"
+homepage = "https://nablachem.org/code"
+repository = "https://github.com/NablaChem/nablachem"
 
 [tool.poetry.dependencies]
 python = "^3.11"
