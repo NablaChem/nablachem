@@ -10,5 +10,5 @@ We care about fundamental properties of chemical space and their connection to q
 The python package is available via pip:
 
 ```
-pip install nablachem
+pip install --upgrade nablachem
 ```
