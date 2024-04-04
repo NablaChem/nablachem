@@ -23,6 +23,7 @@ class Monomial:
         """
         self._powers = powers
         self._prefactor = prefactor
+        self._cached_prefactor = None
 
     def __repr__(self):
         return f"Monomial({self._prefactor}, {self._powers})"
@@ -35,9 +36,11 @@ class Monomial:
         float
             Prefactor for the summation in the Taylor expansion.
         """
-        return self._prefactor / np.prod(
-            [math.factorial(_) for _ in self._powers.values()]
-        )
+        if self._cached_prefactor is None:
+            self._cached_prefactor = self._prefactor / np.prod(
+                [math.factorial(_) for _ in self._powers.values()]
+            )
+        return self._cached_prefactor
 
     def distance(self, pos: dict[str, float], center: dict[str, float]) -> float:
         """Evaluate the distance term of the Taylor expansion.
@@ -57,7 +60,7 @@ class Monomial:
         ret = []
         for column, power in self._powers.items():
             ret.append((pos[column] - center[column]) ** power)
-        return np.prod(ret)
+        return math.prod(ret)
 
 
 class MultiTaylor:
