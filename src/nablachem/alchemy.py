@@ -1,10 +1,9 @@
 import pandas as pd
 import findiff
 import numpy as np
-import collections
 import math
+import collections
 import itertools as it
-from typing import Union
 
 from scipy.optimize import minimize
 
@@ -107,6 +106,7 @@ class MultiTaylor:
 
     def reset_center(self, **kwargs: float):
         """Sets the expansion center from named arguments for each column."""
+
         self._center = kwargs
 
     def reset_filter(self, **kwargs: float):
@@ -134,160 +134,65 @@ class MultiTaylor:
         """
         return df.loc[(df[list(filter)] == pd.Series(filter)).all(axis=1)]
 
-    def _check_uniqueness(self, df: pd.DataFrame, terms: list[str]):
-        """Checks whether the stencil is unique, i.e. whether sufficiently many columns have been filtered.
-
-        If the raw data contains columns I1, I2, O1, O2, A and B, with all evaluated at different points, then a stencil
-        over the input columns I1, I2 can be evaluated for the output columns O1 and O2 only if columns A and B are filtered
-        such that only one set of values remains for each set of values in the I columns.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Stencil dataframe, possibly filtered.
-        terms : list[str]
-            List of columns that should be unique for a given stencil.
-
-        Raises
-        ------
-        ValueError
-            When there are other columns that are not unique.
-        """
-        copy = df.copy()
-
-        # remove variable column
-        for term in terms:
-            del copy[term]
-
-        # remove output columns: they are arbitrary
-        for output in self._outputs:
-            del copy[output]
-
-        copy.drop_duplicates(inplace=True)
-        if len(copy.index) > 1 and len(copy.columns) > 0:
-            print(copy)
-            print(copy.index)
-            print(copy.columns)
-            raise ValueError(f"Terms {terms} are not unique. Is a filter missing?")
-
-    def _split_term(self, term: str, order: int) -> dict[str, int]:
-        """Splits a string-based term into a dictionary based term.
-
-        Keys are the variable names, values are the exponents.
-
-        Parameters
-        ----------
-        term : str
-            String-based term, e.g. A_B_C or A_A_B or A, where the letters are the variable names. All variable names must be given, only for the special case of all variable names being identical, this can be omitted.
-        order : int
-            The total expansion order of this term, i.e. the sum of all exponents.
-
-        Returns
-        -------
-        dict[str, int]
-            Explicit split term representation.
-
-        Raises
-        ------
-        ValueError
-            Wrong order given
-        """
-        parts = term.split("_")
-        if len(parts) == 1:
-            parts = [parts[0]] * order
-        if len(parts) != order:
-            raise ValueError(f"Term {term} has the wrong order.")
-
-        return dict(collections.Counter(parts))
-
-    def _offsets_from_df(
-        self, df: pd.DataFrame, variable_columns: list[str]
-    ) -> tuple[list[tuple[float]], list[float]]:
+    def _offsets(self) -> tuple[np.ndarray, tuple[str]]:
         """Transforms the available data points in the dataframe into stencil offsets.
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Stencil, i.e. filtered and subselected data frame.
-        variable_columns : list[str]
-            List of variables to consider.
-
         Returns
         -------
-        tuple[list[tuple[float]], list[float]]
-            Offsets and spacings for the stencil.
-
-        Raises
-        ------
-        ValueError
-            One column is not evenly spaced.
+        tuple[np.ndarray, tuple[str]]
+            Offsets for the stencil and list of variable names in matching order.
         """
-        offsets = np.zeros((len(variable_columns), len(df)), dtype=float)
-        spacings = dict()
+        variables = [_ for _ in self._filtered.columns if _ not in self._outputs]
+        center = np.array([self._center[_] for _ in variables])
+        offsets = self._filtered[variables].values - center
+        return offsets, tuple(variables)
 
-        for column in variable_columns:
-            unique_values = np.sort(df[column].unique())
-            spacing = np.diff(unique_values)
-            if not np.allclose(spacing, spacing.mean()):
-                raise ValueError(f"Variable {column} is not evenly spaced.")
-            offsets[variable_columns.index(column)] = (
-                df[column].values - self._center[column]
-            ) / spacing.mean()
-            spacings[column] = spacing.mean()
-
-        return [tuple(_) for _ in offsets.T], [spacings[_] for _ in variable_columns]
-
-    def _build_monomials(self, df: pd.DataFrame, term: str, order: int):
+    def _build_monomials(
+        self, term: tuple[str], shifted: tuple[np.ndarray, tuple[str]]
+    ):
         """Builds all monomials and ensures that the stencil is applicable.
 
         Parameters
         ----------
-        df : pd.DataFrame
-            All filtered input data.
         term : str
             String-based term representation.
-        order : int
-            Expansion order
+        shifted : tuple[np.ndarray, tuple[str]]:
+            Cached version of self._offset()
 
         Raises
         ------
         ValueError
-            No stencil could be built.
+            Could not build stencil.
         ValueError
             Not enough points in the stencil for a given order.
         """
-        variable_columns = list(set(term.split("_")))
-        offsets, spacings = self._offsets_from_df(df, variable_columns)
-        assert len(offsets) == len(set(offsets))
-        terms = self._split_term(term, order)
-        partials = tuple([terms[_] for _ in variable_columns])
+        offsets, ordering = shifted
 
+        term_counter = collections.Counter(term)
+        indices = tuple([term_counter[_] for _ in ordering])
+
+        offsets = tuple(map(tuple, offsets))
         try:
             stencil = findiff.stencils.Stencil(
-                offsets, partials={partials: 1}, spacings=spacings
+                offsets, partials={indices: 1}, spacings=1
             )
         except:
             raise ValueError(f"Could not build stencil for term {term}.")
         if len(stencil.values) == 0:
-            print(df)
-            print(order)
-            print(offsets)
-            print(variable_columns)
-            print(partials)
             raise ValueError(f"Not enough points for term {term}.")
 
         for output in self._outputs:
             weights = [stencil.values[_] if _ in stencil.values else 0 for _ in offsets]
-            values = df[output].values
+            values = self._filtered[output].values
 
             self._monomials[output].append(
                 Monomial(
                     prefactor=np.dot(weights, values),
-                    powers=terms,
+                    powers=dict(term_counter),
                 )
             )
 
-    def _all_terms_up_to(self, order: int) -> dict[int, list[str]]:
+    def _all_terms_up_to(self, order: int) -> tuple[tuple[str]]:
         """For all remaining input columns, find all possible terms entering a Taylor expansion.
 
         Parameters
@@ -297,26 +202,24 @@ class MultiTaylor:
 
         Returns
         -------
-        dict[int, list[str]]
-            Order as key, list of terms as value.
+        tuple[tuple[str]]
+            Series of terms up to the given order, as a tuple of variable names.
         """
-        terms = {}
+        terms = []
         data_columns = [_ for _ in self._filtered.columns if _ not in self._outputs]
         data_columns = [_ for _ in data_columns if not _ in self._filter.keys()]
         for order in range(1, order + 1):
-            terms[order] = [
-                "_".join(_)
-                for _ in it.combinations_with_replacement(data_columns, order)
-            ]
-        return terms
+            for entry in it.combinations_with_replacement(data_columns, order):
+                terms.append(entry)
+        return tuple(terms)
 
-    def build_model(self, orders: Union[int, dict[int, list[str]]]):
+    def build_model(self, orders: int):
         """Sets up the model for a specific expansion order.
 
         Parameters
         ----------
-        orders : Union[int, dict[int, list[str]]]
-            Either int, then all terms are included in the expansion up to this order. Otherwise, a dictionary with the order as key and a list of string-based terms as value.
+        orders : int
+            All terms are included in the expansion up to this order.
 
         Raises
         ------
@@ -324,6 +227,8 @@ class MultiTaylor:
             Center needs to be given in dataframe.
         ValueError
             Center is not unique.
+        ValueError
+            Duplicate points in the dataset.
         """
         # check center: there can be only one
         center_rows = self._dict_filter(self._dataframe, self._center)
@@ -333,25 +238,23 @@ class MultiTaylor:
         if len(center_row) > 1:
             raise ValueError(f"Center is not unique.")
 
+        # check for duplicates
+        shifted = self._offsets()
+        if len(self._filtered[list(shifted[1])].drop_duplicates()) != len(
+            self._filtered
+        ):
+            raise ValueError(f"Duplicate points in the dataset.")
+
         # setup constant term
         self._monomials = {k: [Monomial(center_row.iloc[0][k])] for k in self._outputs}
 
-        # accept integer as placeholder
-        if isinstance(orders, int):
-            orders = self._all_terms_up_to(orders)
-
-        # setup other terms
-        for order, terms in orders.items():
-            for term in terms:
-                if order == 1:
-                    other_fields = {k: v for k, v in self._center.items() if k != term}
-                else:
-                    other_fields = {
-                        k: v for k, v in self._center.items() if k not in term
-                    }
-                s = self._dict_filter(self._filtered, other_fields)
-                self._check_uniqueness(s, self._split_term(term, order).keys())
-                self._build_monomials(s, term, order)
+        terms = self._all_terms_up_to(orders)
+        if len(terms) > len(shifted[0]):
+            raise ValueError(
+                f"Not enough points: {len(terms)} required, {len(shifted[0])} given."
+            )
+        for term in terms:
+            self._build_monomials(term, shifted)
 
     def query(self, **kwargs: float) -> float:
         """Evaluate the Taylor expansion at a given point.

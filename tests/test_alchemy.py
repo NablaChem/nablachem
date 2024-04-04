@@ -13,7 +13,7 @@ def test_1d():
         df = pd.DataFrame({"x": xs, "y": ys})
         mt = MultiTaylor(df, outputs=["y"])
         mt.reset_center(x=4)
-        mt.build_model({1: ["x"], 2: ["x"], 3: ["x"], 4: ["x"]})
+        mt.build_model(4)
         assert abs(mt.query(x=5)["y"] - polynomial(5)) < 1e-4
 
 
