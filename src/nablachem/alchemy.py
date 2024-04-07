@@ -170,30 +170,123 @@ class MultiTaylor:
             Not enough points in the stencil for a given order.
         """
         offsets, ordering = shifted
-
         term_counter = collections.Counter(term)
         indices = tuple([term_counter[_] for _ in ordering])
+        order = len(term)
 
-        offsets = tuple(map(tuple, offsets))
-        try:
-            stencil = findiff.stencils.Stencil(
-                offsets, partials={indices: 1}, spacings=1
+        # shortcut for stencils similar to central differences
+        # often it is sufficient to have one value per combination of changes
+        # e.g. in 1D, select one point to the left, one to the right of the center
+        # e.g. in 2D, select one point from every quadrant, plus the center
+        shortcut = None
+        mask_center = np.all(offsets == 0, axis=1)
+        if len(set(term)) == 1:
+            column_mask = offsets[0, :] != offsets[0, :]
+            column_mask[ordering.index(term[0])] = True
+            shortcut = (offsets[:, column_mask] != 0).reshape(-1) & np.all(
+                offsets[:, ~column_mask] == 0, axis=1
             )
-        except:
-            raise ValueError(f"Could not build stencil for term {term}.")
-        if len(stencil.values) == 0:
-            raise ValueError(f"Not enough points for term {term}.")
+            shortcut |= mask_center
+        if len(set(term)) > 0:
+            n_distinct_columns = len(set(term))
+            shortcut = mask_center
+            column_mask = np.array([False] * offsets.shape[1])
+            for column in term:
+                column_mask[ordering.index(column)] = True
+            other_columns_are_centered = np.all(offsets[:, ~column_mask] == 0, axis=1)
+            for hypercube in it.product((False, True), repeat=n_distinct_columns):
+                hypercube_mask = True
+                for sign, column in zip(hypercube, term):
+                    hypercube_mask &= (offsets[:, ordering.index(column)] > 0) == sign
+                hypercube_mask &= other_columns_are_centered
+                hypercube_mask &= ~mask_center
 
-        for output in self._outputs:
-            weights = [stencil.values[_] if _ in stencil.values else 0 for _ in offsets]
-            values = self._filtered[output].values
+                # keep only a few from this hypercube
+                # avoids slowdown because of very imbalanced data-sets
+                # parameter "extra" is free to choose (>0), should be generous
+                # choose closest to origin
+                extra = 3
+                all_selected = np.where(hypercube_mask)[0]
+                distance = np.linalg.norm(offsets[hypercube_mask, :], axis=1)
+                keep = order + extra
+                if len(distance) > keep:
+                    too_far = np.argpartition(distance, keep)[keep:]
+                    too_far = all_selected[too_far]
+                    hypercube_mask[too_far] = False
 
-            self._monomials[output].append(
-                Monomial(
-                    prefactor=np.dot(weights, values),
-                    powers=dict(term_counter),
+                shortcut |= hypercube_mask
+
+            for this, count in term_counter.items():
+                if count < 2:
+                    continue
+
+                column_mask[True] = True
+                for column in term:
+                    column_mask[ordering.index(column)] = False
+                column_mask[ordering.index(this)] = True
+
+                higher_order_mask = np.all(offsets[:, column_mask] == 0, axis=1)
+                shortcut |= higher_order_mask
+
+        # auxiliary heuristics for viable subsets
+        relevant_indices = [i for i, v in enumerate(indices) if v != 0]
+        mask_changed = ~np.all(offsets[:, relevant_indices] == 0, axis=1)
+        base_mask = mask_changed | mask_center
+
+        mask_up_to_order = np.sum(offsets != 0, axis=1) <= order
+
+        # try with simple masks first
+        tries = [
+            shortcut,
+            base_mask & mask_up_to_order,
+            base_mask,
+            base_mask | ~base_mask,
+        ]
+        for mask in tries:
+            subset_offsets = offsets[mask, :]
+
+            # condense: drop all columns which are all zeros
+            non_zero_columns = np.where(~np.all(subset_offsets == 0, axis=0))[0]
+            subset_offsets = subset_offsets[:, non_zero_columns]
+
+            # make sure that no non-zero index is dropped
+            abort_mask = False
+            for i in range(len(indices)):
+                if indices[i] > 0 and i not in non_zero_columns:
+                    abort_mask = True
+                    break
+            if abort_mask:
+                continue
+
+            indices = tuple([indices[_] for _ in non_zero_columns])
+
+            subset_offsets = tuple(map(tuple, subset_offsets))
+            try:
+                stencil = findiff.stencils.Stencil(
+                    subset_offsets, partials={indices: 1}, spacings=1
                 )
-            )
+            except:
+                # Numerical issue -> next try
+                continue
+            # Did not find a stencil -> next try
+            if len(stencil.values) == 0:
+                continue
+
+            for output in self._outputs:
+                weights = [
+                    stencil.values[_] if _ in stencil.values else 0
+                    for _ in subset_offsets
+                ]
+                values = self._filtered[output].values[mask]
+
+                self._monomials[output].append(
+                    Monomial(
+                        prefactor=np.dot(weights, values),
+                        powers=dict(term_counter),
+                    )
+                )
+            return
+        raise ValueError(f"Could not build stencil for term {term}.")
 
     def _all_terms_up_to(self, order: int) -> tuple[tuple[str]]:
         """For all remaining input columns, find all possible terms entering a Taylor expansion.
@@ -216,13 +309,20 @@ class MultiTaylor:
                 terms.append(entry)
         return tuple(terms)
 
-    def build_model(self, orders: int):
-        """Sets up the model for a specific expansion order.
+    def build_model(self, orders: int, additional_terms: list[tuple[str]] = []):
+        """Sets up the model for a specific expansion order or list of terms.
 
         Parameters
         ----------
         orders : int
             All terms are included in the expansion up to this order.
+        additional_terms : list[tuple[str]]
+            The terms to ADDITIONALLY include, i.e. list of tuples of column names.
+
+            To only include d/dx, give [('x',)]
+            To only include d^2/dx^2, give [('x', 'x')]
+            To only include d^2/dxdy, give [('x', 'y')]
+            To include all three, give [('x',), ('x', 'x'), ('x', 'y')]
 
         Raises
         ------
@@ -251,7 +351,7 @@ class MultiTaylor:
         # setup constant term
         self._monomials = {k: [Monomial(center_row.iloc[0][k])] for k in self._outputs}
 
-        terms = self._all_terms_up_to(orders)
+        terms = tuple(list(self._all_terms_up_to(orders)) + list(additional_terms))
         if len(terms) > len(shifted[0]):
             raise ValueError(
                 f"Not enough points: {len(terms)} required, {len(shifted[0])} given."
