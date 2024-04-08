@@ -260,22 +260,40 @@ class MultiTaylor:
 
             mod_indices = tuple([indices[_] for _ in non_zero_columns])
 
-            subset_offsets = tuple(map(tuple, subset_offsets))
-            try:
-                stencil = findiff.stencils.Stencil(
-                    subset_offsets, partials={mod_indices: 1}, spacings=1
+            # for better numerical stability, try different scalings
+            optimal_stencil = None
+            for stencil_scaling in (1, 10, 100, 1000):
+                scaled_subset_offsets = tuple(
+                    map(tuple, subset_offsets * stencil_scaling)
                 )
-            except:
-                # Numerical issue -> next try
-                continue
-            # Did not find a stencil -> next try
-            if len(stencil.values) == 0:
+                try:
+                    stencil = findiff.stencils.Stencil(
+                        scaled_subset_offsets,
+                        partials={mod_indices: 1},
+                        spacings=1 / stencil_scaling,
+                    )
+                except:
+                    # Numerical issue -> next try
+                    continue
+
+                # Did not find a stencil -> next try
+                if len(stencil.values) == 0:
+                    continue
+
+                # usually the one with the fewest points has the least noise
+                if optimal_stencil is None or len(optimal_stencil) > len(
+                    stencil.values
+                ):
+                    optimal_stencil = stencil.values
+                    optimal_offsets = scaled_subset_offsets
+
+            if optimal_stencil is None:
                 continue
 
             for output in self._outputs:
                 weights = [
-                    stencil.values[_] if _ in stencil.values else 0
-                    for _ in subset_offsets
+                    optimal_stencil[_] if _ in optimal_stencil else 0
+                    for _ in optimal_offsets
                 ]
                 values = self._filtered[output].values[mask]
 

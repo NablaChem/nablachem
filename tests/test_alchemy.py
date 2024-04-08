@@ -7,7 +7,6 @@ def test_1d():
     for i in range(100):
         np.random.seed(i)
         polynomial = np.poly1d(np.random.random(5))
-        print(polynomial)
         x = 4
         dx = 0.01
         xs = (np.arange(5) - 2) * dx + x
@@ -76,6 +75,38 @@ def test_2d():
     mt.build_model(4)
     assert abs(mt.query(A=4, B=5)["y"] - polynomial(4, 5)) < 1e-8
     assert abs(mt.query(A=5, B=6)["y"] - polynomial(5, 6)) < 1e-4
+
+
+def test_numerical_instability():
+    ABs = np.array(
+        [
+            [0.0, 0.0],
+            [-0.001, 0.0],
+            [0.0, -0.001],
+            [0.001, 0.0],
+            [0.0, 0.001],
+            [-0.001, -0.001],
+            [-0.001, 0.001],
+            [0.001, -0.001],
+            [0.001, 0.001],
+            [-0.002, 0.0],
+            [0.0, -0.002],
+            [0.002, 0.0],
+            [0.0, 0.002],
+            [-0.002, 0.002],
+            [0.002, -0.002],
+            [0.002, 0.002],
+        ]
+    )
+    polynomial = lambda A, B: A * B * B * B + B * B + A
+    A, B = 4, 5
+    As = ABs[:, 0] + A
+    Bs = ABs[:, 1] + B
+    ys = polynomial(As, Bs)
+    df = pd.DataFrame({"A": As, "B": Bs, "y": ys})
+    mt = MultiTaylor(df, outputs=["y"])
+    mt.reset_center(A=4, B=5)
+    mt.build_model(3)
 
 
 def test_3d():

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nablachem"
-version = "24.6"
+version = "24.7"
 description = "Easy access to research code."
 authors = ["von Rudorff, Guido Falk <vonrudorff@uni-kassel.de>"]
 license = "LGPL"
