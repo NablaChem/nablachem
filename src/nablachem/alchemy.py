@@ -258,12 +258,12 @@ class MultiTaylor:
             if abort_mask:
                 continue
 
-            indices = tuple([indices[_] for _ in non_zero_columns])
+            mod_indices = tuple([indices[_] for _ in non_zero_columns])
 
             subset_offsets = tuple(map(tuple, subset_offsets))
             try:
                 stencil = findiff.stencils.Stencil(
-                    subset_offsets, partials={indices: 1}, spacings=1
+                    subset_offsets, partials={mod_indices: 1}, spacings=1
                 )
             except:
                 # Numerical issue -> next try
