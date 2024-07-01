@@ -15,7 +15,12 @@ import operator
 from scipy._lib._util import check_random_state
 from scipy.optimize._optimize import _check_unknown_options
 from scipy.optimize import OptimizeResult
-
+import pyparsing
+import operator
+import functools
+import gzip
+from mpmath import mp
+import mpmath
 from .utils import *
 
 
@@ -32,7 +37,10 @@ class SearchSpace:
         self._atom_types += element.atom_types
 
     def list_cases_bare(
-        self, natoms: int, degree_sequences_only: bool = False
+        self,
+        natoms: int,
+        degree_sequences_only: bool = False,
+        pure_sequences_only: bool = False,
     ) -> Iterator[tuple[str, int, int]] | Iterator[tuple[int, int]]:
         """Lists all possible stoichiometries for a given number of atoms.
 
@@ -48,14 +56,20 @@ class SearchSpace:
             Number of atoms in the molecule.
         degree_sequences_only : bool, optional
             Flag to switch to degree sequence enumeration, by default False
+        pure_sequences_only : bool, optional
+            Skips sequences where atoms of one valence belong to more than one element label. Implies degree_sequences_only.
 
         Yields
         ------
         Iterator[tuple[str, int, int]] | Iterator[tuple[int, int]]
-            Either tuples of (element, valence, count) or (valence, count).
+            Either tuples of (element, valence, count) or (valence, count). Guaranteed to be sorted by (valence, count).
         """
         valences = sorted(set([_.valence for _ in self._atom_types]))
         valence_elements = [self.get_elements_from_valence(v) for v in valences]
+
+        if pure_sequences_only:
+            degree_sequences_only = True
+            valence_elements = [_[:1] for _ in valence_elements]
 
         @functools.lru_cache(maxsize=None)
         def get_group(nvalenceatoms: int, valenceidx: int):
@@ -76,6 +90,7 @@ class SearchSpace:
                             case.append((valence, count))
                         else:
                             case.append((element, valence, count))
+                case.sort(key=lambda x: x[-1])
                 group.append(case)
             return group
 
@@ -146,97 +161,86 @@ class SearchSpace:
 
 
 class Q:
-    def __init__(self):
-        self._element_at_least = []
-        self._bond_at_least = []
-        self._element_at_most = []
-        self._bond_at_most = []
+    def __init__(self, query_string: str):
+        self._parsed = Q._parse_query(query_string)
 
-    @property
-    def restricts_bonds(self):
-        return len(self._bond_at_least) + len(self._bond_at_most) > 0
-
-    def _at(self, elements, bonds, feature: str, count: int, valence: int):
-        bondlabels = "-=#$"
-        if set(feature) & set(bondlabels):
-            if valence is not None:
-                raise ValueError("Bond features do not have a valence.")
-            for sep in bondlabels:
-                if sep in feature:
-                    element1, element2 = sorted(feature.split(sep))
-                    break
-            order = bondlabels.index(sep) + 1
-            bonds.append((element1, element2, order, count))
-        else:
-            elements.append((feature, count, valence))
-        return self
-
-    def at_least(self, feature: str, count: int, valence: int = None):
-        return self._at(
-            self._element_at_least, self._bond_at_least, feature, count, valence
+    @staticmethod
+    def _parse_query(query_string: str):
+        if query_string.strip() == "":
+            return []
+        identifier = pyparsing.Combine(
+            pyparsing.Word(pyparsing.alphas + "#", pyparsing.alphanums)
         )
+        number = pyparsing.Word(pyparsing.nums)
+        operand = identifier | number
 
-    def at_most(self, feature: str, count: int, valence: int = None):
-        return self._at(
-            self._element_at_most, self._bond_at_most, feature, count, valence
+        comparison_op = pyparsing.oneOf("< > = <= >= !=")
+        and_ = pyparsing.oneOf("and &", caseless=True)
+        or_ = pyparsing.oneOf("or |", caseless=True)
+        not_ = pyparsing.oneOf("not no !", caseless=True)
+
+        parser = pyparsing.infixNotation(
+            operand,
+            [
+                (not_, 1, pyparsing.opAssoc.RIGHT),
+                (comparison_op, 2, pyparsing.opAssoc.LEFT),
+                (and_, 2, pyparsing.opAssoc.LEFT),
+                (or_, 2, pyparsing.opAssoc.LEFT),
+            ],
         )
-
-    def no(self, feature: str, valence: int = None):
-        return self.at_most(feature, 0, valence)
-
-    def exactly(self, feature: str, count: int, valence: int = None):
-        return self.at_least(feature, count, valence).at_most(feature, count, valence)
+        return parser.parseString(query_string, parseAll=True).as_list()
 
     def selected_stoichiometry(self, stoichiometry: AtomStoichiometry) -> bool:
-        # element_at_least
-        for element, count, valence in self._element_at_least:
-            found = 0
-            for atomtype, atomcount in stoichiometry.components.items():
-                if atomtype.label == element:
-                    if valence is None or atomtype.valence == valence:
-                        found += atomcount
-            if found < count:
-                return False
+        element_counts = collections.Counter(stoichiometry.canonical_element_sequence)
+        element_counts["#"] = element_counts.total()
 
-        # element_at_most
-        for element, count, valence in self._element_at_most:
-            found = 0
-            for atomtype, atomcount in stoichiometry.components.items():
-                if atomtype.label == element:
-                    if valence is None or atomtype.valence == valence:
-                        found += atomcount
-            if found > count:
-                return False
+        operators = {
+            ">": operator.gt,
+            "<": operator.lt,
+            "=": operator.eq,
+            "!=": operator.ne,
+            ">=": operator.ge,
+            "<=": operator.le,
+            "and": operator.and_,
+            "or": operator.or_,
+            "&": operator.and_,
+            "|": operator.or_,
+            "not": operator.not_,
+            "no": operator.not_,
+            "!": operator.not_,
+        }
 
-        # bond_at_least
-        for element1, element2, order, count in self._bond_at_least:
-            for element in (element1, element2):
-                found = 0
-                for atomtype, atomcount in stoichiometry.components.items():
-                    if atomtype.label == element:
-                        found += atomcount
-                if found < count:
-                    return False
+        def evaluate(parsed):
+            print(parsed)
+            if parsed == []:
+                return True
 
-        return True
+            if isinstance(parsed, str):
+                return element_counts[parsed] > 0
 
-    def selected_molecule(self, molecule: Molecule) -> bool:
-        if not self.selected_stoichiometry(molecule.to_stoichiometry()):
-            return False
+            if len(parsed) == 1:
+                return evaluate(parsed[0])
 
-        # bond_at_least
-        for element1, element2, order, count in self._bond_at_least:
-            has_count = molecule.count_bonds(element1, element2, order)
-            if has_count < count:
-                return False
+            if len(parsed) == 2:
+                op, rhs = parsed
+                return operators[op](evaluate(rhs))
 
-        # bond_at_most
-        for element1, element2, order, count in self._bond_at_most:
-            has_count = molecule.count_bonds(element1, element2, order)
-            if has_count > count:
-                return False
+            lhs, op, rhs = parsed
 
-        return True
+            if isinstance(lhs, str) and isinstance(rhs, str) and isinstance(op, str):
+                try:
+                    lhs = int(lhs)
+                except ValueError:
+                    lhs = element_counts[lhs]
+                try:
+                    rhs = int(rhs)
+                except ValueError:
+                    rhs = element_counts[rhs]
+                return operators[op](lhs, rhs)
+            else:
+                return operators[op](evaluate(lhs), evaluate(rhs))
+
+        return evaluate(self._parsed)
 
 
 class ExactCounter:
@@ -377,40 +381,142 @@ class ExactCounter:
 
 class ApproximateCounter:
     def __init__(self, other_cachedirs: list[pathlib.Path] = None):
-        self._cache = {}
+        self._exact_cache = {}
+        self._base_cache = {}
+        self._pure_cache = {}
 
         cachedirs = [pathlib.Path(__file__).parent.resolve() / "cache"]
         if other_cachedirs is not None:
             cachedirs += other_cachedirs
+
+        def label_to_lookup(label):
+            parts = label.replace(".", "_").split("_")
+            return tuple(map(int, parts))
+
         for cachedir in cachedirs:
-            for file in cachedir.glob("fip-*.txt"):
+            for file in cachedir.glob("space-exact-*.txt"):
                 with open(file) as fh:
                     for line in fh:
                         canonical_label, count = line.split()
-                        self._cache[canonical_label] = int(count)
+                        canonical_label = label_to_lookup(canonical_label)
+                        self._exact_cache[canonical_label] = int(count)
 
-    def count(
-        self, search_space: SearchSpace, natoms: int, selection: Selection = None
-    ) -> int:
+            a, b = 0.5758412256807119, -4.108765736350106
+            for file in cachedir.glob("space-base-*.txt.gz"):
+                with gzip.open(file, "rt") as fh:
+                    for line in fh:
+                        canonical_label, count = line.split()
+                        canonical_label = label_to_lookup(canonical_label)
+                        self._base_cache[canonical_label] = int(np.exp(a * float(count) + b))
+
+            for file in cachedir.glob("space-pure-*.txt"):
+                with open(file) as fh:
+                    for lidx, line in enumerate(fh):
+                        try:
+                            canonical_label, count = line.split()
+                            canonical_label = label_to_lookup(canonical_label)
+                            self._pure_cache[canonical_label] = float(count)  # scale
+                        except:
+                            raise ValueError(f"Cannot parse {file}, line {lidx}.")
+
+    def get_cache(self, natoms: int):
+        def key_to_natoms(key):
+            return sum([int(_.split(".")[1]) for _ in key.split("_")])
+
+        ret = {}
+        for label, cache in (
+            ("exact", self._exact_cache),
+            ("base", self._base_cache),
+            ("pure", self._pure_cache),
+        ):
+            ret[label] = {k: v for k, v in cache.items() if key_to_natoms(k) == natoms}
+        return ret
+
+    def count(self, search_space: SearchSpace, natoms: int, selection: Q = None) -> int:
         total = 0
-        if selection.restricts_bonds:
-            raise NotImplementedError(
-                "Filtering bonds not available for counting. Use rejection sampling instead."
-            )
 
-        for stoichiometry in search_space.list_cases(natoms):
-            if selection and not selection.selected_stoichiometry(stoichiometry):
-                continue
-            total += self.count_one(stoichiometry)
+        if selection:
+            for stoichiometry in search_space.list_cases(natoms):
+                if not selection.selected_stoichiometry(stoichiometry):
+                    continue
+                total += self.count_one(stoichiometry)
+        else:
+            for case in search_space.list_cases_bare(natoms):
+                components = [[valence, count] for _, valence, count in case]
+                total += self.count_one_bare(tuple(sum(components, [])))
         return total
 
+    def _count_one_asymptotically(self, degrees: list[int]):
+        """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
+        C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419."""
+
+        def factorial(n):
+            result = 1
+            for i in range(2, n + 1):
+                result *= i
+            return result
+
+        @staticmethod
+        @functools.cache
+        def falling_factorial(n, k):
+            result = 1
+            for i in range(n, n - k, -1):
+                result *= i
+            return result
+
+        one = mp.mpf("1")
+        three = mp.mpf("3")
+        third = one / three
+        half = one / mp.mpf("2")
+
+        y1 = mp.mpf("0")  # no loops allowed
+        x2 = mp.mpf("1")  # double bonds allowed
+        x3 = mp.mpf("1")  # triple bonds allowed
+
+        def _M(ks: list[int], r: int) -> int:
+            result = 0
+            for k in ks:
+                result += falling_factorial(k, r)
+            return result
+
+        M = _M(degrees, 1)
+        M_2 = _M(degrees, 2)
+        M_3 = _M(degrees, 3)
+
+        prefactor = factorial(M) / (factorial(M // 2) * 2 ** (M // 2))
+        for k in degrees:
+            prefactor /= factorial(k)
+
+        term1 = (y1 - half) * M_2 / M
+        term2 = (x2 - half) * M_2**2 / (2 * M**2)
+        term3 = M_2**4 / (2 * 2 * M**5)
+        term4 = -(M_2**2 * M_3) / (2 * M**4)
+        term5 = (x3 - x2 + third) * M_3**2 / (2 * M**3)
+
+        theorem = mpmath.log(prefactor) + (term1 + term2 + term3 + term4 + term5)
+        return int(theorem)
+
     def count_one(self, stoichiometry: AtomStoichiometry):
-        label = stoichiometry.canonical_label
-        if label in self._cache:
-            return self._cache[label]
+        return self.count_one_bare(stoichiometry.canonical_tuple)
+
+
+    def count_one_bare(self, label: tuple[int]):
+        try:
+            return self._exact_cache[label]
+        except:
+            pass
+
+        try:
+            return self._base_cache[label]
+        except:
+            pass
+    
+        degrees = sum([[v]*c for v, c in zip(label[::2], label[1::2])], [])
+        if len(degrees) > 20:
+            return self._count_one_asymptotically(degrees)
 
         raise NotImplementedError(
-            """The pre-computed database does not cover this stoichiometry. 
+            f"""The pre-computed database does not cover this stoichiometry: {label}.
             
             You may either compute it yourself using build_cache() or contact vonrudorff@uni-kassel.de, 
             so we can distribute the extended cache in a new version of this library, 
@@ -792,35 +898,6 @@ class ApproximateCounter:
             dict(strategy_score),
         )
 
-    def build_cache(
-        self,
-        search_space: SearchSpace,
-        natoms: int,
-        ngraphs: int = 50,
-        scaler: Callable[[float], int] = None,
-    ):
-        def _stock_scaler(path_length):
-            return np.exp(0.54114301 * path_length - 3.18983462)
-
-        if scaler is None:
-            scaler = _stock_scaler
-
-        entries = []
-        for degree_sequence in search_space.list_cases_bare(
-            natoms, degree_sequences_only=True
-        ):
-            canonical = []
-            for degree, natoms in sorted(degree_sequence):
-                canonical.append(f"{degree}.{natoms}")
-            canonical = "_".join(canonical)
-            if canonical in self._cache:
-                continue
-            avg_path_length = ApproximateCounter.estimate_edit_tree_average_path_length(
-                canonical, ngraphs
-            )
-            entries[canonical] = scaler(avg_path_length)
-        return entries
-
     @staticmethod
     def _weighted_choose(items: list, weights: list[int]):
         total = sum(weights)
@@ -831,7 +908,7 @@ class ApproximateCounter:
                 return item
 
     def _sum_formula_database(
-        self, search_space: SearchSpace, natoms: int, selection: Selection = None
+        self, search_space: SearchSpace, natoms: int, selection: Q = None
     ):
         sum_formula_size = {}
         stoichiometries = {}
@@ -858,7 +935,7 @@ class ApproximateCounter:
         search_space: SearchSpace,
         natoms: int,
         nmols: int,
-        selection: Selection = None,
+        selection: Q = None,
     ) -> list[Molecule]:
         random_order, sizes, stoichiometries = self._sum_formula_database(
             search_space, natoms, selection
@@ -917,7 +994,7 @@ class ApproximateCounter:
         search_space: SearchSpace,
         natoms: int,
         sum_formulas: dict[str, int],
-        selection: Selection = None,
+        selection: Q = None,
     ) -> float:
         """Implements the Kolmogorov-Smirnov statistic comparing the distribution of the database to the expected distribution.
 
