@@ -1,5 +1,6 @@
 import subprocess
-from collections.abc import Iterator, Callable
+from collections.abc import Iterator
+import scipy.special as scs
 import functools
 import re
 import pathlib
@@ -144,19 +145,39 @@ class SearchSpace:
         return [e.label for e in self._atom_types if e.valence == valence]
 
     @staticmethod
-    def covered_search_space():
+    def covered_search_space(kind: str):
+        """Returns the pre-defined chemical spaces from the original publication
+
+        Parameters
+        ----------
+        kind : str
+            Label, either A or B.
+
+        Returns
+        -------
+        SearchSpace
+            The chosen space.
+        """
+        if kind not in ["A", "B"]:
+            raise ValueError("No such label.")
+
         s = SearchSpace()
         s.add_element(Element("C", [4]))
-        s.add_element(Element("N", [3, 5]))
         s.add_element(Element("O", [2]))
         s.add_element(Element("F", [1]))
         s.add_element(Element("H", [1]))
         s.add_element(Element("Cl", [1]))
         s.add_element(Element("Br", [1]))
         s.add_element(Element("I", [1]))
-        s.add_element(Element("P", [3, 5]))
-        s.add_element(Element("S", [2, 4, 6]))
-        s.add_element(Element("Si", [4]))
+        if kind == "A":
+            s.add_element(Element("N", [3, 5]))
+            s.add_element(Element("P", [3, 5]))
+            s.add_element(Element("S", [2, 4, 6]))
+            s.add_element(Element("Si", [4]))
+        else:
+            s.add_element(Element("N", [3]))
+            s.add_element(Element("P", [3]))
+            s.add_element(Element("S", [2]))
         return s
 
 
@@ -401,13 +422,16 @@ class ApproximateCounter:
                         canonical_label = label_to_lookup(canonical_label)
                         self._exact_cache[canonical_label] = int(count)
 
+            # see SI of the paper
             a, b = 0.5758412256807119, -4.108765736350106
             for file in cachedir.glob("space-base-*.txt.gz"):
                 with gzip.open(file, "rt") as fh:
                     for line in fh:
                         canonical_label, count = line.split()
                         canonical_label = label_to_lookup(canonical_label)
-                        self._base_cache[canonical_label] = int(np.exp(a * float(count) + b))
+                        self._base_cache[canonical_label] = int(
+                            np.exp(a * float(count) + b)
+                        )
 
             for file in cachedir.glob("space-pure-*.txt"):
                 with open(file) as fh:
@@ -496,29 +520,81 @@ class ApproximateCounter:
         theorem = mpmath.log(prefactor) + (term1 + term2 + term3 + term4 + term5)
         return int(theorem)
 
+    #    def get_missing_cases(self, search_space: SearchSpace, kind: str, natoms: int):
+    #        cache = None
+    #        if kind == "exact":
+    #            cache = self._exact_cache
+    #        if kind == "base":
+    #            cache = self._base_cache
+    #        if kind == ""
+    #        for case in search_space.list_cases_bare(natoms):
+    #            components = [[valence, count] for _, valence, count in case]
+    #            lookup = tuple(sum(components, []))
+    #            if lookup not in self._
+
     def count_one(self, stoichiometry: AtomStoichiometry):
         return self.count_one_bare(stoichiometry.canonical_tuple)
 
+    def _pure_prediction(self, label: tuple[int]):
+        counts = {}
+        for degree, count in zip(label[::2], label[1::2]):
+            if degree not in counts:
+                counts[degree] = []
+            counts[degree].append(count)
+        score = 1
+        for degree in counts.keys():
+            remaining = sum(counts[degree])
+            for count in counts[degree]:
+                score *= int(scs.binom(remaining, count))
+                remaining -= count
+
+        purespec = [[v, sum(c)] for v, c in counts.items()]
+        purespec.sort()
+        purespec = tuple(sum(purespec, []))
+
+        pl_pure = None
+        try:
+            pl_pure = self._pure_cache[purespec]
+        except:
+            pass
+        try:
+            pl_pure = pl_pure or self._base_cache[purespec]
+        except:
+            pass
+        if pl_pure is None:
+            raise KeyError("Data missing in database")
+
+        M = sum([degree * sum(count) for degree, count in counts.items()])
+
+        return int((np.log(score) / M + 1) * pl_pure)
 
     def count_one_bare(self, label: tuple[int]):
+        # exact data
         try:
             return self._exact_cache[label]
         except:
             pass
 
+        # average path length available
         try:
             return self._base_cache[label]
         except:
             pass
-    
-        degrees = sum([[v]*c for v, c in zip(label[::2], label[1::2])], [])
+
+        # reduction on pure
+        try:
+            return self._pure_prediction(label)
+        except KeyError:
+            pass
+
+        degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
         if len(degrees) > 20:
             return self._count_one_asymptotically(degrees)
 
-        raise NotImplementedError(
+        raise ValueError(
             f"""The pre-computed database does not cover this stoichiometry: {label}.
             
-            You may either compute it yourself using build_cache() or contact vonrudorff@uni-kassel.de, 
+            You may either compute it yourself using estimate_edit_tree_average_path_length() or contact vonrudorff@uni-kassel.de, 
             so we can distribute the extended cache in a new version of this library, 
             as building the cache is a time-consuming process."""
         )
