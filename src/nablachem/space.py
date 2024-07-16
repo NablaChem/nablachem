@@ -423,6 +423,20 @@ class ApproximateCounter:
         self._asymptotic_d = -0.5466985322004583
         self._asymptotic_e = 47.56524350513164
 
+        # cache mpf objects for performance
+        one = mp.mpf("1")
+        three = mp.mpf("3")
+        third = one / three
+        half = one / mp.mpf("2")
+
+        y1 = mp.mpf("0")  # no loops allowed
+        x2 = mp.mpf("1")  # double bonds allowed
+        x3 = mp.mpf("1")  # triple bonds allowed
+
+        self._p1 = y1 - half
+        self._p2 = x2 - half
+        self._p3 = x3 - x2 + third
+
         cachedirs = [pathlib.Path(__file__).parent.resolve() / "cache"]
         if other_cachedirs is not None:
             cachedirs += other_cachedirs
@@ -540,52 +554,52 @@ class ApproximateCounter:
             total += 1
         return total
 
+    @staticmethod
+    @functools.cache
+    def factorial(n):
+        result = 1
+        for i in range(2, n + 1):
+            result *= i
+        return result
+
+    @staticmethod
+    @functools.cache
+    def falling_factorial(n, k):
+        result = 1
+        for i in range(n, n - k, -1):
+            result *= i
+        return result
+
+    @staticmethod
+    @functools.cache
+    def _prefactor(M: int) -> int:
+        return ApproximateCounter.factorial(M) / (
+            ApproximateCounter.factorial(M // 2) * 2 ** (M // 2)
+        )
+
     def _count_one_asymptotically(self, degrees: list[int]):
         """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
         C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
 
-        def factorial(n):
-            result = 1
-            for i in range(2, n + 1):
-                result *= i
-            return result
-
-        @staticmethod
-        @functools.cache
-        def falling_factorial(n, k):
-            result = 1
-            for i in range(n, n - k, -1):
-                result *= i
-            return result
-
-        one = mp.mpf("1")
-        three = mp.mpf("3")
-        third = one / three
-        half = one / mp.mpf("2")
-
-        y1 = mp.mpf("0")  # no loops allowed
-        x2 = mp.mpf("1")  # double bonds allowed
-        x3 = mp.mpf("1")  # triple bonds allowed
-
         def _M(ks: list[int], r: int) -> int:
             result = 0
             for k in ks:
-                result += falling_factorial(k, r)
+                result += ApproximateCounter.falling_factorial(k, r)
             return result
 
         M = _M(degrees, 1)
         M_2 = _M(degrees, 2)
         M_3 = _M(degrees, 3)
 
-        prefactor = factorial(M) / (factorial(M // 2) * 2 ** (M // 2))
+        prefactor = ApproximateCounter._prefactor(M)
         for k in degrees:
-            prefactor /= factorial(k)
+            prefactor /= ApproximateCounter.factorial(k)
 
-        term1 = (y1 - half) * M_2 / M
-        term2 = (x2 - half) * M_2**2 / (2 * M**2)
-        term3 = M_2**4 / (2 * 2 * M**5)
+        term1 = self._p1 * M_2 / M
+        term2 = self._p2 * M_2**2 / (2 * M**2)
+        term3 = M_2**4 / (4 * M**5)
         term4 = -(M_2**2 * M_3) / (2 * M**4)
-        term5 = (x3 - x2 + third) * M_3**2 / (2 * M**3)
+        term5 = self._p3 * M_3**2 / (2 * M**3)
 
         paper_prefactor = prefactor
         paper_exponential = term1 + term2 + term3 + term4 + term5
@@ -599,18 +613,6 @@ class ApproximateCounter:
         )
 
         return int(paper_prefactor * mpmath.exp(paper_exponential + calibration))
-
-    #    def get_missing_cases(self, search_space: SearchSpace, kind: str, natoms: int):
-    #        cache = None
-    #        if kind == "exact":
-    #            cache = self._exact_cache
-    #        if kind == "base":
-    #            cache = self._base_cache
-    #        if kind == ""
-    #        for case in search_space.list_cases_bare(natoms):
-    #            components = [[valence, count] for _, valence, count in case]
-    #            lookup = tuple(sum(components, []))
-    #            if lookup not in self._
 
     def count_one(self, stoichiometry: AtomStoichiometry):
         return self.count_one_bare(stoichiometry.canonical_tuple)
