@@ -95,7 +95,12 @@ class SearchSpace:
                 group.append(case)
             return group
 
+        npartitions = 0
         for outer_partition in integer_partition(natoms, len(valences)):
+            npartitions += 1
+
+        import tqdm
+        for outer_partition in tqdm.tqdm(integer_partition(natoms, len(valences)), total=npartitions):
             total = 0
             count = 0
             maxvalence = 0
@@ -232,7 +237,6 @@ class Q:
         }
 
         def evaluate(parsed):
-            print(parsed)
             if parsed == []:
                 return True
 
@@ -262,6 +266,10 @@ class Q:
                 return operators[op](evaluate(lhs), evaluate(rhs))
 
         return evaluate(self._parsed)
+
+    def selected_molecule(self, mol: Molecule):
+        # should be overridden to implement rejection sampling
+        return True
 
 
 class ExactCounter:
@@ -494,6 +502,12 @@ class ApproximateCounter:
             for case in search_space.list_cases_bare(natoms):
                 components = [[valence, count] for _, valence, count in case]
                 total += self.count_one_bare(tuple(sum(components, [])))
+        return total
+    
+    def count_cases(self,  search_space: SearchSpace, natoms: int) -> int:
+        total = 0
+        for case in search_space.list_cases_bare(natoms):
+            total += 1
         return total
 
     def _count_one_asymptotically(self, degrees: list[int]):
@@ -1075,9 +1089,11 @@ class ApproximateCounter:
         nmols: int,
         selection: Q = None,
     ) -> list[Molecule]:
+        print("hi")
         random_order, sizes, stoichiometries = self._sum_formula_database(
             search_space, natoms, selection
         )
+        print("RS", len(sizes))
         if len(random_order) == 0:
             raise ValueError("Search space and selection yield no feasible molecule.")
 
@@ -1139,10 +1155,6 @@ class ApproximateCounter:
         The best score is 0, the worst is 1.
 
         This does not test the distribution of molecules within a given sum formula."""
-        if selection.restricts_bonds:
-            raise NotImplementedError(
-                "Scoring not available for bond-based selections."
-            )
 
         random_order, sizes, _ = self._sum_formula_database(
             search_space, natoms, selection=selection
