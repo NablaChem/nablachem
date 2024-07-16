@@ -405,6 +405,13 @@ class ApproximateCounter:
         self._exact_cache = {}
         self._base_cache = {}
         self._pure_cache = {}
+        # see SI of the paper
+        self._a, self._b = 0.5758412256807119, -4.108765736350106
+        self._asymptotic_a = -90.26536323333897
+        self._asymptotic_b = 96.37998089390749
+        self._asymptotic_c = -0.004867110462540063
+        self._asymptotic_d = -0.5466985322004583
+        self._asymptotic_e = 47.56524350513164
 
         cachedirs = [pathlib.Path(__file__).parent.resolve() / "cache"]
         if other_cachedirs is not None:
@@ -422,30 +429,48 @@ class ApproximateCounter:
                         canonical_label = label_to_lookup(canonical_label)
                         self._exact_cache[canonical_label] = int(count)
 
-            # see SI of the paper
-            a, b = 0.5758412256807119, -4.108765736350106
             for file in cachedir.glob("space-base-*.txt.gz"):
                 with gzip.open(file, "rt") as fh:
                     for line in fh:
-                        canonical_label, count = line.split()
+                        canonical_label, length = line.split()
                         canonical_label = label_to_lookup(canonical_label)
-                        self._base_cache[canonical_label] = int(
-                            np.exp(a * float(count) + b)
+                        self._base_cache[canonical_label] = (
+                            self._average_path_length_to_size(length)
                         )
+                        if self._is_pure(canonical_label):
+                            self._pure_cache[canonical_label] = self._base_cache[
+                                canonical_label
+                            ]
 
             for file in cachedir.glob("space-pure-*.txt"):
                 with open(file) as fh:
                     for lidx, line in enumerate(fh):
                         try:
-                            canonical_label, count = line.split()
+                            canonical_label, length = line.split()
                             canonical_label = label_to_lookup(canonical_label)
-                            self._pure_cache[canonical_label] = float(count)  # scale
+                            self._pure_cache[canonical_label] = (
+                                self._average_path_length_to_size(length)
+                            )
                         except:
                             raise ValueError(f"Cannot parse {file}, line {lidx}.")
 
+    def _is_pure(self, label):
+        valences = label[::2]
+        if len(valences) == len(set(valences)):
+            return True
+        return False
+
+    def _size_to_average_path_length(self, size: int) -> float:
+        if size < 1:
+            return 0
+        return (np.log(float(size)) - self._b) / self._a
+
+    def _average_path_length_to_size(self, length: float) -> int:
+        return max(int(np.exp(self._a * float(length) + self._b)), 0)
+
     def get_cache(self, natoms: int):
         def key_to_natoms(key):
-            return sum([int(_.split(".")[1]) for _ in key.split("_")])
+            return sum(key[1::2])
 
         ret = {}
         for label, cache in (
@@ -453,6 +478,7 @@ class ApproximateCounter:
             ("base", self._base_cache),
             ("pure", self._pure_cache),
         ):
+
             ret[label] = {k: v for k, v in cache.items() if key_to_natoms(k) == natoms}
         return ret
 
@@ -472,7 +498,7 @@ class ApproximateCounter:
 
     def _count_one_asymptotically(self, degrees: list[int]):
         """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
-        C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419."""
+        C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
 
         def factorial(n):
             result = 1
@@ -517,8 +543,18 @@ class ApproximateCounter:
         term4 = -(M_2**2 * M_3) / (2 * M**4)
         term5 = (x3 - x2 + third) * M_3**2 / (2 * M**3)
 
-        theorem = mpmath.log(prefactor) + (term1 + term2 + term3 + term4 + term5)
-        return int(theorem)
+        paper_prefactor = prefactor
+        paper_exponential = term1 + term2 + term3 + term4 + term5
+
+        # calibration via error term, see SI
+        natoms = len(degrees)
+        calibration = (
+            (self._asymptotic_a * natoms + self._asymptotic_b) / M
+            + (self._asymptotic_c * natoms + self._asymptotic_d) * M
+            + self._asymptotic_e
+        )
+
+        return int(paper_prefactor * mpmath.exp(paper_exponential + calibration))
 
     #    def get_missing_cases(self, search_space: SearchSpace, kind: str, natoms: int):
     #        cache = None
@@ -535,7 +571,26 @@ class ApproximateCounter:
     def count_one(self, stoichiometry: AtomStoichiometry):
         return self.count_one_bare(stoichiometry.canonical_tuple)
 
-    def _pure_prediction(self, label: tuple[int]):
+    def _pure_prediction(self, label: tuple[int], pure_size: int = None) -> int:
+        """Estimates the non-pure size via lookup of the pure average path length.
+
+        Parameters
+        ----------
+        label : tuple[int]
+            Case key: degree and count, alternating.
+        pure_size : int
+            If the size of the protomolecule list of the pure degree sequence is known, pass it here.
+
+        Returns
+        -------
+        int
+            Estimated number of molecules
+
+        Raises
+        ------
+        KeyError
+            If no pure average path length is known.
+        """
         counts = {}
         for degree, count in zip(label[::2], label[1::2]):
             if degree not in counts:
@@ -552,23 +607,25 @@ class ApproximateCounter:
         purespec.sort()
         purespec = tuple(sum(purespec, []))
 
-        pl_pure = None
-        try:
-            pl_pure = self._pure_cache[purespec]
-        except:
-            pass
-        try:
-            pl_pure = pl_pure or self._base_cache[purespec]
-        except:
-            pass
-        if pl_pure is None:
-            raise KeyError("Data missing in database")
+        if pure_size is None:
+            try:
+                pure_size = self._pure_cache[purespec]
+            except:
+                pass
+            try:
+                pure_size = pure_size or self._base_cache[purespec]
+            except:
+                pass
+            if pure_size is None:
+                raise KeyError("Data missing in database")
 
         M = sum([degree * sum(count) for degree, count in counts.items()])
 
-        return int((np.log(score) / M + 1) * pl_pure)
+        prefactor = np.log(score) / M + 1
+        lgdu = self._size_to_average_path_length(pure_size)
+        return self._average_path_length_to_size(prefactor * lgdu)
 
-    def count_one_bare(self, label: tuple[int]):
+    def count_one_bare(self, label: tuple[int]) -> int:
         # exact data
         try:
             return self._exact_cache[label]
@@ -588,8 +645,13 @@ class ApproximateCounter:
             pass
 
         degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
+        # only use asymptotic scaling relations if the number of atoms is large enough
         if len(degrees) > 20:
-            return self._count_one_asymptotically(degrees)
+            asymptotic_size = self._count_one_asymptotically(degrees)
+            if self._is_pure(label):
+                return asymptotic_size
+            else:
+                return self._pure_prediction(label, pure_size=asymptotic_size)
 
         raise ValueError(
             f"""The pre-computed database does not cover this stoichiometry: {label}.
