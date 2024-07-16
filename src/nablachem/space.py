@@ -615,6 +615,15 @@ class ApproximateCounter:
     def count_one(self, stoichiometry: AtomStoichiometry):
         return self.count_one_bare(stoichiometry.canonical_tuple)
 
+    @functools.lru_cache(maxsize=1000)
+    def _cached_permutation_factor_log(self, groups: tuple[int]) -> int:
+        score = 1
+        remaining = sum(groups)
+        for count in groups:
+            score *= int(scs.binom(remaining, count))
+            remaining -= count
+        return np.log(score)
+
     def _pure_prediction(self, label: tuple[int], pure_size: int = None) -> int:
         """Estimates the non-pure size via lookup of the pure average path length.
 
@@ -635,21 +644,27 @@ class ApproximateCounter:
         KeyError
             If no pure average path length is known.
         """
-        counts = {}
-        for degree, count in zip(label[::2], label[1::2]):
-            if degree not in counts:
-                counts[degree] = []
-            counts[degree].append(count)
-        score = 1
-        for degree in counts.keys():
-            remaining = sum(counts[degree])
-            for count in counts[degree]:
-                score *= int(scs.binom(remaining, count))
-                remaining -= count
+        M = 0
+        purespec = []
+        logscore = 0
 
-        purespec = [[v, sum(c)] for v, c in counts.items()]
-        purespec.sort()
-        purespec = tuple(sum(purespec, []))
+        last_d = label[0]
+        counts = []
+        for i in range(len(label) // 2):
+            degree, count = label[i * 2 : i * 2 + 2]
+            if degree != last_d:
+                logscore += self._cached_permutation_factor_log(tuple(counts))
+                counts = sum(counts)
+                purespec += [last_d, counts]
+                M += last_d * counts
+                last_d = degree
+                counts = []
+            counts.append(count)
+        logscore += self._cached_permutation_factor_log(tuple(counts))
+        counts = sum(counts)
+        purespec += [last_d, counts]
+        purespec = tuple(purespec)
+        M += last_d * counts
 
         if pure_size is None:
             try:
@@ -663,9 +678,7 @@ class ApproximateCounter:
             if pure_size is None:
                 raise KeyError("Data missing in database")
 
-        M = sum([degree * sum(count) for degree, count in counts.items()])
-
-        prefactor = np.log(score) / M + 1
+        prefactor = logscore / M + 1
         lgdu = self._size_to_average_path_length(pure_size)
         return self._average_path_length_to_size(prefactor * lgdu)
 
