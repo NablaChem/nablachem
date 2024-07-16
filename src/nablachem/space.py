@@ -19,6 +19,7 @@ from scipy.optimize import OptimizeResult
 import pyparsing
 import operator
 import functools
+import tqdm
 import gzip
 from mpmath import mp
 import mpmath
@@ -99,8 +100,9 @@ class SearchSpace:
         for outer_partition in integer_partition(natoms, len(valences)):
             npartitions += 1
 
-        import tqdm
-        for outer_partition in tqdm.tqdm(integer_partition(natoms, len(valences)), total=npartitions):
+        for outer_partition in tqdm.tqdm(
+            integer_partition(natoms, len(valences)), total=npartitions
+        ):
             total = 0
             count = 0
             maxvalence = 0
@@ -425,42 +427,54 @@ class ApproximateCounter:
         if other_cachedirs is not None:
             cachedirs += other_cachedirs
 
-        def label_to_lookup(label):
-            parts = label.replace(".", "_").split("_")
-            return tuple(map(int, parts))
+        self._cachefiles = dict()
+        kinds = "exact base pure".split()
+        for kind in kinds:
+            self._cachefiles[kind] = dict()
 
         for cachedir in cachedirs:
-            for file in cachedir.glob("space-exact-*.txt"):
-                with open(file) as fh:
-                    for line in fh:
-                        canonical_label, count = line.split()
-                        canonical_label = label_to_lookup(canonical_label)
-                        self._exact_cache[canonical_label] = int(count)
+            for kind in kinds:
+                for fn in cachedir.glob(f"space-{kind}-*.txt*"):
+                    natoms = int(str(fn).split("-")[-1].split(".")[0])
+                    if natoms not in self._cachefiles[kind]:
+                        self._cachefiles[kind][natoms] = []
+                    self._cachefiles[kind][natoms].append(fn)
 
-            for file in cachedir.glob("space-base-*.txt.gz"):
-                with gzip.open(file, "rt") as fh:
-                    for line in fh:
-                        canonical_label, length = line.split()
-                        canonical_label = label_to_lookup(canonical_label)
-                        self._base_cache[canonical_label] = (
-                            self._average_path_length_to_size(length)
-                        )
-                        if self._is_pure(canonical_label):
-                            self._pure_cache[canonical_label] = self._base_cache[
-                                canonical_label
-                            ]
+    def _label_to_lookup(self, label):
+        parts = label.replace(".", "_").split("_")
+        return tuple(map(int, parts))
 
-            for file in cachedir.glob("space-pure-*.txt"):
-                with open(file) as fh:
-                    for lidx, line in enumerate(fh):
-                        try:
-                            canonical_label, length = line.split()
-                            canonical_label = label_to_lookup(canonical_label)
-                            self._pure_cache[canonical_label] = (
-                                self._average_path_length_to_size(length)
-                            )
-                        except:
-                            raise ValueError(f"Cannot parse {file}, line {lidx}.")
+    def _parse_base_file(self, file):
+        with gzip.open(file, "rt") as fh:
+            for line in fh:
+                canonical_label, length = line.split()
+                canonical_label = self._label_to_lookup(canonical_label)
+                self._base_cache[canonical_label] = self._average_path_length_to_size(
+                    length
+                )
+                if self._is_pure(canonical_label):
+                    self._pure_cache[canonical_label] = self._base_cache[
+                        canonical_label
+                    ]
+
+    def _parse_pure_file(self, file):
+        with open(file) as fh:
+            for lidx, line in enumerate(fh):
+                try:
+                    canonical_label, length = line.split()
+                    canonical_label = self._label_to_lookup(canonical_label)
+                    self._pure_cache[canonical_label] = (
+                        self._average_path_length_to_size(length)
+                    )
+                except:
+                    raise ValueError(f"Cannot parse {file}, line {lidx}.")
+
+    def _parse_exact_file(self, file):
+        with open(file) as fh:
+            for line in fh:
+                canonical_label, count = line.split()
+                canonical_label = self._label_to_lookup(canonical_label)
+                self._exact_cache[canonical_label] = int(count)
 
     def _is_pure(self, label):
         valences = label[::2]
@@ -476,7 +490,22 @@ class ApproximateCounter:
     def _average_path_length_to_size(self, length: float) -> int:
         return max(int(np.exp(self._a * float(length) + self._b)), 0)
 
+    def _fill_cache(self, natoms: int):
+        functions = {
+            "exact": self._parse_exact_file,
+            "pure": self._parse_pure_file,
+            "base": self._parse_base_file,
+        }
+
+        for kind in self._cachefiles.keys():
+            if natoms in self._cachefiles[kind]:
+                for filename in self._cachefiles[kind][natoms]:
+                    functions[kind](filename)
+                del self._cachefiles[kind][natoms]
+
     def get_cache(self, natoms: int):
+        self._fill_cache(natoms)
+
         def key_to_natoms(key):
             return sum(key[1::2])
 
@@ -486,11 +515,11 @@ class ApproximateCounter:
             ("base", self._base_cache),
             ("pure", self._pure_cache),
         ):
-
             ret[label] = {k: v for k, v in cache.items() if key_to_natoms(k) == natoms}
         return ret
 
     def count(self, search_space: SearchSpace, natoms: int, selection: Q = None) -> int:
+        self._fill_cache(natoms)
         total = 0
 
         if selection:
@@ -503,8 +532,9 @@ class ApproximateCounter:
                 components = [[valence, count] for _, valence, count in case]
                 total += self.count_one_bare(tuple(sum(components, [])))
         return total
-    
-    def count_cases(self,  search_space: SearchSpace, natoms: int) -> int:
+
+    def count_cases(self, search_space: SearchSpace, natoms: int) -> int:
+        self._fill_cache(natoms)
         total = 0
         for case in search_space.list_cases_bare(natoms):
             total += 1
