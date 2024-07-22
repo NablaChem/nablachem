@@ -25,22 +25,12 @@ from mpmath import mp
 import mpmath
 from .utils import *
 
-# try:
-from .hotspot import space as hotspace
-
-# except:
-# hotspace = None
-
 
 def _is_pure(label):
     valences = label[::2]
     if len(valences) == len(set(valences)):
         return True
     return False
-
-
-if hotspace is not None:
-    _is_pure = hotspace.is_pure
 
 
 class SearchSpace:
@@ -698,45 +688,38 @@ class ApproximateCounter:
                 pass
             raise KeyError("Data missing in database")
 
-        if hotspace is None:
-            M = 0
-            purespec = []
-            logscore = 0
+        M = 0
+        purespec = []
+        logscore = 0
 
-            last_d = label[0]
-            counts = []
-            for i in range(len(label) // 2):
-                degree, count = label[i * 2 : i * 2 + 2]
-                if degree != last_d:
-                    logscore += self._cached_permutation_factor_log(tuple(counts))
-                    counts = sum(counts)
-                    purespec += [last_d, counts]
-                    M += last_d * counts
-                    last_d = degree
-                    counts = []
-                counts.append(count)
-            logscore += self._cached_permutation_factor_log(tuple(counts))
-            counts = sum(counts)
-            purespec += [last_d, counts]
-            purespec = tuple(purespec)
-            M += last_d * counts
+        last_d = label[0]
+        counts = []
+        for i in range(len(label) // 2):
+            degree, count = label[i * 2 : i * 2 + 2]
+            if degree != last_d:
+                logscore += self._cached_permutation_factor_log(tuple(counts))
+                counts = sum(counts)
+                purespec += [last_d, counts]
+                M += last_d * counts
+                last_d = degree
+                counts = []
+            counts.append(count)
+        logscore += self._cached_permutation_factor_log(tuple(counts))
+        counts = sum(counts)
+        purespec += [last_d, counts]
+        purespec = tuple(purespec)
+        M += last_d * counts
 
-            if pure_size is None:
-                if log_size is None:
-                    pure_size = _from_cache()
-                else:
-                    pure_size = int(mpmath.exp(log_size))
+        if pure_size is None:
+            if log_size is None:
+                pure_size = _from_cache()
+            else:
+                pure_size = int(mpmath.exp(log_size))
 
-            prefactor = logscore / M + 1
-        else:
-            if pure_size is None and log_size is None:
-                log_size = np.log(_from_cache())
-                raise NotImplementedError("Should not happen anyway.")
-            return int(hotspace.pure_prediction(label, self._a, self._b, log_size))
+        prefactor = logscore / M + 1
         lgdu = self._size_to_average_path_length(pure_size)
         return self._average_path_length_to_size(prefactor * lgdu)
 
-    # @profile
     def count_one_bare(
         self, label: tuple[int], natoms: int, cached_degree_sequence: bool = False
     ) -> int:
