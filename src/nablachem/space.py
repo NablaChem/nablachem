@@ -25,6 +25,23 @@ from mpmath import mp
 import mpmath
 from .utils import *
 
+# try:
+from .hotspot import space as hotspace
+
+# except:
+# hotspace = None
+
+
+def _is_pure(label):
+    valences = label[::2]
+    if len(valences) == len(set(valences)):
+        return True
+    return False
+
+
+if hotspace is not None:
+    _is_pure = hotspace.is_pure
+
 
 class SearchSpace:
     def __init__(self, elements: str = None):
@@ -134,11 +151,14 @@ class SearchSpace:
                     )
                 )
 
+            yield None  # denotes a new degree sequence
             for case in it.product(*groups):
                 yield sum(case, [])
 
     def list_cases(self, natoms: int) -> Iterator[AtomStoichiometry]:
         for case in self.list_cases_bare(natoms):
+            if case is None:
+                continue
             stoichiometry = AtomStoichiometry()
             for element, valence, count in case:
                 stoichiometry.extend(AtomType(element, valence), count)
@@ -454,6 +474,13 @@ class ApproximateCounter:
                         self._cachefiles[kind][natoms] = []
                     self._cachefiles[kind][natoms].append(fn)
 
+        self._max_natoms_from_cache = dict()
+        overall = 0
+        for kind in kinds:
+            self._max_natoms_from_cache[kind] = max(self._cachefiles[kind].keys())
+            overall = max(overall, self._max_natoms_from_cache[kind])
+        self._max_natoms_from_cache["all"] = overall
+
     def _label_to_lookup(self, label):
         parts = label.replace(".", "_").split("_")
         return tuple(map(int, parts))
@@ -466,7 +493,7 @@ class ApproximateCounter:
                 self._base_cache[canonical_label] = self._average_path_length_to_size(
                     length
                 )
-                if self._is_pure(canonical_label):
+                if _is_pure(canonical_label):
                     self._pure_cache[canonical_label] = self._base_cache[
                         canonical_label
                     ]
@@ -489,12 +516,6 @@ class ApproximateCounter:
                 canonical_label, count = line.split()
                 canonical_label = self._label_to_lookup(canonical_label)
                 self._exact_cache[canonical_label] = int(count)
-
-    def _is_pure(self, label):
-        valences = label[::2]
-        if len(valences) == len(set(valences)):
-            return True
-        return False
 
     def _size_to_average_path_length(self, size: int) -> float:
         if size < 1:
@@ -540,18 +561,29 @@ class ApproximateCounter:
             for stoichiometry in search_space.list_cases(natoms):
                 if not selection.selected_stoichiometry(stoichiometry):
                     continue
-                total += self.count_one(stoichiometry)
+                total += self.count_one(stoichiometry, natoms)
         else:
+            cached_degree_sequence = False
             for case in search_space.list_cases_bare(natoms):
+                if case is None:
+                    cached_degree_sequence = False
+                    continue
+
+                cached_degree_sequence = False
+
                 components = [[valence, count] for _, valence, count in case]
-                total += self.count_one_bare(tuple(sum(components, [])))
+                total += self.count_one_bare(
+                    tuple(sum(components, [])), natoms, cached_degree_sequence
+                )
+                cached_degree_sequence = True
         return total
 
     def count_cases(self, search_space: SearchSpace, natoms: int) -> int:
         self._fill_cache(natoms)
         total = 0
         for case in search_space.list_cases_bare(natoms):
-            total += 1
+            if case is not None:
+                total += 1
         return total
 
     @staticmethod
@@ -578,7 +610,7 @@ class ApproximateCounter:
         )
 
     @functools.cache
-    def _count_one_asymptotically(self, degrees: tuple[int]):
+    def _count_one_asymptotically_log(self, degrees: tuple[int]):
         """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
         C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
 
@@ -613,10 +645,10 @@ class ApproximateCounter:
             + self._asymptotic_e
         )
 
-        return int(paper_prefactor * mpmath.exp(paper_exponential + calibration))
+        return np.log(float(paper_prefactor)) + paper_exponential + calibration
 
-    def count_one(self, stoichiometry: AtomStoichiometry):
-        return self.count_one_bare(stoichiometry.canonical_tuple)
+    def count_one(self, stoichiometry: AtomStoichiometry, natoms: int):
+        return self.count_one_bare(stoichiometry.canonical_tuple, natoms)
 
     @functools.cache
     def _cached_permutation_factor_log(self, groups: tuple[int]) -> int:
@@ -627,7 +659,9 @@ class ApproximateCounter:
             remaining -= count
         return np.log(score)
 
-    def _pure_prediction(self, label: tuple[int], pure_size: int = None) -> int:
+    def _pure_prediction(
+        self, label: tuple[int], pure_size: int = None, log_size: float = None
+    ) -> int:
         """Estimates the non-pure size via lookup of the pure average path length.
 
         Parameters
@@ -647,79 +681,104 @@ class ApproximateCounter:
         KeyError
             If no pure average path length is known.
         """
-        M = 0
-        purespec = []
-        logscore = 0
 
-        last_d = label[0]
-        counts = []
-        for i in range(len(label) // 2):
-            degree, count = label[i * 2 : i * 2 + 2]
-            if degree != last_d:
-                logscore += self._cached_permutation_factor_log(tuple(counts))
-                counts = sum(counts)
-                purespec += [last_d, counts]
-                M += last_d * counts
-                last_d = degree
-                counts = []
-            counts.append(count)
-        logscore += self._cached_permutation_factor_log(tuple(counts))
-        counts = sum(counts)
-        purespec += [last_d, counts]
-        purespec = tuple(purespec)
-        M += last_d * counts
-
-        if pure_size is None:
+        def _from_cache():
             try:
-                pure_size = self._pure_cache[purespec]
+                return self._pure_cache[purespec]
             except:
                 pass
             try:
-                pure_size = pure_size or self._base_cache[purespec]
+                return pure_size or self._base_cache[purespec]
             except:
                 pass
+            raise KeyError("Data missing in database")
+
+        if hotspace is None:
+            M = 0
+            purespec = []
+            logscore = 0
+
+            last_d = label[0]
+            counts = []
+            for i in range(len(label) // 2):
+                degree, count = label[i * 2 : i * 2 + 2]
+                if degree != last_d:
+                    logscore += self._cached_permutation_factor_log(tuple(counts))
+                    counts = sum(counts)
+                    purespec += [last_d, counts]
+                    M += last_d * counts
+                    last_d = degree
+                    counts = []
+                counts.append(count)
+            logscore += self._cached_permutation_factor_log(tuple(counts))
+            counts = sum(counts)
+            purespec += [last_d, counts]
+            purespec = tuple(purespec)
+            M += last_d * counts
+
             if pure_size is None:
-                raise KeyError("Data missing in database")
+                if log_size is None:
+                    pure_size = _from_cache()
+                else:
+                    pure_size = int(mpmath.exp(log_size))
 
-        prefactor = logscore / M + 1
+            prefactor = logscore / M + 1
+        else:
+            if pure_size is None and log_size is None:
+                log_size = np.log(_from_cache())
+                raise NotImplementedError("Should not happen anyway.")
+            return int(hotspace.pure_prediction(label, self._a, self._b, log_size))
         lgdu = self._size_to_average_path_length(pure_size)
         return self._average_path_length_to_size(prefactor * lgdu)
 
-    def count_one_bare(self, label: tuple[int]) -> int:
-        # exact data
-        try:
-            return self._exact_cache[label]
-        except:
-            pass
+    # @profile
+    def count_one_bare(
+        self, label: tuple[int], natoms: int, cached_degree_sequence: bool = False
+    ) -> int:
+        if natoms < self._max_natoms_from_cache["all"]:
+            # exact data
+            if natoms <= self._max_natoms_from_cache["exact"]:
+                try:
+                    return self._exact_cache[label]
+                except:
+                    pass
 
-        # average path length available
-        try:
-            return self._base_cache[label]
-        except:
-            pass
+            # average path length available
+            if natoms <= self._max_natoms_from_cache["base"]:
+                try:
+                    return self._base_cache[label]
+                except:
+                    pass
 
-        # reduction on pure
-        try:
-            return self._pure_prediction(label)
-        except KeyError:
-            pass
+            # reduction on pure
+            if natoms <= self._max_natoms_from_cache["pure"]:
+                try:
+                    return self._pure_prediction(label)
+                except KeyError:
+                    pass
 
-        degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
         # only use asymptotic scaling relations if the number of atoms is large enough
-        if len(degrees) > 20:
-            asymptotic_size = self._count_one_asymptotically(tuple(degrees))
-            if self._is_pure(label):
-                return asymptotic_size
-            else:
-                return self._pure_prediction(label, pure_size=asymptotic_size)
 
-        raise ValueError(
-            f"""The pre-computed database does not cover this stoichiometry: {label}.
-            
-            You may either compute it yourself using estimate_edit_tree_average_path_length() or contact vonrudorff@uni-kassel.de, 
-            so we can distribute the extended cache in a new version of this library, 
-            as building the cache is a time-consuming process."""
-        )
+        if cached_degree_sequence:
+            log_asymptotic_size = self._cached_log_asymptotic_size
+        else:
+            if natoms < 20:
+                raise ValueError(
+                    f"""The pre-computed database does not cover this stoichiometry: {label}.
+                    
+                    You may either compute it yourself using estimate_edit_tree_average_path_length() or contact vonrudorff@uni-kassel.de, 
+                    so we can distribute the extended cache in a new version of this library, 
+                    as building the cache is a time-consuming process."""
+                )
+            degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
+            log_asymptotic_size = self._count_one_asymptotically_log(tuple(degrees))
+            print(log_asymptotic_size)
+            self._cached_log_asymptotic_size = log_asymptotic_size
+
+        if _is_pure(label):
+            return int(mpmath.exp(log_asymptotic_size))
+        else:
+            return self._pure_prediction(label, log_size=log_asymptotic_size)
 
     @staticmethod
     def sample_connected(spec):
