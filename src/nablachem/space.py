@@ -196,15 +196,14 @@ class SearchSpace:
         s.add_element(Element("Cl", [1]))
         s.add_element(Element("Br", [1]))
         s.add_element(Element("I", [1]))
+        s.add_element(Element("P", [3, 5]))
         if kind == "A":
             s.add_element(Element("N", [3, 5]))
-            s.add_element(Element("P", [3, 5]))
             s.add_element(Element("S", [2, 4, 6]))
             s.add_element(Element("Si", [4]))
         else:
             s.add_element(Element("N", [3]))
-            s.add_element(Element("P", [3]))
-            s.add_element(Element("S", [2]))
+
         return s
 
 
@@ -610,7 +609,9 @@ class ApproximateCounter:
         )
 
     @functools.cache
-    def _count_one_asymptotically_log(self, degrees: tuple[int]):
+    def _count_one_asymptotically_log(
+        self, degrees: tuple[int], calibrated: bool = True
+    ):
         """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
         C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
 
@@ -639,11 +640,15 @@ class ApproximateCounter:
 
         # calibration via error term, see SI
         natoms = len(degrees)
-        calibration = (
-            (self._asymptotic_a * natoms + self._asymptotic_b) / M
-            + (self._asymptotic_c * natoms + self._asymptotic_d) * M
-            + self._asymptotic_e
-        )
+
+        if calibrated:
+            calibration = (
+                (self._asymptotic_a * natoms + self._asymptotic_b) / M
+                + (self._asymptotic_c * natoms + self._asymptotic_d) * M
+                + self._asymptotic_e
+            )
+        else:
+            calibration = 0
 
         return np.log(float(paper_prefactor)) + paper_exponential + calibration
 
@@ -772,7 +777,6 @@ class ApproximateCounter:
                 )
             degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
             log_asymptotic_size = self._count_one_asymptotically_log(tuple(degrees))
-            print(log_asymptotic_size)
             self._cached_log_asymptotic_size = log_asymptotic_size
 
         if _is_pure(label):
