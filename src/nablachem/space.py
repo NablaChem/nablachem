@@ -577,7 +577,8 @@ class ApproximateCounter:
             ApproximateCounter.factorial(M // 2) * 2 ** (M // 2)
         )
 
-    def _count_one_asymptotically(self, degrees: list[int]):
+    @functools.cache
+    def _count_one_asymptotically(self, degrees: tuple[int]):
         """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
         C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
 
@@ -617,7 +618,7 @@ class ApproximateCounter:
     def count_one(self, stoichiometry: AtomStoichiometry):
         return self.count_one_bare(stoichiometry.canonical_tuple)
 
-    @functools.lru_cache(maxsize=1000)
+    @functools.cache
     def _cached_permutation_factor_log(self, groups: tuple[int]) -> int:
         score = 1
         remaining = sum(groups)
@@ -706,7 +707,7 @@ class ApproximateCounter:
         degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
         # only use asymptotic scaling relations if the number of atoms is large enough
         if len(degrees) > 20:
-            asymptotic_size = self._count_one_asymptotically(degrees)
+            asymptotic_size = self._count_one_asymptotically(tuple(degrees))
             if self._is_pure(label):
                 return asymptotic_size
             else:
