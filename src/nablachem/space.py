@@ -558,8 +558,6 @@ class ApproximateCounter:
                     cached_degree_sequence = False
                     continue
 
-                cached_degree_sequence = False
-
                 components = [[valence, count] for _, valence, count in case]
                 total += self.count_one_bare(
                     tuple(sum(components, [])), natoms, cached_degree_sequence
@@ -643,6 +641,7 @@ class ApproximateCounter:
         return np.log(float(paper_prefactor)) + paper_exponential + calibration
 
     def count_one(self, stoichiometry: AtomStoichiometry, natoms: int):
+        self._fill_cache(natoms)
         return self.count_one_bare(stoichiometry.canonical_tuple, natoms)
 
     @functools.cache
@@ -1162,7 +1161,7 @@ class ApproximateCounter:
             ):
                 continue
             sum_formula = stoichiometry.sum_formula
-            magnitude = self.count_one(stoichiometry)
+            magnitude = self.count_one(stoichiometry, natoms)
             if sum_formula not in stoichiometries:
                 stoichiometries[sum_formula] = [stoichiometry]
                 sum_formula_size[sum_formula] = 0
