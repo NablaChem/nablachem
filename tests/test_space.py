@@ -1,3 +1,4 @@
+import pytest
 import nablachem.space as ncs
 
 
@@ -463,3 +464,13 @@ def test_limit_relation():
         )
         == False
     )
+
+
+@pytest.mark.parametrize(
+    "letter,natoms", [(letter, natoms) for letter in "AB" for natoms in range(3, 30)]
+)
+def test_sum_formula_database_covered(letter, natoms):
+    s = ncs.SearchSpace.covered_search_space(letter)
+    counter = ncs.ApproximateCounter()
+    switchover = {"A": 15, "B": 22}
+    assert counter.missing_parameters(s, natoms, natoms > switchover[letter]) == []

@@ -33,6 +33,24 @@ def _is_pure(label):
     return False
 
 
+def _to_pure(label):
+    purespec = []
+
+    last_d = label[0]
+    counts = []
+    for i in range(len(label) // 2):
+        degree, count = label[i * 2 : i * 2 + 2]
+        if degree != last_d:
+            counts = sum(counts)
+            purespec += [last_d, counts]
+            last_d = degree
+            counts = []
+        counts.append(count)
+    counts = sum(counts)
+    purespec += [last_d, counts]
+    return tuple(purespec)
+
+
 class SearchSpace:
     def __init__(self, elements: str = None):
         self._atom_types = []
@@ -227,8 +245,15 @@ class Q:
         )
         return parser.parseString(query_string, parseAll=True).as_list()
 
-    def selected_stoichiometry(self, stoichiometry: AtomStoichiometry) -> bool:
-        element_counts = collections.Counter(stoichiometry.canonical_element_sequence)
+    def selected_stoichiometry(
+        self, stoichiometry: AtomStoichiometry | list[str]
+    ) -> bool:
+        if isinstance(stoichiometry, AtomStoichiometry):
+            element_counts = collections.Counter(
+                stoichiometry.canonical_element_sequence
+            )
+        else:
+            element_counts = collections.Counter(stoichiometry)
         element_counts["#"] = element_counts.total()
 
         operators = {
@@ -431,6 +456,7 @@ class ApproximateCounter:
         self._asymptotic_c = -0.004867110462540063
         self._asymptotic_d = -0.5466985322004583
         self._asymptotic_e = 47.56524350513164
+        self._minimum_natoms_for_asymptotics = 20
 
         # cache mpf objects for performance
         one = mp.mpf("1")
@@ -745,11 +771,10 @@ class ApproximateCounter:
                     pass
 
         # only use asymptotic scaling relations if the number of atoms is large enough
-
         if cached_degree_sequence:
             log_asymptotic_size = self._cached_log_asymptotic_size
         else:
-            if natoms < 20:
+            if natoms < self._minimum_natoms_for_asymptotics:
                 raise ValueError(
                     f"""The pre-computed database does not cover this stoichiometry: {label}.
                     
@@ -1263,3 +1288,69 @@ class ApproximateCounter:
         ys = ys / ys[-1]
 
         return max(abs(ys - ys_expected))
+
+    def missing_parameters(
+        self,
+        search_space: SearchSpace,
+        natoms: int,
+        pure_only: bool,
+        selection: Q = None,
+    ):
+        """Returns the colored degree sequences for which no parameters have been precomputed yet."""
+        # no parameters needed for asymptotics
+        if natoms > self._minimum_natoms_for_asymptotics:
+            return []
+
+        self._fill_cache(natoms)
+        missing = []
+
+        if selection is not None:
+            for case in search_space.list_cases_bare(natoms):
+                if case is None:
+                    continue
+
+                label = tuple(sum([[valence, count] for _, valence, count in case], []))
+                if pure_only and not _is_pure(label):
+                    continue
+
+                if selection is not None and not selection.selected_stoichiometry(
+                    sum([[element] * count for element, _, count in case], [])
+                ):
+                    continue
+
+                # check in cache
+                if natoms <= self._max_natoms_from_cache["exact"]:
+                    if label in self._exact_cache:
+                        continue
+
+                if natoms <= self._max_natoms_from_cache["base"]:
+                    if label in self._base_cache:
+                        continue
+
+                # reduction on pure
+                if natoms <= self._max_natoms_from_cache["pure"]:
+                    if pure_only:
+                        purespec = label
+                    else:
+                        purespec = _to_pure(label)
+
+                    if purespec in self._pure_cache or purespec in self._base_cache:
+                        continue
+
+                missing.append(label)
+        else:
+            for case in search_space.list_cases_bare(
+                natoms, degree_sequences_only=True, pure_sequences_only=pure_only
+            ):
+                if case is None:
+                    continue
+
+                label = tuple(sum([[valence, count] for valence, count in case], []))
+                if (
+                    label not in self._exact_cache
+                    and label not in self._base_cache
+                    and label not in self._pure_cache
+                ):
+                    missing.append(label)
+
+        return list(set(missing))
