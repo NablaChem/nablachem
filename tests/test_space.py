@@ -362,6 +362,51 @@ def test_selection_eq():
         )
 
 
+def test_selection_eq_multiple():
+    selection = ncs.Q("C = 1 & N = 1 & F = 0 & Cl = 0")
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=4): 1,
+            }
+        )
+    )
+
+
+def test_selection_multiple_andor_precedence():
+    for case in ("C = 1 & N = 1 | F = 0", "F = 0 | C = 1 & N = 1"):
+        selection = ncs.Q(case)
+        assert selection.selected_stoichiometry(
+            ncs.AtomStoichiometry(
+                components={
+                    ncs.AtomType(label="C", valence=4): 2,
+                    ncs.AtomType(label="N", valence=4): 1,
+                }
+            )
+        )
+        assert not selection.selected_stoichiometry(
+            ncs.AtomStoichiometry(
+                components={
+                    ncs.AtomType(label="C", valence=4): 1,
+                    ncs.AtomType(label="F", valence=4): 1,
+                }
+            )
+        )
+
+
+def test_selection_eq_multiple_mixed_operators():
+    selection = ncs.Q("C = 1 and N = 1 & F = 0 and Cl = 0")
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=4): 1,
+            }
+        )
+    )
+
+
 def test_selection_neq():
     selection = ncs.Q("(C != 4)")
     for natoms, result in ((3, True), (4, False), (5, True)):

@@ -276,6 +276,9 @@ class Q:
             if parsed == []:
                 return True
 
+            if parsed in (True, False):
+                return parsed
+
             if isinstance(parsed, str):
                 return element_counts[parsed] > 0
 
@@ -285,6 +288,22 @@ class Q:
             if len(parsed) == 2:
                 op, rhs = parsed
                 return operators[op](evaluate(rhs))
+
+            if len(parsed) > 3:
+                ops = parsed[1::2]
+                # and precedence
+                anyof = ("|", "or")
+                if "&" in ops or "and" in ops:
+                    anyof = ("&", "and")
+                try:
+                    opidx = ops.index(anyof[0])
+                except:
+                    opidx = ops.index(anyof[1])
+                opidx = opidx * 2 + 1
+                center = evaluate(parsed[opidx - 1 : opidx + 2])
+                left = parsed[: opidx - 1]
+                right = parsed[opidx + 2 :]
+                return evaluate(left + [center] + right)
 
             lhs, op, rhs = parsed
 
