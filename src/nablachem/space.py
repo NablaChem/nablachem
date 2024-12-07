@@ -778,7 +778,8 @@ class ApproximateCounter:
                 raise ValueError(
                     f"""The pre-computed database does not cover this stoichiometry: {label}.
                     
-                    You may either compute it yourself using estimate_edit_tree_average_path_length() or contact vonrudorff@uni-kassel.de, 
+                    You may either compute it yourself using estimate_edit_tree_average_path_length()
+                    (see maintenance/space_cache.py) or contact vonrudorff@uni-kassel.de, 
                     so we can distribute the extended cache in a new version of this library, 
                     as building the cache is a time-consuming process."""
                 )
