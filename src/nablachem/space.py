@@ -165,7 +165,7 @@ class SearchSpace:
 
     def list_cases(self, natoms: int) -> Iterator[AtomStoichiometry]:
         for case in self.list_cases_bare(natoms):
-            if case is None:
+            if case is None or case == []:
                 continue
             stoichiometry = AtomStoichiometry()
             for element, valence, count in case:

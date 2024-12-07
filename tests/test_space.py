@@ -110,39 +110,73 @@ def test_case_list():
     assert len(actual) == len(expected)
 
 
+def _compare_caselists(actual, expected):
+    # sorting within one case does not matter, sorting of cases does,
+    # but only between None separators which indicate a new degree sequence starting
+    if len(actual) != len(expected):
+        return False
+
+    def _to_blocks(caselist):
+        blocks = []
+        block = []
+        for entry in caselist:
+            if entry is None:
+                blocks.append(set(block))
+                block = []
+            else:
+                block.append(tuple(sorted(entry)))
+        blocks.append(set(block))
+        return blocks
+
+    blocks_actual = _to_blocks(actual)
+    blocks_expected = _to_blocks(expected)
+    if len(blocks_actual) != len(blocks_expected):
+        return False
+
+    for block in blocks_expected:
+        index = blocks_actual.index(block)
+        del blocks_actual[index]
+    return True
+
+
 def test_case_list_bare():
     s = ncs.SearchSpace()
     s.add_element(ncs.Element("C", [4]))
     s.add_element(ncs.Element("F", [1]))
     s.add_element(ncs.Element("H", [1]))
 
-    expected = [[("C", 4, 3)]]
+    expected = [None, [("C", 4, 3)]]
     assert list(s.list_cases_bare(3)) == expected
 
     expected = [
+        None,
         [("C", 4, 4)],
+        None,
         [("C", 4, 2), ("H", 1, 2)],
         [("C", 4, 2), ("F", 1, 2)],
         [("C", 4, 2), ("H", 1, 1), ("F", 1, 1)],
     ]
     actual = list(s.list_cases_bare(4))
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
     expected = [
+        None,
         [("C", 4, 5)],
+        None,
+        [("H", 1, 2), ("C", 4, 3)],
+        [("F", 1, 2), ("C", 4, 3)],
+        [("H", 1, 1), ("F", 1, 1), ("C", 4, 3)],
+        None,
         [("C", 4, 1), ("F", 1, 4)],
         [("C", 4, 1), ("H", 1, 4)],
         [("C", 4, 1), ("F", 1, 3), ("H", 1, 1)],
         [("C", 4, 1), ("F", 1, 2), ("H", 1, 2)],
         [("C", 4, 1), ("F", 1, 1), ("H", 1, 3)],
-        [("H", 1, 2), ("C", 4, 3)],
-        [("F", 1, 2), ("C", 4, 3)],
-        [("H", 1, 1), ("F", 1, 1), ("C", 4, 3)],
     ]
     actual = list(s.list_cases_bare(5))
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
 
 def test_case_list_bare_sequence():
@@ -151,29 +185,34 @@ def test_case_list_bare_sequence():
     s.add_element(ncs.Element("F", [1]))
     s.add_element(ncs.Element("H", [1]))
 
-    expected = [[(4, 3)]]
+    expected = [None, [(4, 3)]]
     assert list(s.list_cases_bare(3, degree_sequences_only=True)) == expected
 
     expected = [
+        None,
         [(4, 4)],
+        None,
         [(4, 2), (1, 2)],
         [(4, 2), (1, 1), (1, 1)],
     ]
     actual = list(s.list_cases_bare(4, degree_sequences_only=True))
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
     expected = [
+        None,
         [(4, 5)],
+        None,
         [(4, 1), (1, 4)],
         [(4, 1), (1, 3), (1, 1)],
         [(4, 1), (1, 2), (1, 2)],
+        None,
         [(1, 2), (4, 3)],
         [(1, 1), (1, 1), (4, 3)],
     ]
     actual = list(s.list_cases_bare(5, degree_sequences_only=True))
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
 
 def test_case_list_bare_sequence_pure():
@@ -182,32 +221,37 @@ def test_case_list_bare_sequence_pure():
     s.add_element(ncs.Element("F", [1]))
     s.add_element(ncs.Element("H", [1]))
 
-    expected = [[(4, 3)]]
+    expected = [None, [(4, 3)]]
     assert (
         list(s.list_cases_bare(3, degree_sequences_only=True, pure_sequences_only=True))
         == expected
     )
 
     expected = [
+        None,
         [(4, 4)],
+        None,
         [(4, 2), (1, 2)],
     ]
     actual = list(
         s.list_cases_bare(4, degree_sequences_only=True, pure_sequences_only=True)
     )
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
     expected = [
+        None,
         [(4, 5)],
+        None,
         [(4, 1), (1, 4)],
+        None,
         [(1, 2), (4, 3)],
     ]
     actual = list(
         s.list_cases_bare(5, degree_sequences_only=True, pure_sequences_only=True)
     )
 
-    assert sorted([sorted(_) for _ in expected]) == sorted([sorted(_) for _ in actual])
+    assert _compare_caselists(actual, expected)
 
 
 def test_empty_selection():
