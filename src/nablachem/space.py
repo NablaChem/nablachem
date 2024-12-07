@@ -26,14 +26,41 @@ import mpmath
 from .utils import *
 
 
-def _is_pure(label):
+def _is_pure(label: tuple[int]) -> bool:
+    """Tests whether a colored degree sequence is pure.
+
+    A pure degree sequence has no two colors ("elements") with same valency.
+
+    Parameters
+    ----------
+    label : tuple[int]
+        (degree, natoms, degree, natoms)
+
+    Returns
+    -------
+    bool
+        Whether the sequence is pure.
+    """
     valences = label[::2]
     if len(valences) == len(set(valences)):
         return True
     return False
 
 
-def _to_pure(label):
+def _to_pure(label: tuple[int]) -> tuple[int]:
+    """Finds the corresponding pure colored degree sequence from a (potentially) non-pure one.
+
+    Parameters
+    ----------
+    label : tuple[int]
+        (degree, natoms, degree, natoms)
+
+    Returns
+    -------
+    tuple[int]
+        (degree, natoms, degree, natoms)
+    """
+
     purespec = []
 
     last_d = label[0]
@@ -326,6 +353,12 @@ class Q:
 
 
 class ExactCounter:
+    """Python API for exact counts of molecular graphs via surge.
+
+    Note that this implementation avoids the built-in pruning of
+    "infeasible" molecular graphs in surge by defining non-standard element labels.
+    """
+
     def __init__(self, binary):
         self._binary = binary
         self._cache = {}
@@ -514,11 +547,30 @@ class ApproximateCounter:
             overall = max(overall, self._max_natoms_from_cache[kind])
         self._max_natoms_from_cache["all"] = overall
 
-    def _label_to_lookup(self, label):
+    def _label_to_lookup(self, label: str) -> tuple[int]:
+        """Converts a canonical label into a cache lookup key.
+
+        Parameters
+        ----------
+        label : str
+            Canonical label ("degree.natoms_degree.natoms")
+
+        Returns
+        -------
+        tuple[int]
+            The corresponding cache key.
+        """
         parts = label.replace(".", "_").split("_")
         return tuple(map(int, parts))
 
     def _parse_base_file(self, file):
+        """Parse a data file containing estimated graph counts for pure and non-pure colored degree sequences.
+
+        Parameters
+        ----------
+        file : str
+            Filename
+        """
         with gzip.open(file, "rt") as fh:
             for line in fh:
                 canonical_label, length = line.split()
@@ -531,7 +583,14 @@ class ApproximateCounter:
                         canonical_label
                     ]
 
-    def _parse_pure_file(self, file):
+    def _parse_pure_file(self, file: str):
+        """Parse a data file containing estimated graph counts for pure colored degree sequences.
+
+        Parameters
+        ----------
+        file : str
+            Filename
+        """
         with open(file) as fh:
             for lidx, line in enumerate(fh):
                 try:
@@ -543,7 +602,14 @@ class ApproximateCounter:
                 except:
                     raise ValueError(f"Cannot parse {file}, line {lidx}.")
 
-    def _parse_exact_file(self, file):
+    def _parse_exact_file(self, file: str):
+        """Parse a data file containing exact graph counts for colored degree sequences.
+
+        Parameters
+        ----------
+        file : str
+            Filename
+        """
         with open(file) as fh:
             for line in fh:
                 canonical_label, count = line.split()
@@ -551,14 +617,45 @@ class ApproximateCounter:
                 self._exact_cache[canonical_label] = int(count)
 
     def _size_to_average_path_length(self, size: int) -> float:
+        """Converts a total number of molecules to an expected average path length.
+
+        Parameters
+        ----------
+        size : int
+            Total count of molecules
+
+        Returns
+        -------
+        float
+            The corresponding average path length.
+        """
         if size < 1:
             return 0
         return (np.log(float(size)) - self._b) / self._a
 
     def _average_path_length_to_size(self, length: float) -> int:
+        """Converts the average path length from the database to a molecule count.
+
+        Parameters
+        ----------
+        length : float
+            The average path length.
+
+        Returns
+        -------
+        int
+            Total number of molecules.
+        """
         return max(int(np.exp(self._a * float(length) + self._b)), 0)
 
     def _fill_cache(self, natoms: int):
+        """Populates the cache by parsing the file for the given number of atoms.
+
+        Parameters
+        ----------
+        natoms : int
+            Number of atoms for which to read the cache
+        """
         functions = {
             "exact": self._parse_exact_file,
             "pure": self._parse_pure_file,
@@ -574,22 +671,23 @@ class ApproximateCounter:
         if natoms not in self._seen_sequences:
             self._seen_sequences[natoms] = {}
 
-    def get_cache(self, natoms: int):
-        self._fill_cache(natoms)
-
-        def key_to_natoms(key):
-            return sum(key[1::2])
-
-        ret = {}
-        for label, cache in (
-            ("exact", self._exact_cache),
-            ("base", self._base_cache),
-            ("pure", self._pure_cache),
-        ):
-            ret[label] = {k: v for k, v in cache.items() if key_to_natoms(k) == natoms}
-        return ret
-
     def count(self, search_space: SearchSpace, natoms: int, selection: Q = None) -> int:
+        """Counts the total number of molecules in a search space.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            The number of atoms to restrict to.
+        selection : Q, optional
+            A subselection based on a query string, by default None
+
+        Returns
+        -------
+        int
+            Total count of molecules in this search space.
+        """
         self._fill_cache(natoms)
         total = 0
 
@@ -613,6 +711,20 @@ class ApproximateCounter:
         return total
 
     def count_cases(self, search_space: SearchSpace, natoms: int) -> int:
+        """Counts the total number of stoichiometries in a search space.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            The number of atoms for which to count.
+
+        Returns
+        -------
+        int
+            Total number of stoichiometries.
+        """
         self._fill_cache(natoms)
         total = 0
         for case in search_space.list_cases_bare(natoms):
@@ -639,6 +751,7 @@ class ApproximateCounter:
     @staticmethod
     @functools.cache
     def _prefactor(M: int) -> int:
+        """Cached term from the paper in _count_one_asymptotically_log."""
         return ApproximateCounter.factorial(M) / (
             ApproximateCounter.factorial(M // 2) * 2 ** (M // 2)
         )
@@ -647,8 +760,26 @@ class ApproximateCounter:
     def _count_one_asymptotically_log(
         self, degrees: tuple[int], calibrated: bool = True
     ):
-        """Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
-        C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1."""
+        """Estimate the total number of molecules of a given degree sequence from the asymptotic limit.
+
+        Follows "Asymptotic Enumeration of Sparse Multigraphs with Given Degrees"
+        C Greenhill, B McKay, SIAM J Discrete Math. 10.1137/130913419, Theorem 1.1.
+
+        The calibration has been added by nablachem to determine the prefactors of the asymptotic
+        formulas.
+
+        Parameters
+        ----------
+        degrees : tuple[int]
+            Degree sequence
+        calibrated : bool, optional
+            Whether to apply the calibration, by default True
+
+        Returns
+        -------
+        float
+            Log of the number estimate.
+        """
 
         def _M(ks: list[int], r: int) -> int:
             result = 0
@@ -687,12 +818,44 @@ class ApproximateCounter:
 
         return np.log(float(paper_prefactor)) + paper_exponential + calibration
 
-    def count_one(self, stoichiometry: AtomStoichiometry, natoms: int):
+    def count_one(self, stoichiometry: AtomStoichiometry, natoms: int) -> int:
+        """Counts the total number of molecules in a given stoichiometry.
+
+        The redundant specification of the number of atoms is a performance tweak.
+
+        Parameters
+        ----------
+        stoichiometry : AtomStoichiometry
+            The stoichiometry to count.
+        natoms : int
+            Number of atoms in that stoichiometry.
+
+        Returns
+        -------
+        int
+            Total count of molecules.
+        """
         self._fill_cache(natoms)
         return self.count_one_bare(stoichiometry.canonical_tuple, natoms)
 
     @functools.cache
-    def _cached_permutation_factor_log(self, groups: tuple[int]) -> int:
+    def _cached_permutation_factor_log(self, groups: tuple[int]) -> float:
+        """Calculates the natural logarithm of of permutations in groups.
+
+        In estimating the size of non-pure degree sequences (e.g. CF2H2) from their pure counterpart
+        (here, CH4), the total count of permutations is required where the non-pure groups of same
+        valency are assigned to the total number of atoms of this valency.
+
+        Parameters
+        ----------
+        groups : tuple[int]
+            Counts of atoms of same valency.
+
+        Returns
+        -------
+        float
+            Log of the number of permutations.
+        """
         score = 1
         remaining = sum(groups)
         for count in groups:
@@ -769,6 +932,24 @@ class ApproximateCounter:
     def count_one_bare(
         self, label: tuple[int], natoms: int, cached_degree_sequence: bool = False
     ) -> int:
+        """Counts the number of molecules of a given colored degree sequence.
+
+        The last two arguments are performance tweaks and not strictly necessary.
+
+        Parameters
+        ----------
+        label : tuple[int]
+            Degree sequence in groups ((degree, natoms), (degree, natoms))
+        natoms : int
+            The total number of atoms.
+        cached_degree_sequence : bool, optional
+            Whether this case has the same pure degree sequence of the previous call, by default False
+
+        Returns
+        -------
+        int
+            Total count.
+        """
         # done recently?
         try:
             return self._seen_sequences[natoms][label]
@@ -833,7 +1014,19 @@ class ApproximateCounter:
         return found
 
     @staticmethod
-    def sample_connected(spec):
+    def sample_connected(spec: str) -> nx.MultiGraph:
+        """Find a random connected multigraph of a given degree sequence.
+
+        Parameters
+        ----------
+        spec : str
+            Canonical label from which the degree sequence is extracted.
+
+        Returns
+        -------
+        nx.MultiGraph
+            The resulting graph
+        """
         degrees, elements = ApproximateCounter.spec_to_sequence(spec)
         while True:
             edges = random_graph.sample_multi_hypergraph(
@@ -847,7 +1040,19 @@ class ApproximateCounter:
                 return G
 
     @staticmethod
-    def spec_to_sequence(spec):
+    def spec_to_sequence(spec: str) -> tuple[list[int], list[str]]:
+        """Converts a canonical label to a degree sequence and pseudoelement labels.
+
+        Parameters
+        ----------
+        spec : str
+            Canonical label of the pseudomolecule ("degree.natoms_degree.natoms").
+
+        Returns
+        -------
+        tuple[list[int], list[str]]
+            Degree sequence and artificial element labels.
+        """
         degrees = []
         elements = []
         letter = "a"
@@ -860,6 +1065,35 @@ class ApproximateCounter:
 
     @staticmethod
     def estimate_edit_tree_average_path_length(canonical_label: str, ngraphs: int):
+        """Estimates the average path length via graph edit distance heuristics.
+
+        This is done by choosing `ngraphs` random molecules and calculating their pairwise graph distance
+        by finding the minimal edit distance between them. The final answer is then averaged over all unique
+        pairs in this list. Therefore runtime scales quadratically with `ngraphs`.
+
+        The shorted edit distance is defined as the Wasserstein metric between adjacency matrices of
+        two molecules.
+
+        The function also returns a statistic of the success of the different strategies to propose the
+        minimal edit distance. For a description of those strategies, see the docstrings of the local functions.
+
+        canonical_label,
+            ngraphs,
+            total_path_length / (ngraphs * (ngraphs - 1) / 2),
+            dict(strategy_score),
+
+        Parameters
+        ----------
+        canonical_label : str
+            The case for which to run the computation. Format is "degree.natoms_degree.natoms_degree.natoms".
+        ngraphs : int
+            Number of graphs to use for averaging. Suggested to be 30-50.
+
+        Returns
+        -------
+        tuple[str, int, float, dict[str, int]]
+            The canonical label, the number of graphs, the average path length, the success counts of the individual strategies.
+        """
 
         def _common_input_validation(A, B, partial_match):
             # copied from scipy, since this routine is not exposed but required for custom QAP
@@ -1013,7 +1247,25 @@ class ApproximateCounter:
             res = {"col_ind": perm, "fun": best_score, "nit": n_iter}
             return OptimizeResult(res)
 
-        def _score_permutation(i, j, permutation):
+        def _score_permutation(i: int, j: int, permutation: list[int]) -> float:
+            """Calculates the minimum edit distance as the Wasserstein metric between
+            adjacency matrices of two molecules after a permutation has been applied to
+            molecule j.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+            permutation : list[int]
+                Reordering of atoms.
+
+            Returns
+            -------
+            float
+                Distance.
+            """
             adj = nx.adjacency_matrix(Gs[j], nodelist=permutation)
             return abs(adjacencies[i] - adj).sum()
 
@@ -1021,6 +1273,22 @@ class ApproximateCounter:
             i,
             j,
         ):
+            """Tries to improve the edit distance between two molecules by considering it a
+            quadratic assignment problem within each block of element identities sequentially
+            in multiple iterations.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+
+            Returns
+            -------
+            float
+                The minimal distance.
+            """
             A = adjacencies[i].todense()
             B = adjacencies[j].todense()
 
@@ -1044,6 +1312,21 @@ class ApproximateCounter:
             return min(distances)
 
         def pair_path_length_QAP_blocked(i, j):
+            """Tries to improve the edit distance between two molecules by considering it a
+            quadratic assignment problem within each block of element identities individually.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+
+            Returns
+            -------
+            float
+                The minimal distance.
+            """
             A = adjacencies[i].todense()
             B = adjacencies[j].todense()
 
@@ -1068,6 +1351,21 @@ class ApproximateCounter:
             return _score_permutation(i, j, permutation)
 
         def pair_path_length_QAP_constrained(i, j):
+            """Tries to improve the edit distance between two molecules by considering it a
+            quadratic assignment problem in global blocks of element identities.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+
+            Returns
+            -------
+            float
+                The minimal distance.
+            """
             A = adjacencies[i].todense()
             B = adjacencies[j].todense()
             groups = []
@@ -1082,6 +1380,20 @@ class ApproximateCounter:
             return min(distances)
 
         def pair_path_length_random_shuffle(i, j):
+            """Tries to improve the edit distance between two molecules by random shuffles of atoms of same elements.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+
+            Returns
+            -------
+            float
+                The minimal distance.
+            """
             distances = []
             for _ in range(100):
                 permutation = []
@@ -1094,6 +1406,20 @@ class ApproximateCounter:
             return min(distances)
 
         def pair_length_random_refinement(i, j):
+            """Tries to improve the edit distance between two molecules by random exchanges of atoms of same elements.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index.
+            j : int
+                Molecule index.
+
+            Returns
+            -------
+            float
+                The minimal distance.
+            """
             distance = None
             groups = [nbe[element].copy() for element in element_order]
             group_weights = np.array([len(_) for _ in groups]) - 1
@@ -1126,6 +1452,21 @@ class ApproximateCounter:
             return distance
 
         def pair_length_all_permutions(i, j):
+            """Finds the shortest distance for an exhaustive permutation of atom assignments
+            which keep the atom identity unchanged.
+
+            Parameters
+            ----------
+            i : int
+                Molecule index
+            j : int
+                Molecule index
+
+            Returns
+            -------
+            float
+                Minimum distance (Wasserstein metric)
+            """
             distances = []
             for permutation in it.product(*permutations[j]):
                 mapping = sum([list(_) for _ in permutation], [])
@@ -1133,12 +1474,14 @@ class ApproximateCounter:
             return min(distances)
 
         def number_of_permutations():
+            """Calculates the total number of permutations of atoms without changing atom identity."""
             n = 1
             for element in nbe.values():
                 n *= math.factorial(len(element))
             return n
 
         def nodes_by_element(G):
+            """Groups atoms by their element label."""
             elements = {}
             for node, element in nx.get_node_attributes(G, "element").items():
                 if element not in elements:
@@ -1147,6 +1490,8 @@ class ApproximateCounter:
             return elements
 
         def node_order(G):
+            """Create a static order where the graph node indices are sorted by element.
+            The order within each element is undefined."""
             elements = nodes_by_element(G)
             node_order = []
             for element in element_order:
@@ -1155,6 +1500,7 @@ class ApproximateCounter:
             return node_order
 
         def all_permutations(G):
+            """Builds an explicit list of all permutations of all atoms within each element."""
             elements = nodes_by_element(G)
             permutations = []
             for element in element_order:
@@ -1209,8 +1555,22 @@ class ApproximateCounter:
 
     @staticmethod
     def _weighted_choose(items: list, weights: list[int]):
+        """Weighted random selection with support for arbitrarily large integer weights.
+
+        Parameters
+        ----------
+        items : list
+            Items to choose from.
+        weights : list[int]
+            Integer weights for each item.
+
+        Returns
+        -------
+        any
+            One item.
+        """
         total = sum(weights)
-        choice = random.uniform(0, total)
+        choice = random.randint(0, total)
         for item, weight in zip(items, weights):
             choice -= weight
             if choice <= 0:
@@ -1219,6 +1579,22 @@ class ApproximateCounter:
     def _sum_formula_database(
         self, search_space: SearchSpace, natoms: int, selection: Q = None
     ):
+        """Builds a size database of the sizes of all sum formulas in randomized order.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            The number of atoms to cover.
+        selection : Q, optional
+            A selection via query string, by default None
+
+        Returns
+        -------
+        tuple[list[str], list[int], dict[str, list[utils.AtomStoichiometry]]]
+            Sum formulas in random order, their molecule count and all stoichiometries for all sum formulas.
+        """
         sum_formula_size = {}
         stoichiometries = {}
         for stoichiometry in search_space.list_cases(natoms):
@@ -1246,12 +1622,33 @@ class ApproximateCounter:
         nmols: int,
         selection: Q = None,
     ) -> list[Molecule]:
-        print("hi")
+        """Builds a fixed size random sample from a search space for a given number of atoms.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The total search space.
+        natoms : int
+            The total number of atoms of the chosen molecules.
+        nmols : int
+            Number of random molecules to be drawn.
+        selection : Q, optional
+            Selecting subsets via query string, by default None
+
+        Returns
+        -------
+        list[Molecule]
+            Random molecules.
+
+        Raises
+        ------
+        ValueError
+            If selection is empty.
+        """
         random_order, sizes, stoichiometries = self._sum_formula_database(
             search_space, natoms, selection
         )
-        print("RS", len(sizes))
-        if len(random_order) == 0:
+        if len(random_order) == 0 or sum(sizes) == 0:
             raise ValueError("Search space and selection yield no feasible molecule.")
 
         # sample molecules
@@ -1263,6 +1660,10 @@ class ApproximateCounter:
             stoichiometry = ApproximateCounter._weighted_choose(ss, ws)
             spec = stoichiometry.canonical_label
 
+            # try a few times to find a concrete graph
+            # needs to stop eventually, since there might be stoichiometries
+            # for which the estimate is non-zero but which are actually
+            # infeasible
             tries_selection = 0
             while True and tries_selection < 1e4:
                 graph = ApproximateCounter.sample_connected(spec)
@@ -1337,7 +1738,24 @@ class ApproximateCounter:
         pure_only: bool,
         selection: Q = None,
     ):
-        """Returns the colored degree sequences for which no parameters have been precomputed yet."""
+        """Returns the colored degree sequences for which no parameters are available in the database.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            Number of atoms to check for.
+        pure_only : bool
+            Whether only pure degree sequences should be precomputed for this space.
+        selection : Q, optional
+            Subselection by query string, by default None
+
+        Returns
+        -------
+        list[tuple[int]]
+            The colored degree sequences for which there are no parameters.
+        """
         # no parameters needed for asymptotics
         if natoms > self._minimum_natoms_for_asymptotics:
             return []
