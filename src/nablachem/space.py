@@ -95,6 +95,7 @@ class SearchSpace:
         natoms: int,
         degree_sequences_only: bool = False,
         pure_sequences_only: bool = False,
+        progress: bool = True,
     ) -> Iterator[tuple[str, int, int]] | Iterator[tuple[int, int]]:
         """Lists all possible stoichiometries for a given number of atoms.
 
@@ -112,6 +113,8 @@ class SearchSpace:
             Flag to switch to degree sequence enumeration, by default False
         pure_sequences_only : bool, optional
             Skips sequences where atoms of one valence belong to more than one element label. Implies degree_sequences_only.
+        progress : bool, optional
+            Whether to show a progress bar, by default True
 
         Yields
         ------
@@ -150,9 +153,11 @@ class SearchSpace:
 
         outer_partitions = list(integer_partition(natoms, len(valences)))
 
-        for outer_partition in tqdm.tqdm(
-            outer_partitions, desc="Partition over valences"
-        ):
+        if progress:
+            washlist = tqdm.tqdm(outer_partitions, desc="Partition over valences")
+        else:
+            washlist = outer_partitions
+        for outer_partition in washlist:
             total = 0
             count = 0
             maxvalence = 0
@@ -188,8 +193,10 @@ class SearchSpace:
             for case in it.product(*groups):
                 yield sum(case, [])
 
-    def list_cases(self, natoms: int) -> Iterator[AtomStoichiometry]:
-        for case in self.list_cases_bare(natoms):
+    def list_cases(
+        self, natoms: int, progress: bool = True
+    ) -> Iterator[AtomStoichiometry]:
+        for case in self.list_cases_bare(natoms, progress=progress):
             if case is None or case == []:
                 continue
             stoichiometry = AtomStoichiometry()
@@ -495,7 +502,8 @@ class ExactCounter:
 
 
 class ApproximateCounter:
-    def __init__(self, other_cachedirs: list[pathlib.Path] = None):
+    def __init__(self, other_cachedirs: list[pathlib.Path] = None, show_progress=True):
+        self._progress = show_progress
         self._seen_sequences = {}
         self._exact_cache = {}
         self._base_cache = {}
@@ -692,13 +700,15 @@ class ApproximateCounter:
         total = 0
 
         if selection:
-            for stoichiometry in search_space.list_cases(natoms):
+            for stoichiometry in search_space.list_cases(
+                natoms, progress=self._progress
+            ):
                 if not selection.selected_stoichiometry(stoichiometry):
                     continue
                 total += self.count_one(stoichiometry, natoms)
         else:
             cached_degree_sequence = False
-            for case in search_space.list_cases_bare(natoms):
+            for case in search_space.list_cases_bare(natoms, progress=self._progress):
                 if case is None:
                     cached_degree_sequence = False
                     continue
@@ -712,6 +722,10 @@ class ApproximateCounter:
 
     def count_cases(self, search_space: SearchSpace, natoms: int) -> int:
         """Counts the total number of stoichiometries in a search space.
+
+        Note that different stoichiometries could yield the same sum formula.
+
+        Note that this only returns cases where all valences are saturated.
 
         Parameters
         ----------
@@ -727,10 +741,33 @@ class ApproximateCounter:
         """
         self._fill_cache(natoms)
         total = 0
-        for case in search_space.list_cases_bare(natoms):
+        for case in search_space.list_cases_bare(natoms, progress=self._progress):
             if case is not None:
                 total += 1
         return total
+
+    def count_sum_formulas(self, search_space: SearchSpace, natoms: int) -> int:
+        """Counts the total number of sum formulas in a search space.
+
+        Note that this only returns cases where all valences are saturated.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            The number of atoms for which to count.
+
+        Returns
+        -------
+        int
+            Total number of sum formulas.
+        """
+        self._fill_cache(natoms)
+        sum_formulas = []
+        for stoichiometry in search_space.list_cases(natoms, progress=self._progress):
+            sum_formulas.append(stoichiometry.sum_formula)
+        return len(set(sum_formulas))
 
     @staticmethod
     @functools.cache
@@ -1597,7 +1634,7 @@ class ApproximateCounter:
         """
         sum_formula_size = {}
         stoichiometries = {}
-        for stoichiometry in search_space.list_cases(natoms):
+        for stoichiometry in search_space.list_cases(natoms, progress=self._progress):
             if selection is not None and not selection.selected_stoichiometry(
                 stoichiometry
             ):
@@ -1764,7 +1801,7 @@ class ApproximateCounter:
         missing = []
 
         if selection is not None:
-            for case in search_space.list_cases_bare(natoms):
+            for case in search_space.list_cases_bare(natoms, progress=self._progress):
                 if case is None:
                     continue
 
@@ -1799,7 +1836,10 @@ class ApproximateCounter:
                 missing.append(label)
         else:
             for case in search_space.list_cases_bare(
-                natoms, degree_sequences_only=True, pure_sequences_only=pure_only
+                natoms,
+                degree_sequences_only=True,
+                pure_sequences_only=pure_only,
+                progress=self._progress,
             ):
                 if case is None:
                     continue
