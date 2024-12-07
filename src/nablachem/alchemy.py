@@ -92,10 +92,6 @@ class MultiTaylor:
     'SIGMA': 0.0018744333333333316}
     """
 
-    @classmethod
-    def suggested_stencil(variables: list[str], order: int, cost: int):
-
-
     def __init__(self, dataframe: pd.DataFrame, outputs: list[str]):
         """Initialize the Taylor expansion from a dataframe of data points forming the superset of stencils.
 
@@ -315,7 +311,7 @@ class MultiTaylor:
         data_columns = [_ for _ in self._filtered.columns if _ not in self._outputs]
         data_columns = [_ for _ in data_columns if not _ in self._filter.keys()]
         return data_columns
-    
+
     def _all_terms_up_to(self, order: int) -> tuple[tuple[str]]:
         """For all remaining input columns, find all possible terms entering a Taylor expansion.
 
@@ -330,7 +326,7 @@ class MultiTaylor:
             Series of terms up to the given order, as a tuple of variable names.
         """
         terms = []
-        
+
         for order in range(1, order + 1):
             for entry in it.combinations_with_replacement(self._data_columns, order):
                 terms.append(entry)
@@ -383,7 +379,9 @@ class MultiTaylor:
         # check for valid names
         for term in additional_terms:
             if len(set(term) - set(self._data_columns)) > 0:
-                raise ValueError(f"Invalid column name in {term}, needs to be in {self._data_columns}.")
+                raise ValueError(
+                    f"Invalid column name in {term}, needs to be in {self._data_columns}."
+                )
 
         terms = tuple(list(self._all_terms_up_to(orders)) + list(additional_terms))
         if len(terms) > len(shifted[0]):
