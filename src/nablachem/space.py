@@ -121,12 +121,10 @@ class SearchSpace:
                 group.append(case)
             return group
 
-        npartitions = 0
-        for outer_partition in integer_partition(natoms, len(valences)):
-            npartitions += 1
+        outer_partitions = list(integer_partition(natoms, len(valences)))
 
         for outer_partition in tqdm.tqdm(
-            integer_partition(natoms, len(valences)), total=npartitions
+            outer_partitions, desc="Partition over valences"
         ):
             total = 0
             count = 0
@@ -465,6 +463,7 @@ class ExactCounter:
 
 class ApproximateCounter:
     def __init__(self, other_cachedirs: list[pathlib.Path] = None):
+        self._seen_sequences = {}
         self._exact_cache = {}
         self._base_cache = {}
         self._pure_cache = {}
@@ -571,6 +570,9 @@ class ApproximateCounter:
                 for filename in self._cachefiles[kind][natoms]:
                     functions[kind](filename)
                 del self._cachefiles[kind][natoms]
+
+        if natoms not in self._seen_sequences:
+            self._seen_sequences[natoms] = {}
 
     def get_cache(self, natoms: int):
         self._fill_cache(natoms)
@@ -767,27 +769,43 @@ class ApproximateCounter:
     def count_one_bare(
         self, label: tuple[int], natoms: int, cached_degree_sequence: bool = False
     ) -> int:
+        # done recently?
+        try:
+            return self._seen_sequences[natoms][label]
+        except:
+            pass
+
+        found = None
         if natoms < self._max_natoms_from_cache["all"]:
             # exact data
             if natoms <= self._max_natoms_from_cache["exact"]:
                 try:
-                    return self._exact_cache[label]
+                    found = self._exact_cache[label]
                 except:
                     pass
+                if found is not None:
+                    self._seen_sequences[natoms][label] = found
+                    return found
 
             # average path length available
             if natoms <= self._max_natoms_from_cache["base"]:
                 try:
-                    return self._base_cache[label]
+                    found = self._base_cache[label]
                 except:
                     pass
+                if found is not None:
+                    self._seen_sequences[natoms][label] = found
+                    return found
 
             # reduction on pure
             if natoms <= self._max_natoms_from_cache["pure"]:
                 try:
-                    return self._pure_prediction(label)
+                    found = self._pure_prediction(label)
                 except KeyError:
                     pass
+                if found is not None:
+                    self._seen_sequences[natoms][label] = found
+                    return found
 
         # only use asymptotic scaling relations if the number of atoms is large enough
         if cached_degree_sequence:
@@ -807,9 +825,12 @@ class ApproximateCounter:
             self._cached_log_asymptotic_size = log_asymptotic_size
 
         if _is_pure(label):
-            return int(mpmath.exp(log_asymptotic_size))
+            found = int(mpmath.exp(log_asymptotic_size))
         else:
-            return self._pure_prediction(label, log_size=log_asymptotic_size)
+            found = self._pure_prediction(label, log_size=log_asymptotic_size)
+
+        self._seen_sequences[natoms][label] = found
+        return found
 
     @staticmethod
     def sample_connected(spec):
