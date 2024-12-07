@@ -12,7 +12,7 @@ c = ncs.ApproximateCounter()
 condition = "((((C<=9) & (O <=9)) & (N <=9)) & (S<=9)) & ((H<=28) & (Cl<=9))"
 
 missing = []
-natoms = range(18, 25):
+natoms = range(18, 25)
 pure_only = True
 for i in natoms:
     missing += c.missing_parameters(s, i, pure_only, ncs.Q(condition))
