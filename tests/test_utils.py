@@ -8,4 +8,3 @@ def test_atomtype_label_simple():
 
     with pytest.raises(ValueError):
         ncu.AtomType(label="with<special>characters", valence=1)
-    # pydantic

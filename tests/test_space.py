@@ -423,6 +423,7 @@ def test_selection_invalid_queries():
         "C < ()",
         "C < (not C)",
         "C < (N < 3)",
+        "C+N < 3 & 4",
     ]
     for invalid in invalids:
         with pytest.raises(pyparsing.exceptions.ParseException):
@@ -431,6 +432,26 @@ def test_selection_invalid_queries():
 
 def test_selection_addition():
     selection = ncs.Q("C+N < 3")
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=3): 1,
+            }
+        )
+    )
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 2,
+                ncs.AtomType(label="N", valence=3): 1,
+            }
+        )
+    )
+
+
+def test_selection_addition_multiple():
+    selection = ncs.Q("C+N+O < 3")
     assert selection.selected_stoichiometry(
         ncs.AtomStoichiometry(
             components={

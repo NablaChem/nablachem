@@ -313,7 +313,6 @@ class Q:
             "&": operator.and_,
             "|": operator.or_,
             "not": operator.not_,
-            "no": operator.not_,
             "!": operator.not_,
             "+": operator.add,
             "-": operator.sub,
@@ -324,6 +323,9 @@ class Q:
                 return True
 
             if parsed in (True, False):
+                return parsed
+
+            if isinstance(parsed, int):
                 return parsed
 
             if isinstance(parsed, str):
@@ -348,7 +350,10 @@ class Q:
                 try:
                     opidx = ops.index(anyof[0])
                 except:
-                    opidx = ops.index(anyof[1])
+                    try:
+                        opidx = ops.index(anyof[1])
+                    except:
+                        opidx = 0
                 opidx = opidx * 2 + 1
                 center = evaluate(parsed[opidx - 1 : opidx + 2])
                 left = parsed[: opidx - 1]
