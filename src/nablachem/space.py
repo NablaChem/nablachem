@@ -332,7 +332,7 @@ class Q:
                 try:
                     return int(parsed)
                 except:
-                    return element_counts[parsed] > 0
+                    return element_counts[parsed]
 
             if len(parsed) == 1:
                 return evaluate(parsed[0])
@@ -1720,7 +1720,7 @@ class ApproximateCounter:
         while len(molecules) < nmols:
             sum_formula = ApproximateCounter._weighted_choose(random_order, sizes)
             ss = stoichiometries[sum_formula]
-            ws = [self.count_one(_) for _ in ss]
+            ws = [self.count_one(_, natoms) for _ in ss]
             stoichiometry = ApproximateCounter._weighted_choose(ss, ws)
             spec = stoichiometry.canonical_label
 

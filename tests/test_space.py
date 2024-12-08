@@ -450,6 +450,21 @@ def test_selection_addition():
     )
 
 
+def test_selection_addition_limit():
+    # H7F6N23O4
+    selection = ncs.Q("C+O+N+F <= 9")
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="H", valence=1): 7,
+                ncs.AtomType(label="F", valence=1): 6,
+                ncs.AtomType(label="N", valence=3): 23,
+                ncs.AtomType(label="O", valence=2): 4,
+            }
+        )
+    )
+
+
 def test_selection_addition_multiple():
     selection = ncs.Q("C+N+O < 3")
     assert selection.selected_stoichiometry(
