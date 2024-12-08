@@ -20,6 +20,10 @@ class AtomType:
     label: str
     valence: int
 
+    def __post_init__(self):
+        if not self.label.isalpha():
+            raise ValueError("AtomType label must be alphabetic")
+
 
 @dataclasses.dataclass
 class Element:
@@ -49,7 +53,7 @@ class AtomStoichiometry:
     @property
     def canonical_tuple(self):
         return tuple(sum([[e[0].valence, e[1]] for e in self._canonical_sorting], []))
-    
+
     @property
     def canonical_element_sequence(self):
         return tuple(sum([[e[0].label] * e[1] for e in self._canonical_sorting], []))
