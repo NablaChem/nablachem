@@ -1,3 +1,4 @@
+import pyparsing
 import pytest
 import nablachem.space as ncs
 
@@ -374,6 +375,102 @@ def test_selection_eq_multiple():
     )
 
 
+def test_selection_word_elements():
+    selection = ncs.Q("Carbon < 2")
+
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="Carbon", valence=4): 1,
+            }
+        )
+    )
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="Carbon", valence=4): 2,
+            }
+        )
+    )
+
+
+def test_selection_multiletter_elements():
+    selection = ncs.Q("Cl < 2")
+
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="Cl", valence=1): 1,
+            }
+        )
+    )
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="Cl", valence=1): 2,
+            }
+        )
+    )
+
+
+def test_selection_invalid_queries():
+    invalids = [
+        "C",
+        "not C",
+        "C# < 2",
+        "C | N",
+        "2 | 3",
+        "C < ()",
+        "C < (not C)",
+        "C < (N < 3)",
+    ]
+    for invalid in invalids:
+        with pytest.raises(pyparsing.exceptions.ParseException):
+            ncs.Q(invalid)
+
+
+def test_selection_addition():
+    selection = ncs.Q("C+N < 3")
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=3): 1,
+            }
+        )
+    )
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 2,
+                ncs.AtomType(label="N", valence=3): 1,
+            }
+        )
+    )
+
+
+def test_selection_two_additions():
+    selection = ncs.Q("C+N < N+F")
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=3): 0,
+                ncs.AtomType(label="F", valence=1): 2,
+            }
+        )
+    )
+    assert not selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(
+            components={
+                ncs.AtomType(label="C", valence=4): 1,
+                ncs.AtomType(label="N", valence=3): 0,
+                ncs.AtomType(label="F", valence=1): 1,
+            }
+        )
+    )
+
+
 def test_selection_multiple_andor_precedence():
     for case in ("C = 1 & N = 1 | F = 0", "F = 0 | C = 1 & N = 1"):
         selection = ncs.Q(case)
@@ -393,6 +490,19 @@ def test_selection_multiple_andor_precedence():
                 }
             )
         )
+
+
+def test_counter_value():
+    c = ncs.ApproximateCounter()
+    s = ncs.SearchSpace.covered_search_space("B")
+    q = ncs.Q("C < 4 & H > 2")
+
+    assert c.count(s, 10) == 3754609422
+    assert c.count(s, 10, q) == 7333401
+
+    s = ncs.SearchSpace.covered_search_space("A")
+    assert c.count(s, 10) == 11608588574694
+    assert c.count(s, 10, q) == 1486411142
 
 
 def test_selection_eq_multiple_mixed_operators():
@@ -449,7 +559,7 @@ def test_selection_or():
 
 
 def test_selection_not():
-    for op in ("not", "no", "!"):
+    for op in ("not", "!"):
         selection = ncs.Q(f"{op}(C > 3)")
         for natoms, result in ((2, True), (3, True), (4, False)):
             assert (
@@ -463,7 +573,7 @@ def test_selection_not():
 
 
 def test_selection_exclude_element():
-    selection = ncs.Q("no He")
+    selection = ncs.Q("He =0")
     for natoms, result in ((0, True), (1, False)):
         assert (
             selection.selected_stoichiometry(
@@ -563,3 +673,10 @@ def test_sum_formula_database_covered(letter, natoms):
     counter = ncs.ApproximateCounter()
     switchover = {"A": 15, "B": 22}
     assert counter.missing_parameters(s, natoms, natoms > switchover[letter]) == []
+
+
+def test_sum_formula_countable():
+    s = ncs.SearchSpace.covered_search_space("B")
+    c = ncs.ApproximateCounter()
+    for i in range(3, 10):
+        c.count(s, i)

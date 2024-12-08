@@ -255,24 +255,37 @@ class Q:
     def _parse_query(query_string: str):
         if query_string.strip() == "":
             return []
-        identifier = pyparsing.Combine(
-            pyparsing.Word(pyparsing.alphas + "#", pyparsing.alphanums)
-        )
+
+        alpha_identifier = pyparsing.Word(pyparsing.alphas)
+        hash_identifier = pyparsing.Literal("#")
+        identifier = alpha_identifier | hash_identifier
+
         number = pyparsing.Word(pyparsing.nums)
         operand = identifier | number
 
         comparison_op = pyparsing.oneOf("< > = <= >= !=")
-        and_ = pyparsing.oneOf("and &", caseless=True)
-        or_ = pyparsing.oneOf("or |", caseless=True)
-        not_ = pyparsing.oneOf("not no !", caseless=True)
+        and_op = pyparsing.oneOf("and &", caseless=True)
+        or_op = pyparsing.oneOf("or |", caseless=True)
+        not_op = pyparsing.oneOf("not !", caseless=True)
+        add_op = pyparsing.oneOf("+ -")
 
-        parser = pyparsing.infixNotation(
+        arithmetic_expr = pyparsing.infixNotation(
             operand,
             [
-                (not_, 1, pyparsing.opAssoc.RIGHT),
-                (comparison_op, 2, pyparsing.opAssoc.LEFT),
-                (and_, 2, pyparsing.opAssoc.LEFT),
-                (or_, 2, pyparsing.opAssoc.LEFT),
+                (add_op, 2, pyparsing.opAssoc.LEFT),
+            ],
+        )
+
+        comparison_expr = pyparsing.Group(
+            arithmetic_expr + comparison_op + arithmetic_expr
+        )
+        not_expr = pyparsing.Group(not_op + comparison_expr)
+        parser = pyparsing.infixNotation(
+            comparison_expr | not_expr,
+            [
+                (not_op, 1, pyparsing.opAssoc.RIGHT),
+                (and_op, 2, pyparsing.opAssoc.LEFT),
+                (or_op, 2, pyparsing.opAssoc.LEFT),
             ],
         )
         return parser.parseString(query_string, parseAll=True).as_list()
@@ -302,6 +315,8 @@ class Q:
             "not": operator.not_,
             "no": operator.not_,
             "!": operator.not_,
+            "+": operator.add,
+            "-": operator.sub,
         }
 
         def evaluate(parsed):
@@ -312,7 +327,10 @@ class Q:
                 return parsed
 
             if isinstance(parsed, str):
-                return element_counts[parsed] > 0
+                try:
+                    return int(parsed)
+                except:
+                    return element_counts[parsed] > 0
 
             if len(parsed) == 1:
                 return evaluate(parsed[0])
@@ -348,9 +366,13 @@ class Q:
                     rhs = int(rhs)
                 except ValueError:
                     rhs = element_counts[rhs]
-                return operators[op](lhs, rhs)
+                res = operators[op](lhs, rhs)
+                return res
             else:
-                return operators[op](evaluate(lhs), evaluate(rhs))
+                lhs = evaluate(lhs)
+                rhs = evaluate(rhs)
+                res = operators[op](lhs, rhs)
+                return res
 
         return evaluate(self._parsed)
 
