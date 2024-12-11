@@ -26,6 +26,16 @@ import mpmath
 from .utils import *
 
 
+def label_to_stoichiometry(label: str):
+    parts = label.replace(".", "_").split("_")
+    atomtypes = {}
+    idx = 0
+    for degree, natoms in zip(parts[0::2], parts[1::2]):
+        atomtypes[AtomType("X" + chr(ord("a") + idx), int(degree))] = int(natoms)
+        idx += 1
+    return AtomStoichiometry(atomtypes)
+
+
 def _is_pure(label: tuple[int]) -> bool:
     """Tests whether a colored degree sequence is pure.
 
@@ -393,9 +403,10 @@ class ExactCounter:
     "infeasible" molecular graphs in surge by defining non-standard element labels.
     """
 
-    def __init__(self, binary):
+    def __init__(self, binary, timeout=None):
         self._binary = binary
         self._cache = {}
+        self._timeout = timeout
 
     def _build_cli_arguments(
         self, stoichiometry: AtomStoichiometry, count_only: bool
@@ -432,7 +443,9 @@ class ExactCounter:
             stderr = subprocess.STDOUT
         else:
             stderr = subprocess.DEVNULL
-        stdout = subprocess.check_output(cmd, shell=True, stderr=stderr)
+        stdout = subprocess.check_output(
+            cmd, shell=True, stderr=stderr, timeout=self._timeout
+        )
         return stdout.decode("utf-8")
 
     def count_one(self, stoichiometry: AtomStoichiometry):
@@ -581,6 +594,12 @@ class ApproximateCounter:
             self._max_natoms_from_cache[kind] = max(self._cachefiles[kind].keys())
             overall = max(overall, self._max_natoms_from_cache[kind])
         self._max_natoms_from_cache["all"] = overall
+        self._estimated = []
+
+    def estimated_in_cache(self) -> list[str]:
+        for natoms in range(3, self._max_natoms_from_cache["all"] + 1):
+            self._fill_cache(natoms)
+        return self._estimated
 
     def _label_to_lookup(self, label: str) -> tuple[int]:
         """Converts a canonical label into a cache lookup key.
@@ -609,6 +628,7 @@ class ApproximateCounter:
         with gzip.open(file, "rt") as fh:
             for line in fh:
                 canonical_label, length = line.split()
+                self._estimated.append(canonical_label)
                 canonical_label = self._label_to_lookup(canonical_label)
                 self._base_cache[canonical_label] = self._average_path_length_to_size(
                     length
@@ -630,6 +650,7 @@ class ApproximateCounter:
             for lidx, line in enumerate(fh):
                 try:
                     canonical_label, length = line.split()
+                    self._estimated.append(canonical_label)
                     canonical_label = self._label_to_lookup(canonical_label)
                     self._pure_cache[canonical_label] = (
                         self._average_path_length_to_size(length)
