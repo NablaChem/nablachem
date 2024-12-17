@@ -298,7 +298,12 @@ class Q:
                 (or_op, 2, pyparsing.opAssoc.LEFT),
             ],
         )
-        return parser.parseString(query_string, parseAll=True).as_list()
+        try:
+            return parser.parseString(query_string, parseAll=True).as_list()
+        except:
+            raise ValueError(
+                "Cannot parse query string. Mismatched parentheses or invalid syntax?"
+            )
 
     def selected_stoichiometry(
         self, stoichiometry: AtomStoichiometry | list[str]

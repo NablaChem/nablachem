@@ -424,9 +424,10 @@ def test_selection_invalid_queries():
         "C < (not C)",
         "C < (N < 3)",
         "C+N < 3 & 4",
+        "(C < 3",
     ]
     for invalid in invalids:
-        with pytest.raises(pyparsing.exceptions.ParseException):
+        with pytest.raises(ValueError):
             ncs.Q(invalid)
 
 
@@ -463,6 +464,250 @@ def test_selection_addition_limit():
             }
         )
     )
+
+
+fuzzydb = [
+    (
+        "(C > 2) AND (H > 6) AND (N = 1)",
+        ({"C": 3, "H": 7, "N": 1}, {"C": 4, "H": 8, "N": 1}, {"C": 5, "H": 10, "N": 1}),
+        ({"C": 2, "H": 6, "N": 1}, {"C": 3, "H": 6, "N": 1}, {"C": 3, "H": 7, "N": 2}),
+    ),
+    (
+        "(O > 2) OR (S >= 1) AND (Cl = 0)",
+        ({"O": 3}, {"O": 4, "S": 0}, {"S": 1}, {"S": 1, "O": 2}),
+        ({"O": 2}, {"S": 1, "Cl": 1}, {"S": 0, "O": 0}),
+    ),
+    (
+        "(C >= 2) AND (H > 4) AND (F > 1)",
+        ({"C": 2, "H": 5, "F": 2}, {"C": 3, "H": 6, "F": 2}, {"C": 4, "H": 10, "F": 2}),
+        ({"C": 1, "H": 4, "F": 2}, {"C": 2, "H": 5, "F": 1}),
+    ),
+    (
+        "(N > 1) OR ((S = 1) AND (H < 6))",
+        ({"N": 2}, {"N": 3}, {"S": 1, "H": 5}, {"S": 1, "H": 4}),
+        ({"N": 1}, {"S": 1, "H": 6}, {"S": 2, "H": 3}),
+    ),
+    (
+        "(C = 1) AND ((F >= 1) OR (Cl >= 2))",
+        ({"C": 1, "F": 1}, {"C": 1, "Cl": 2}, {"C": 1, "F": 2}),
+        ({"C": 2, "F": 1}, {"C": 1, "Cl": 1}, {"C": 1, "F": 0}),
+    ),
+    (
+        "(H >= 4) AND (Cl = 1) AND (F > 0)",
+        ({"H": 4, "Cl": 1, "F": 1}, {"H": 5, "Cl": 1, "F": 2}),
+        ({"H": 3, "Cl": 1, "F": 1}, {"H": 4, "Cl": 0, "F": 1}),
+    ),
+    (
+        "(C > 1) AND ((O > 1) OR (N >= 1) AND (S = 1))",
+        ({"C": 2, "O": 2}, {"C": 3, "S": 1, "N": 1}, {"C": 3, "O": 3}),
+        ({"C": 1, "O": 2}, {"C": 2, "O": 1, "S": 1}),
+    ),
+    (
+        "(C = 3) AND (H = 6) AND (Cl >= 2)",
+        ({"C": 3, "H": 6, "Cl": 2}, {"C": 3, "H": 6, "Cl": 3}),
+        ({"C": 3, "H": 5, "Cl": 2}, {"C": 4, "H": 6, "Cl": 2}),
+    ),
+    (
+        "(C = 0) AND ((O > 2) OR (H > 1) AND (S >= 1))",
+        ({"O": 3}, {"H": 2, "S": 1}, {"S": 1, "O": 4}),
+        ({"C": 1, "O": 3}, {"H": 1, "S": 1}),
+    ),
+    (
+        "((H > 2) OR (Cl > 1)) AND ((C > 2) AND (O > 1))",
+        ({"H": 3, "C": 3, "O": 2}, {"C": 3, "O": 2, "Cl": 2}),
+        ({"H": 2, "C": 3, "O": 1}, {"C": 2, "O": 2}),
+    ),
+    (
+        "(C > 3) AND (H <= 6) AND (O = 1)",
+        (
+            {"C": 4, "H": 6, "O": 1},
+            {"C": 5, "H": 4, "O": 1},
+            {"C": 6, "H": 5, "O": 1},
+            {"C": 4, "H": 3, "O": 1},
+            {"C": 5, "H": 6, "O": 1},
+        ),
+        (
+            {"C": 3, "H": 6, "O": 1},
+            {"C": 4, "H": 7, "O": 1},
+            {"C": 2, "H": 6, "O": 0},
+            {"C": 4, "H": 6, "O": 0},
+            {"C": 5, "H": 7, "O": 2},
+        ),
+    ),
+    (
+        "(C = 2) AND (H = 4) AND (N > 1)",
+        (
+            {"C": 2, "H": 4, "N": 2},
+            {"C": 2, "H": 4, "N": 3},
+            {"C": 2, "H": 4, "N": 4},
+            {"C": 2, "H": 4, "N": 5},
+            {"C": 2, "H": 4, "N": 6},
+        ),
+        (
+            {"C": 2, "H": 5, "N": 2},
+            {"C": 3, "H": 4, "N": 2},
+            {"C": 1, "H": 4, "N": 1},
+            {"C": 2, "H": 4, "N": 1},
+            {"C": 2, "H": 3, "N": 2},
+        ),
+    ),
+    (
+        "(H >= 6) AND (F = 2) AND (Cl < 3)",
+        (
+            {"H": 6, "F": 2, "Cl": 2},
+            {"H": 7, "F": 2, "Cl": 1},
+            {"H": 8, "F": 2, "Cl": 0},
+            {"H": 9, "F": 2, "Cl": 1},
+            {"H": 6, "F": 2, "Cl": 0},
+        ),
+        (
+            {"H": 5, "F": 2, "Cl": 2},
+            {"H": 6, "F": 1, "Cl": 2},
+            {"H": 6, "F": 2, "Cl": 3},
+            {"H": 4, "F": 2, "Cl": 0},
+            {"H": 7, "F": 3, "Cl": 1},
+        ),
+    ),
+    (
+        "(C = 1) AND (O > 2) AND (H > 2)",
+        (
+            {"C": 1, "O": 3, "H": 3},
+            {"C": 1, "O": 4, "H": 4},
+            {"C": 1, "O": 5, "H": 5},
+            {"C": 1, "O": 6, "H": 6},
+            {"C": 1, "O": 3, "H": 4},
+        ),
+        (
+            {"C": 1, "O": 2, "H": 3},
+            {"C": 1, "O": 1, "H": 4},
+            {"C": 2, "O": 3, "H": 3},
+            {"C": 1, "O": 3, "H": 2},
+            {"C": 0, "O": 4, "H": 3},
+        ),
+    ),
+    (
+        "(N >= 2) AND (H = 6) AND (C > 1)",
+        (
+            {"N": 2, "H": 6, "C": 2},
+            {"N": 3, "H": 6, "C": 3},
+            {"N": 4, "H": 6, "C": 4},
+            {"N": 2, "H": 6, "C": 5},
+            {"N": 3, "H": 6, "C": 2},
+        ),
+        (
+            {"N": 1, "H": 6, "C": 2},
+            {"N": 2, "H": 5, "C": 2},
+            {"N": 2, "H": 6, "C": 1},
+            {"N": 0, "H": 6, "C": 3},
+            {"N": 3, "H": 7, "C": 2},
+        ),
+    ),
+    (
+        "(C > 2) AND ((H = 6) OR (F = 1))",
+        (
+            {"C": 3, "H": 6},
+            {"C": 4, "H": 6},
+            {"C": 5, "F": 1},
+            {"C": 6, "F": 1},
+            {"C": 3, "H": 6, "F": 0},
+        ),
+        (
+            {"C": 2, "H": 6},
+            {"C": 1, "F": 1},
+            {"C": 3, "H": 5},
+            {"C": 4, "H": 7},
+            {"C": 2, "H": 6, "F": 1},
+        ),
+    ),
+    (
+        "(C > 0) AND (N > 0) AND (H > 4)",
+        (
+            {"C": 1, "N": 1, "H": 5},
+            {"C": 2, "N": 2, "H": 6},
+            {"C": 3, "N": 1, "H": 7},
+            {"C": 4, "N": 3, "H": 8},
+            {"C": 1, "N": 2, "H": 5},
+        ),
+        (
+            {"C": 0, "N": 1, "H": 5},
+            {"C": 1, "N": 0, "H": 5},
+            {"C": 1, "N": 1, "H": 4},
+            {"C": 2, "N": 0, "H": 3},
+            {"C": 1, "N": 1, "H": 3},
+        ),
+    ),
+    (
+        "(O > 2) OR (S = 1) OR (Cl > 1)",
+        ({"O": 3}, {"S": 1}, {"Cl": 2}, {"O": 4, "S": 1}, {"Cl": 3, "O": 0}),
+        ({"O": 2}, {"S": 0}, {"Cl": 1}, {"O": 1, "S": 0, "Cl": 0}, {"O": 0, "Cl": 0}),
+    ),
+    (
+        "(C = 2) AND (H > 2) AND (F <= 1)",
+        (
+            {"C": 2, "H": 3, "F": 1},
+            {"C": 2, "H": 4, "F": 0},
+            {"C": 2, "H": 5, "F": 1},
+            {"C": 2, "H": 6, "F": 0},
+            {"C": 2, "H": 7, "F": 1},
+        ),
+        (
+            {"C": 2, "H": 2, "F": 1},
+            {"C": 2, "H": 3, "F": 2},
+            {"C": 1, "H": 3, "F": 1},
+            {"C": 3, "H": 4, "F": 0},
+            {"C": 2, "H": 3, "F": 2},
+        ),
+    ),
+    (
+        "(C > 3) AND (H > 5) AND (O >= 2)",
+        (
+            {"C": 4, "H": 6, "O": 2},
+            {"C": 5, "H": 8, "O": 3},
+            {"C": 6, "H": 7, "O": 4},
+            {"C": 4, "H": 6, "O": 2},
+            {"C": 5, "H": 9, "O": 3},
+        ),
+        (
+            {"C": 3, "H": 6, "O": 2},
+            {"C": 4, "H": 5, "O": 2},
+            {"C": 4, "H": 6, "O": 1},
+            {"C": 2, "H": 6, "O": 2},
+            {"C": 4, "H": 4, "O": 2},
+        ),
+    ),
+]
+
+
+def _matching_to_components(matching: str):
+    valences = {"H": 1, "C": 4, "N": 3, "O": 2, "Cl": 1, "S": 2, "F": 1}
+    components = {}
+    for label, count in matching.items():
+        components[ncs.AtomType(label=label, valence=valences[label])] = count
+    return components
+
+
+@pytest.mark.parametrize(
+    "selection,matching", [(_[0], __) for _ in fuzzydb for __ in _[1]]
+)
+def test_cases_fuzzy_matching(selection: str, matching: str):
+    selection = ncs.Q(selection)
+    components = _matching_to_components(matching)
+
+    assert selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(components=components)
+    )
+
+
+@pytest.mark.parametrize(
+    "selection,matching", [(_[0], __) for _ in fuzzydb for __ in _[2]]
+)
+def test_cases_fuzzy_nonmatching(selection: str, matching: str):
+    selection = ncs.Q(selection)
+    components = _matching_to_components(matching)
+    result = selection.selected_stoichiometry(
+        ncs.AtomStoichiometry(components=components)
+    )
+    assert not result
 
 
 def test_selection_addition_multiple():
