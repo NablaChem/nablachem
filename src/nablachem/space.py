@@ -601,10 +601,38 @@ class ApproximateCounter:
         self._max_natoms_from_cache["all"] = overall
         self._estimated = []
 
-    def estimated_in_cache(self) -> list[str]:
+    def estimated_in_cache(self, maxsize: int = None) -> list[str]:
+        """Builds a list of all those degree sequences that are estimated only.
+
+        Parameters
+        ----------
+        maxsize : int, optional
+            Cap of the estimated size of the number of graphs with that degree sequence, by default None
+
+        Returns
+        -------
+        list[str]
+            List of canonical labels
+        """
         for natoms in range(3, self._max_natoms_from_cache["all"] + 1):
             self._fill_cache(natoms)
-        return self._estimated
+
+        if maxsize is None:
+            return self._estimated
+        else:
+            smaller = []
+            for label in self._estimated:
+                lookup = self._label_to_lookup(label)
+                if lookup in self._base_cache:
+                    if self._base_cache[lookup] < maxsize:
+                        smaller.append(label)
+                    continue
+                if lookup in self._pure_cache:
+                    if self._pure_cache[lookup] < maxsize:
+                        smaller.append(label)
+                    continue
+                raise NotImplementedError("Lookup failed.")
+            return smaller
 
     def _label_to_lookup(self, label: str) -> tuple[int]:
         """Converts a canonical label into a cache lookup key.
@@ -633,15 +661,14 @@ class ApproximateCounter:
         with gzip.open(file, "rt") as fh:
             for line in fh:
                 canonical_label, length = line.split()
+                lookup = self._label_to_lookup(canonical_label)
+                if lookup in self._exact_cache:
+                    # why estimate if we already know?
+                    continue
                 self._estimated.append(canonical_label)
-                canonical_label = self._label_to_lookup(canonical_label)
-                self._base_cache[canonical_label] = self._average_path_length_to_size(
-                    length
-                )
-                if _is_pure(canonical_label):
-                    self._pure_cache[canonical_label] = self._base_cache[
-                        canonical_label
-                    ]
+                self._base_cache[lookup] = self._average_path_length_to_size(length)
+                if _is_pure(lookup):
+                    self._pure_cache[lookup] = self._base_cache[lookup]
 
     def _parse_pure_file(self, file: str):
         """Parse a data file containing estimated graph counts for pure colored degree sequences.
@@ -655,11 +682,12 @@ class ApproximateCounter:
             for lidx, line in enumerate(fh):
                 try:
                     canonical_label, length = line.split()
+                    lookup = self._label_to_lookup(canonical_label)
+                    if lookup in self._exact_cache:
+                        # why estimate if we already know?
+                        continue
                     self._estimated.append(canonical_label)
-                    canonical_label = self._label_to_lookup(canonical_label)
-                    self._pure_cache[canonical_label] = (
-                        self._average_path_length_to_size(length)
-                    )
+                    self._pure_cache[lookup] = self._average_path_length_to_size(length)
                 except:
                     raise ValueError(f"Cannot parse {file}, line {lidx}.")
 
@@ -723,7 +751,7 @@ class ApproximateCounter:
             "base": self._parse_base_file,
         }
 
-        for kind in self._cachefiles.keys():
+        for kind in "exact base pure".split():  # making sure exact ones are read first
             if natoms in self._cachefiles[kind]:
                 for filename in self._cachefiles[kind][natoms]:
                     functions[kind](filename)

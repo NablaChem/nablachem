@@ -85,6 +85,10 @@ class AtomStoichiometry:
         return sumformula
 
     @property
+    def num_atoms(self):
+        return sum(self.components.values())
+
+    @property
     def largest_valence(self):
         largest = 0
         for atom_type, count in self.components.items():
