@@ -1,0 +1,13 @@
+[server]
+port = 80
+enableCORS = false
+enableXsrfProtection = false
+address = "0.0.0.0"
+cookieSecret = "cookie"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "random-molecule.org"
+
+[theme]
+primaryColor="#1F3664"
