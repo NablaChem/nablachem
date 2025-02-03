@@ -406,9 +406,20 @@ class ExactCounter:
 
     Note that this implementation avoids the built-in pruning of
     "infeasible" molecular graphs in surge by defining non-standard element labels.
+
+    Uses surge (https://doi.org/10.1186/s13321-022-00604-9) which in turn leverages nauty.
     """
 
-    def __init__(self, binary, timeout=None):
+    def __init__(self, binary: str, timeout: int = None):
+        """Sets up the environment.
+
+        Parameters
+        ----------
+        binary : str
+            Path to the surge binary.
+        timeout : int, optional
+            Limits the total runtime for counting any one chemical formula, by default None
+        """
         self._binary = binary
         self._cache = {}
         self._timeout = timeout
@@ -502,7 +513,7 @@ class ExactCounter:
             elements += [element] * int(repeat or 1)
         return elements
 
-    def list_one(self, stoichiometry: AtomStoichiometry) -> list[Molecule]:
+    def list_one(self, stoichiometry: AtomStoichiometry) -> Iterator[Molecule]:
         args, lookup = self._build_cli_arguments(stoichiometry, count_only=False)
 
         stdout = self._run(args, keep_stderr=False)
@@ -513,7 +524,6 @@ class ExactCounter:
             node_labels += [component[0].label] * component[1]
 
         bondtypes = {"-": 1, "=": 2, "#": 3}
-        molecules = []
         for line in stdout.split("\n"):
             if len(line.strip()) == 0:
                 continue
@@ -534,16 +544,14 @@ class ExactCounter:
                 order = bondtypes[bondtype]
                 edges.append([int(idx1), int(idx2), order])
 
-            molecules.append(Molecule(elements, edges))
+            yield Molecule(elements, edges)
 
-        return molecules
-
-    def list(self, search_space: SearchSpace, natoms: int) -> list[Molecule]:
-        molecules = []
-
+    def list(
+        self, search_space: SearchSpace, natoms: int, selection: Q = None
+    ) -> Iterator[Molecule]:
         for stoichiometry in search_space.list_cases(natoms):
-            molecules += self.list_one(stoichiometry)
-        return molecules
+            if selection.selected_stoichiometry(stoichiometry):
+                yield from self.list_one(stoichiometry)
 
 
 class ApproximateCounter:

@@ -961,3 +961,10 @@ def test_sum_formula_countable():
     c = ncs.ApproximateCounter()
     for i in range(3, 10):
         c.count(s, i)
+
+
+@pytest.mark.timeout(2)
+def test_big():
+    space = ncs.SearchSpace("C:4 H:1 N:3 O:2 F:1 Cl:1 Br:1 S:2,4,6 P:3,5")
+    counter = ncs.ExactCounter("/bin/false")  # should never be called anyway
+    assert list(counter.list(space, natoms=8, selection=ncs.Q("# = 0"))) == []
