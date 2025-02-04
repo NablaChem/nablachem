@@ -1018,6 +1018,10 @@ class ApproximateCounter:
             except:
                 pass
             try:
+                return self._exact_cache[purespec]
+            except:
+                pass
+            try:
                 return pure_size or self._base_cache[purespec]
             except:
                 pass
@@ -1115,18 +1119,19 @@ class ApproximateCounter:
                     return found
 
         # only use asymptotic scaling relations if the number of atoms is large enough
+
+        if natoms < self._minimum_natoms_for_asymptotics:
+            raise ValueError(
+                f"""The pre-computed database does not cover this stoichiometry: {label}.
+                
+                You may either compute it yourself using estimate_edit_tree_average_path_length()
+                (see maintenance/space_cache.py) or contact vonrudorff@uni-kassel.de, 
+                so we can distribute the extended cache in a new version of this library, 
+                as building the cache is a time-consuming process."""
+            )
         if cached_degree_sequence:
             log_asymptotic_size = self._cached_log_asymptotic_size
         else:
-            if natoms < self._minimum_natoms_for_asymptotics:
-                raise ValueError(
-                    f"""The pre-computed database does not cover this stoichiometry: {label}.
-                    
-                    You may either compute it yourself using estimate_edit_tree_average_path_length()
-                    (see maintenance/space_cache.py) or contact vonrudorff@uni-kassel.de, 
-                    so we can distribute the extended cache in a new version of this library, 
-                    as building the cache is a time-consuming process."""
-                )
             degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
             log_asymptotic_size = self._count_one_asymptotically_log(tuple(degrees))
             self._cached_log_asymptotic_size = log_asymptotic_size
