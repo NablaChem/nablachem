@@ -974,3 +974,19 @@ def test_issue4():
     space = ncs.SearchSpace("C:4 S:2,4")
     counter = ncs.ApproximateCounter()
     counter.count(space, natoms=16)
+
+
+def test_small():
+    space = ncs.SearchSpace("H:1")
+    assert ncs.ApproximateCounter().count(space, natoms=2) > 0
+
+
+def test_ring():
+    space = ncs.SearchSpace("O:2")
+    for natoms in range(2, 10):
+        assert ncs.ApproximateCounter().count(space, natoms=natoms) > 0
+
+
+def test_only_one_partition():
+    space = ncs.SearchSpace("S:4")
+    assert ncs.ApproximateCounter().count(space, natoms=4) > 0
