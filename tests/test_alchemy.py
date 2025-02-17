@@ -144,5 +144,9 @@ def test_analytical_gradients():
     from nablachem.analyticgrads.AP_class import APDFT_perturbator as AP
 
     ap_nn = AP(mf, sites=[0, 1])
-    assert abs(ap_nn.af(0)[0, 2] - 0.02656966379363701) < 1e-8
-    assert abs(ap_nn.af(1)[0, 2] - 0.27339079067037564) < 1e-8
+    val1 = 0.02656966379363701
+    assert abs(ap_nn.af(0)[0, 2] - val1) < 1e-8
+    assert abs(ap_nn.af(0)[1, 2] + val1) < 1e-8
+    val2 = 0.27339079067037564
+    assert abs(ap_nn.af(1)[0, 2] - val2) < 1e-8
+    assert abs(ap_nn.af(1)[1, 2] + val2) < 1e-8
