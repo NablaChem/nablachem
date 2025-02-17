@@ -4,6 +4,8 @@ import numpy as np
 import math
 import collections
 import itertools as it
+import pyscf
+import enum
 
 from scipy.optimize import minimize
 
@@ -503,3 +505,116 @@ class MultiTaylor:
             Optimal position found.
         """
         return self._optimize(True, target, bounds)
+
+
+class Anygrad:
+    class Property(enum.Enum):
+        ENERGY = "energy"
+
+    class Variable(enum.Enum):
+        # POSITION = "R"
+        # NUCLEAR_CHARGE = "Z"
+        POSNUC = "RZ"
+
+    class Method(enum.Enum):
+        COUPLED_PERTURBED = "CP"
+        FINITE_DIFFERENCES = "FD"
+
+    def __init__(self, calculator, target: "Anygrad.Property"):
+        self._calculator = calculator
+        self._natm = calculator.mol.natm
+        self._atomspec = calculator.mol.atom
+        self._basis = calculator.mol.basis
+        self._target = target
+
+    def get(self, *args: "Anygrad.Variable", method: "Anygrad.Method" = None):
+
+        if method == Anygrad.Method.FINITE_DIFFERENCES:
+            if not hasattr(self, "_fd_cache"):
+                self._fd_cache = self._finite_differences(
+                    self._atomspec, self._basis, self._calculator.__class__
+                )
+
+            if args == (Anygrad.Variable.POSNUC,):
+                return self._fd_cache[1]
+            elif args == (Anygrad.Variable.POSNUC, Anygrad.Variable.POSNUC):
+                return self._fd_cache[2]
+
+            raise NotImplementedError(f"Finite differences not implemented for {args}.")
+
+    def _finite_differences(
+        atomspec: str,
+        basis: str,
+        baseclass: pyscf.scf.RHF,
+        callable=lambda _: _.kernel(),
+        delta=1e-3,
+    ):
+        def do_one(atomspec, basis, displacement):
+            mol = pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False)
+
+            # update positions
+            coords = mol.atom_coords(unit="Bohr")
+            dx = displacement.reshape(-1, 4)[:, :3]
+            dZ = displacement.reshape(-1, 4)[:, 3]
+            mol.set_geom_(coords + dx, unit="Bohr")
+
+            # update nuclear charges
+            mf = baseclass(mol)
+            h1 = mf.get_hcore()
+
+            # electronic: extend external potential
+            s = 0
+            for i, Z in enumerate(dZ):
+                mol.set_rinv_orig_(mol.atom_coords()[i])
+                s -= Z * mol.intor("int1e_rinv")
+
+            # nuclear: difference to already included NN repulsion
+            nn = 0
+            for i in range(mol.natm):
+                Z_i = mol.atom_charge(i) + dZ[i]
+
+                for j in range(i + 1, mol.natm):
+                    Z_j = mol.atom_charge(j) + dZ[j]
+
+                    if i != j:
+                        rij = np.linalg.norm(
+                            mol.atom_coords()[i] - mol.atom_coords()[j]
+                        )
+                        missing = Z_i * Z_j - mol.atom_charge(j) * mol.atom_charge(i)
+                        nn += missing / rij
+
+            mf.get_hcore = lambda *args, **kwargs: h1 + s
+            mf._kernel = mf.kernel
+            mf.kernel = lambda *args, **kwargs: mf._kernel(*args, **kwargs) + nn
+            return callable(mf)
+
+        ndims = 4 * pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False).natm
+
+        center = do_one(atomspec, basis, np.zeros(ndims))
+        gradient = np.zeros(ndims)
+        hessian = np.zeros((ndims, ndims))
+
+        for i in range(ndims):
+            disp_i = np.zeros(ndims)
+            disp_i[i] = delta
+
+            f_i_plus = do_one(atomspec, basis, disp_i)
+            f_i_minus = do_one(atomspec, basis, -disp_i)
+
+            gradient[i] = (f_i_plus - f_i_minus) / (2 * delta)
+            hessian[i, i] = (f_i_plus - 2 * center + f_i_minus) / (delta**2)
+
+            for j in range(i + 1, ndims):
+                disp_j = np.zeros(ndims)
+                disp_j[j] = delta
+
+                f_pp = do_one(atomspec, basis, disp_i + disp_j)
+                f_pm = do_one(atomspec, basis, disp_i - disp_j)
+                f_mp = do_one(atomspec, basis, -disp_i + disp_j)
+                f_mm = do_one(atomspec, basis, -disp_i - disp_j)
+
+                hessian[i, j] = hessian[j, i] = (f_pp - f_pm - f_mp + f_mm) / (
+                    4 * delta**2
+                )
+
+        return center, gradient, hessian

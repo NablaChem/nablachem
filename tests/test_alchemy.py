@@ -1,4 +1,4 @@
-from nablachem.alchemy import MultiTaylor
+from nablachem.alchemy import MultiTaylor, Anygrad
 import pandas as pd
 import numpy as np
 
@@ -152,3 +152,24 @@ def test_analytical_gradients():
     assert abs(ap_nn.af(1)[1, 2] + val2) < 1e-8
 
     ap_nn.build_all()
+
+
+def test_anygrad_HF():
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "sto-3g"
+
+    mf = pyscf.scf.RHF(pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False))
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.ENERGY)
+    grad = ag.get(Anygrad.Variable.POSNUC, method=Anygrad.Method.FINITE_DIFFERENCES)
+    hess = ag.get(
+        Anygrad.Variable.POSNUC,
+        Anygrad.Variable.POSNUC,
+        method=Anygrad.Method.FINITE_DIFFERENCES,
+    )
+    print(grad, hess)
+    assert False

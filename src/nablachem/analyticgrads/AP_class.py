@@ -42,9 +42,8 @@ def g1(mol0, dP, P, DZ, g0):  # dP/dz*dH/dx, P* d2H/dzdx
     return ga_1
 
 
-def g2(mol0, dP, P, DZ, g0):
+def g2(mol0, dP, P, g0):
     natm = mol0.natm
-    nao = mol0.nao
     aoslices = mol0.aoslice_by_atom()
     ga_2 = np.zeros((natm, 3))
     vhf = g0.get_veff(mol0, P)
@@ -58,7 +57,7 @@ def g2(mol0, dP, P, DZ, g0):
     return ga_2
 
 
-def g3(mol0, dP, P, g0, e, e1, C, dC):  # -dW/dZ *dS/dx
+def g3(mol0, g0, e, e1, C, dC):  # -dW/dZ *dS/dx
     s1 = g0.get_ovlp(mol0)
     g3 = np.zeros((mol0.natm, 3))
     nocc = mol0.nelec[0]
@@ -81,11 +80,7 @@ def aaff_resolv(mf, DZ, U, dP, e1):
     C = mf.mo_coeff
     e = mf.mo_energy
     dC = C @ U
-    return (
-        g1(mol0, dP, P, DZ, g0)
-        + g2(mol0, dP, P, DZ, g0)
-        + g3(mol0, dP, P, g0, e, e1, C, dC)
-    )
+    return g1(mol0, dP, P, DZ, g0) + g2(mol0, dP, P, g0) + g3(mol0, g0, e, e1, C, dC)
 
 
 def alc_deriv_grad_nuc(
@@ -108,16 +103,12 @@ max_cycle_cphf = 40  # default PYSCF params
 conv_tol_cphf = 1e-9  # default PYSCF params
 
 
-def alchemy_cphf_deriv(mf, int_r, with_cphf=True):
-    mol = mf.mol
+def alchemy_cphf_deriv(mf, int_r):
     mo_energy = mf.mo_energy
     mo_coeff = mf.mo_coeff
     mo_occ = mf.mo_occ
     occidx = mo_occ > 0
     orbo = mo_coeff[:, occidx]
-    orbv = mo_coeff[:, ~occidx]
-    charges = mol.atom_charges()
-    coords = mol.atom_coords()
     h1 = lib.einsum(
         "pq,pi,qj->ij", int_r, mo_coeff.conj(), orbo
     )  # going to molecular orbitals
@@ -236,40 +227,10 @@ def cubic_alch_hessian(mf, int_r, mo1, e1):
     return e3
 
 
-def parse_charge(dL):
-    """There are two options:
-    1) call FcM(**kwargs,fcs=[c1,c2,--cn]) with a list of length equal to the number of atoms
-    2) FcM(**kwargs,fcs=[[aidx1,aidx2,..,aidxn],[c1,c2,..cn]]) with a list of two sublist for atoms' indexes and fract charges
-    """
-    a = [[], []]
-    parsed = False
-    if len(dL) == 2:  # necessario, ma non sufficiente per caso 2
-        try:
-            len(dL[0]) == len(dL[1])
-            if isinstance(dL[0][0], int) or isinstance(dL[0][0], float):
-                parsed = True
-        except:
-            pass
-    if not parsed and (
-        isinstance(dL[0], int) or isinstance(dL[0], float)
-    ):  # move to case2
-        for i in range(len(dL)):
-            if dL[i] != 0:
-                a[0].append(i)
-                a[1].append(dL[i])
-        dL = a
-        parsed = True
-    if not parsed:
-        print("Failed to parse charges")
-        raise
-    return dL
-
-
 def DeltaV(mol, dL):
     """dL=[[i1,i2,i3],[c1,c2,c3]]"""
-    mol.set_rinv_orig_(mol.atom_coords()[dL[0][0]])
-    dV = mol.intor("int1e_rinv") * dL[1][0]
-    for i in range(1, len(dL[0])):
+    dV = 0
+    for i in range(len(dL[0])):
         mol.set_rinv_orig_(mol.atom_coords()[dL[0][i]])
         dV += mol.intor("int1e_rinv") * dL[1][i]
     return -dV
@@ -283,9 +244,6 @@ class APDFT_perturbator(lib.StreamObject):
         self.sites = []
         for site in sites:
             self.sites.append(site)
-        self.DeltaV = DeltaV
-        self.alchemy_cphf_deriv = alchemy_cphf_deriv
-        self.make_U = make_U
         self.dVs = {}
         self.mo1s = {}
         self.e1s = {}
