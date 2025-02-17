@@ -7,11 +7,16 @@ from pyscf import lib
 from functools import reduce
 from pyscf.scf import cphf
 from pyscf import lib
-from aaff import alc_deriv_grad_nuc, aaff_resolv
+from .aaff import alc_deriv_grad_nuc, aaff_resolv
 from scipy.spatial.transform import Rotation as R
-from FcMole import FcM_like
-from AP_utils import alias_param, parse_charge, DeltaV, charge2symbol
-from alch_deriv import *
+from .FcMole import FcM_like
+from .AP_utils import (
+    alias_param,
+    parse_charge,
+    DeltaV,
+    charge2symbol,
+)
+from .alch_deriv import *
 import copy
 
 

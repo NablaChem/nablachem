@@ -1,5 +1,5 @@
 from pyscf import gto
-from AP_utils import parse_charge
+from .AP_utils import parse_charge
 
 NUC_FRAC_CHARGE = gto.mole.NUC_FRAC_CHARGE
 NUC_MOD_OF = gto.mole.NUC_MOD_OF

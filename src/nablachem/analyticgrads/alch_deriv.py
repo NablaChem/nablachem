@@ -11,7 +11,7 @@ from pyscf import lib
 
 # from pyscf.prop.nmr import rhf as rhf_nmr
 
-from AP_utils import alias_param, parse_charge, DeltaV
+from .AP_utils import alias_param, parse_charge, DeltaV
 from pyscf.hessian.rhf import gen_vind
 
 max_cycle_cphf = 40  # default PYSCF params

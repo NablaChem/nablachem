@@ -129,3 +129,20 @@ def test_3d():
         abs(mt.query(A=A + 1, B=B + 1, C=C + 1)["y"] - polynomial(A + 1, B + 1, C + 1))
         < 1e-4
     )
+
+
+def test_analytical_gradients():
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "sto-3g"
+
+    mf = pyscf.scf.RHF(pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False))
+    mf.kernel()
+
+    from nablachem.analyticgrads.AP_class import APDFT_perturbator as AP
+
+    ap_nn = AP(mf, sites=[0, 1])
+    assert abs(ap_nn.af(0)[0, 2] - 0.02656966379363701) < 1e-8
+    assert abs(ap_nn.af(1)[0, 2] - 0.27339079067037564) < 1e-8
