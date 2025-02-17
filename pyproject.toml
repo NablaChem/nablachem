@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nablachem"
-version = "25.1"
+version = "25.2"
 description = "Easy access to research code."
 authors = ["von Rudorff, Guido Falk <vonrudorff@uni-kassel.de>"]
 license = "LGPL"
@@ -16,6 +16,10 @@ numpy = "^1.26.3"
 scipy = "^1.12.0"
 pysmiles = "^2.0.0"
 random-graph = "^0.0.0a1"
+networkx = "^3.4.2"
+pyparsing = "^3.2.1"
+tqdm = "^4.67.1"
+mpmath = "^1.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
