@@ -150,3 +150,5 @@ def test_analytical_gradients():
     val2 = 0.27339079067037564
     assert abs(ap_nn.af(1)[0, 2] - val2) < 1e-8
     assert abs(ap_nn.af(1)[1, 2] + val2) < 1e-8
+
+    ap_nn.build_all()

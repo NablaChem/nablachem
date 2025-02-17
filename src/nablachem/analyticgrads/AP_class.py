@@ -104,41 +104,6 @@ def alc_deriv_grad_nuc(
     return gn
 
 
-def alc_differential_grad_nuc(
-    mol, dL
-):  # to get the exact diffeential after alch. perturbation
-    gn = np.zeros((mol.natm, 3))
-    for j in range(mol.natm):
-        q2 = mol.atom_charge(j) + dL[j]
-        r2 = mol.atom_coord(j)
-        for i in range(mol.natm):
-            if i != j:
-                q1 = mol.atom_charge(i) + dL[i]
-                r1 = mol.atom_coord(i)
-                r = np.linalg.norm(r1 - r2)
-                gn[j] += (
-                    (q1 * q2 - mol.atom_charge(i) * mol.atom_charge(j))
-                    * (r1 - r2)
-                    / r**3
-                )
-    return gn
-
-
-def g3_old(mol0, dP, P, DZ, g0, vresp, F):  # -dW/dZ *dS/dx
-    s1 = g0.get_ovlp(mol0)
-    dF = vresp(dP) + DeltaV(mol0, DZ)
-    S = mol0.intor_symmetric("int1e_ovlp")
-    S_1 = np.linalg.inv(S)
-    g3 = np.zeros((mol0.natm, 3))
-    for i in range(mol0.natm):
-        p0, p1 = mol0.aoslice_by_atom()[i, 2:]
-        g3[i] -= (
-            np.einsum("xij,ij->x", s1[:, p0:p1], (S_1 @ ((F @ dP) + (dF @ P)))[p0:p1])
-            * 2
-        )
-    return g3
-
-
 max_cycle_cphf = 40  # default PYSCF params
 conv_tol_cphf = 1e-9  # default PYSCF params
 
@@ -219,24 +184,7 @@ def third_deriv_elec(mf, int_r, mo1, e1):  # only for one site (d^3 E /dZ^3)
     return e3
 
 
-def alch_deriv(mf, dL=[]):
-    """alch_deriv(mf,dL=[]) returns U,dP for a dl=.001 times the charges
-    dL can be the whole list of nuclear charges placed on atom, with length equals to mol.natm (eg.[0,1,0,0,-1,...,0])
-    or alternatively a list with two sublist of equal length in the form [[atm_idxs],[atm_charges]]
-    """
-    mol = mf.mol
-    dL = parse_charge(dL)
-    int_r = DeltaV(mol, dL)
-    mo1, e1 = alchemy_cphf_deriv(mf, int_r)
-    der1 = first_deriv_elec(mf, int_r) + first_deriv_nuc_nuc(mol, dL)
-    der2 = second_deriv_elec(mf, int_r, mo1) + second_deriv_nuc_nuc(mol, dL)
-    der3 = third_deriv_elec(mf, int_r, mo1, e1)
-    return (der1, der2, der3)
-
-
 def make_dP(mf, mo1):
-    mol = mf.mol
-    nao = mol.nao
     nocc = mf.mol.nelec[0]
     C = mf.mo_coeff
     dP = np.zeros_like(C)
@@ -288,58 +236,6 @@ def cubic_alch_hessian(mf, int_r, mo1, e1):
     return e3
 
 
-charge2symbol = {
-    1: "H",
-    2: "He",
-    3: "Li",
-    4: "Be",
-    5: "B",
-    6: "C",
-    7: "N",
-    8: "O",
-    9: "F",
-    10: "Ne",
-    11: "Na",
-    12: "Mg",
-    13: "Al",
-    14: "Si",
-}
-
-
-def alias_param(param_name: str, param_alias: str):
-    """
-    Decorator for aliasing a param in a function
-    Args:
-        param_name: name of param in function to alias
-        param_alias: alias that can be used for this param
-    Returns:
-    """
-
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            alias_param_value = kwargs.get(param_alias)
-            if param_alias in kwargs.keys():
-                kwargs[param_name] = alias_param_value
-                del kwargs[param_alias]
-            result = func(*args, **kwargs)
-            return result
-
-        return wrapper
-
-    return decorator
-
-
-def printxyz(coords, al, fn):
-    atomnumber = {1: "H", 5: "B", 6: "C", 7: "N"}
-    assert len(al) == len(coords)
-    with open(fn, "w") as xyzf:
-        xyzf.write(str(len(al)) + " \n")
-        xyzf.write("molecule \n")
-        for i in range(len(coords)):
-            xyzf.write(atomnumber[al[i]] + "    " + str(coords[i])[1:-1] + "\n")
-    return
-
-
 def parse_charge(dL):
     """There are two options:
     1) call FcM(**kwargs,fcs=[c1,c2,--cn]) with a list of length equal to the number of atoms
@@ -379,52 +275,6 @@ def DeltaV(mol, dL):
     return -dV
 
 
-def with_rinv_at_nucleus(self, atm_id):
-    rinv = self.atom_coord(atm_id)
-    self._env[gto.mole.AS_RINV_ORIG_ATOM] = atm_id  # required by ecp gradients
-    return self.with_rinv_origin(rinv)
-
-
-class FracMole(gto.Mole):
-    def with_rinv_at_nucleus(self, atm_id):
-        rinv = self.atom_coord(atm_id)
-        self._env[gto.mole.AS_RINV_ORIG_ATOM] = atm_id  # required by ecp gradients
-        return self.with_rinv_origin(rinv)
-
-
-def FcM(fcs=[], **kwargs):
-    mol = FracMole()
-    mol.build(**kwargs)
-    init_charges = mol.atom_charges()
-    if fcs:
-        fcs = parse_charge(fcs)
-        init_charges = mol.atom_charges()
-        for j in range(len(fcs[0])):
-            mol._env[mol._atm[fcs[0][j], PTR_FRAC_CHARGE]] = (
-                init_charges[fcs[0][j]] + fcs[1][j]
-            )
-            mol._atm[fcs[0][j], NUC_MOD_OF] = NUC_FRAC_CHARGE
-        mol.charge = sum(fcs[1]) + mol.charge
-    return mol
-
-
-def FcM_like(in_mol, fcs=[]):
-    mol = in_mol.copy()
-    mol.with_rinv_at_nucleus = with_rinv_at_nucleus.__get__(mol)
-    mol.symmetry = None  # symmetry usually breaks after perturbation
-    init_charges = mol.atom_charges()
-    if fcs:
-        fcs = parse_charge(fcs)
-        init_charges = mol.atom_charges()
-        for j in range(len(fcs[0])):
-            mol._env[mol._atm[fcs[0][j], PTR_FRAC_CHARGE]] = (
-                init_charges[fcs[0][j]] + fcs[1][j]
-            )
-            mol._atm[fcs[0][j], NUC_MOD_OF] = NUC_FRAC_CHARGE
-        mol.charge = in_mol.charge + sum(fcs[1])
-    return mol
-
-
 class APDFT_perturbator(lib.StreamObject):
     def __init__(self, mf, symmetry=None, sites=None):
         self.mf = mf
@@ -435,22 +285,12 @@ class APDFT_perturbator(lib.StreamObject):
             self.sites.append(site)
         self.DeltaV = DeltaV
         self.alchemy_cphf_deriv = alchemy_cphf_deriv
-        self.make_dP = make_dP
         self.make_U = make_U
         self.dVs = {}
         self.mo1s = {}
         self.e1s = {}
-        self.dPs = {}
         self.afs = {}
         self.perturb()
-        self.cubic_hessian = None
-        self.hessian = None
-        self.gradient = None
-        self.xcf = None
-        try:
-            self.xcf = mf.xc
-        except:
-            pass
 
     def U(self, atm_idx):
         if atm_idx not in self.sites:
@@ -463,18 +303,6 @@ class APDFT_perturbator(lib.StreamObject):
             self.sites.append(atm_idx)
             self.perturb()
         return make_dP(self.mf, self.mo1s[atm_idx])
-
-    def dP_atom(self, atm_idx):
-        if atm_idx not in self.sites:
-            self.sites.append(atm_idx)
-            self.perturb()
-        return make_dP(self.mf, self.mo1s[atm_idx])
-
-    def dP_pred(self, pvec):
-        pvec = np.asarray(pvec)
-        return self.mf.make_rdm1() + np.array(
-            [self.dP_atom(i) for i in self.sites]
-        ).transpose(1, 2, 0).dot(pvec)
 
     def perturb(self):
         for site in self.sites:
@@ -599,10 +427,3 @@ class APDFT_perturbator(lib.StreamObject):
         self.build_gradient()
         self.build_hessian()
         self.build_cubic_hessian()
-
-
-def parse_to_array(natm, dL):
-    arr = np.zeros(natm)
-    for i in range(len(dL[0])):
-        arr[dL[0][i]] = dL[1][i]
-    return arr
