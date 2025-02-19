@@ -9,6 +9,8 @@ import enum
 
 from scipy.optimize import minimize
 
+from .analyticgrads.AP_class import APDFT_perturbator as AP
+
 
 class Monomial:
     """A single monomial in the multi-dimensional Taylor expansion."""
@@ -512,9 +514,8 @@ class Anygrad:
         ENERGY = "energy"
 
     class Variable(enum.Enum):
-        # POSITION = "R"
-        # NUCLEAR_CHARGE = "Z"
-        POSNUC = "RZ"
+        POSITION = "R"
+        NUCLEAR_CHARGE = "Z"
 
     class Method(enum.Enum):
         COUPLED_PERTURBED = "CP"
@@ -523,26 +524,89 @@ class Anygrad:
     def __init__(self, calculator, target: "Anygrad.Property"):
         self._calculator = calculator
         self._natm = calculator.mol.natm
-        self._atomspec = calculator.mol.atom
+        self._atomspec = calculator.mol._atom
         self._basis = calculator.mol.basis
         self._target = target
 
     def get(self, *args: "Anygrad.Variable", method: "Anygrad.Method" = None):
+        args = tuple(Anygrad.Variable(_) for _ in args)
+
+        # TODO: sort and auto-transpose
 
         if method == Anygrad.Method.FINITE_DIFFERENCES:
             if not hasattr(self, "_fd_cache"):
                 self._fd_cache = self._finite_differences(
-                    self._atomspec, self._basis, self._calculator.__class__
+                    self._atomspec,
+                    self._basis,
+                    self._calculator.__class__,
                 )
 
-            if args == (Anygrad.Variable.POSNUC,):
-                return self._fd_cache[1]
-            elif args == (Anygrad.Variable.POSNUC, Anygrad.Variable.POSNUC):
-                return self._fd_cache[2]
+            if args == (Anygrad.Variable.POSITION,):
+                return self._fd_cache[1].reshape(-1, 4)[:, :3].reshape(-1)
+            elif args == (Anygrad.Variable.NUCLEAR_CHARGE,):
+                return self._fd_cache[1].reshape(-1, 4)[:, 3].reshape(-1)
+            elif args == (Anygrad.Variable.POSITION, Anygrad.Variable.POSITION):
+                mask = np.ones(4 * self._natm, dtype=bool)
+                mask[3::4] = False
+                return self._fd_cache[2][mask][:, mask]
+            elif args == (
+                Anygrad.Variable.NUCLEAR_CHARGE,
+                Anygrad.Variable.NUCLEAR_CHARGE,
+            ):
+                return self._fd_cache[2][3::4, 3::4]
+            elif args == (
+                Anygrad.Variable.POSITION,
+                Anygrad.Variable.NUCLEAR_CHARGE,
+            ):
+                mask = np.ones(4 * self._natm, dtype=bool)
+                mask[3::4] = False
+                return self._fd_cache[2][mask, 3::4]
+            elif args == (
+                Anygrad.Variable.NUCLEAR_CHARGE,
+                Anygrad.Variable.POSITION,
+            ):
+                return self.get(*args[::-1], method=method).T
 
             raise NotImplementedError(f"Finite differences not implemented for {args}.")
+        elif method == Anygrad.Method.COUPLED_PERTURBED:
+            if args == (Anygrad.Variable.POSITION,):
+                # calculate gradient
+                self._calculator.kernel()
+                grad = self._calculator.Gradients().kernel()
+                return grad.reshape(3 * self._natm)
+            if args == (Anygrad.Variable.POSITION, Anygrad.Variable.POSITION):
+                self._calculator.kernel()
+                hess = self._calculator.Hessian().kernel()
+                return hess.transpose(0, 2, 1, 3).reshape(3 * self._natm, -1)
+            if args == (Anygrad.Variable.NUCLEAR_CHARGE,):
+
+                ap = AP(self._calculator, sites=range(self._natm))
+                return ap.build_gradient()
+
+            if args == (
+                Anygrad.Variable.NUCLEAR_CHARGE,
+                Anygrad.Variable.NUCLEAR_CHARGE,
+            ):
+
+                ap = AP(self._calculator, sites=range(self._natm))
+                return ap.build_hessian()
+            elif args == (
+                Anygrad.Variable.POSITION,
+                Anygrad.Variable.NUCLEAR_CHARGE,
+            ):
+                sites = range(self._natm)
+                ap = AP(self._calculator, sites=sites)
+                return np.array([ap.af(i).reshape(-1) for i in sites]).T
+            elif args == (
+                Anygrad.Variable.NUCLEAR_CHARGE,
+                Anygrad.Variable.POSITION,
+            ):
+                return self.get(*args[::-1], method=method).T
+
+            raise NotImplementedError(f"CP not implemented.")
 
     def _finite_differences(
+        self,
         atomspec: str,
         basis: str,
         baseclass: pyscf.scf.RHF,
@@ -550,7 +614,9 @@ class Anygrad:
         delta=1e-3,
     ):
         def do_one(atomspec, basis, displacement):
-            mol = pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False)
+            mol = pyscf.gto.M(
+                atom=atomspec, basis=basis, symmetry=False, verbose=0, unit="bohr"
+            )
 
             # update positions
             coords = mol.atom_coords(unit="Bohr")
@@ -561,6 +627,7 @@ class Anygrad:
             # update nuclear charges
             mf = baseclass(mol)
             h1 = mf.get_hcore()
+            mf.max_cycle = 500
 
             # electronic: extend external potential
             s = 0
@@ -586,6 +653,9 @@ class Anygrad:
             mf.get_hcore = lambda *args, **kwargs: h1 + s
             mf._kernel = mf.kernel
             mf.kernel = lambda *args, **kwargs: mf._kernel(*args, **kwargs) + nn
+            mf.kernel()
+            if not mf.converged:
+                raise ValueError("SCF did not converge.")
             return callable(mf)
 
         ndims = 4 * pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False).natm
@@ -611,7 +681,7 @@ class Anygrad:
                 f_pp = do_one(atomspec, basis, disp_i + disp_j)
                 f_pm = do_one(atomspec, basis, disp_i - disp_j)
                 f_mp = do_one(atomspec, basis, -disp_i + disp_j)
-                f_mm = do_one(atomspec, basis, -disp_i - disp_j)
+                f_mm = do_one(atomspec, basis, -disp_i - disp_j)  #
 
                 hessian[i, j] = hessian[j, i] = (f_pp - f_pm - f_mp + f_mm) / (
                     4 * delta**2
