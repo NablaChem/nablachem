@@ -532,6 +532,16 @@ class Anygrad:
         args = tuple(Anygrad.Variable(_) for _ in args)
 
         # TODO: sort and auto-transpose
+        if method is None:
+            for method in (
+                Anygrad.Method.COUPLED_PERTURBED,
+                Anygrad.Method.FINITE_DIFFERENCES,
+            ):
+                try:
+                    return self.get(*args, method=method)
+                except NotImplementedError:
+                    pass
+            raise NotImplementedError("No method supports that derivative.")
 
         if method == Anygrad.Method.FINITE_DIFFERENCES:
             if not hasattr(self, "_fd_cache"):
