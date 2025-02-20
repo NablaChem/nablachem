@@ -114,7 +114,14 @@ def alchemy_cphf_deriv(mf, int_r):
     )  # going to molecular orbitals
     h1 = h1.reshape((1, h1.shape[0], h1.shape[1]))
     s1 = np.zeros_like(h1)
-    vind = gen_vind(mf, mo_coeff, mo_occ)
+    if hasattr(mf, "xc"):
+        import pyscf.prop
+
+        pol = pyscf.prop.polarizability.rks.Polarizability(mf)
+        vind = pol.gen_vind(mf, mo_coeff, mo_occ)
+    else:
+        vind = gen_vind(mf, mo_coeff, mo_occ)
+
     mo1, e1 = cphf.solve(vind, mo_energy, mo_occ, h1, s1, max_cycle_cphf, conv_tol_cphf)
     return mo1[0], e1[0]
 

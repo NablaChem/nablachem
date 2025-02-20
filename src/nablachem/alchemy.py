@@ -545,10 +545,21 @@ class Anygrad:
 
         if method == Anygrad.Method.FINITE_DIFFERENCES:
             if not hasattr(self, "_fd_cache"):
+                if hasattr(self._calculator, "xc"):
+
+                    def build_calc(mol, xc):
+                        mf = pyscf.scf.RKS(mol)
+                        mf.xc = xc
+                        return mf
+
+                    calc = lambda mol: build_calc(mol, self._calculator.xc)
+                else:
+                    calc = self._calculator.__class__
+
                 self._fd_cache = self._finite_differences(
                     self._atomspec,
                     self._basis,
-                    self._calculator.__class__,
+                    calc,
                 )
 
             if args == (Anygrad.Variable.POSITION,):
@@ -604,6 +615,9 @@ class Anygrad:
                 Anygrad.Variable.POSITION,
                 Anygrad.Variable.NUCLEAR_CHARGE,
             ):
+                if hasattr(self._calculator, "xc"):
+                    raise NotImplementedError("CP not implemented for DFT.")
+
                 sites = range(self._natm)
                 ap = AP(self._calculator, sites=sites)
                 return np.array([ap.af(i).reshape(-1) for i in sites]).T
