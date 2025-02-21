@@ -326,7 +326,7 @@ def test_anygrad_KS_first(letter, method):
     "letters,method",
     [
         (letters, method)
-        for letters in "RR ZZ".split()
+        for letters in "RR ZZ RZ".split()
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,
             Anygrad.Method.FINITE_DIFFERENCES,
@@ -415,9 +415,13 @@ def test_anygrad_KS_second(letters, method):
     mf.kernel()
 
     ag = Anygrad(mf, Anygrad.Property.ENERGY)
-    actual_hess = ag.get(*list(letters), method=method)
+    if letters == "RZ" and method == Anygrad.Method.COUPLED_PERTURBED:
+        with pytest.raises(NotImplementedError):
+            ag.get(*list(letters), method=method)
+    else:
+        actual_hess = ag.get(*list(letters), method=method)
+        expected_hess = refhess[letters]
 
-    expected_hess = refhess[letters]
-    if letters[0] == letters[1]:
-        assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
-    assert np.allclose(actual_hess, expected_hess, atol=3e-4)
+        if letters[0] == letters[1]:
+            assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+        assert np.allclose(actual_hess, expected_hess, atol=3e-4)

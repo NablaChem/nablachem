@@ -5,7 +5,9 @@
 import numpy as np
 from pyscf import lib
 from pyscf import gto
-from pyscf.scf import cphf
+import pyscf
+import pyscf.hessian
+
 from pyscf.hessian.rhf import gen_vind
 
 NUC_FRAC_CHARGE = gto.mole.NUC_FRAC_CHARGE
@@ -102,6 +104,8 @@ def alc_deriv_grad_nuc(
 max_cycle_cphf = 40  # default PYSCF params
 conv_tol_cphf = 1e-9  # default PYSCF params
 
+from pyscf.scf import cphf
+
 
 def alchemy_cphf_deriv(mf, int_r):
     mo_energy = mf.mo_energy
@@ -115,14 +119,19 @@ def alchemy_cphf_deriv(mf, int_r):
     h1 = h1.reshape((1, h1.shape[0], h1.shape[1]))
     s1 = np.zeros_like(h1)
     if hasattr(mf, "xc"):
-        import pyscf.prop
+        mo1, e1 = cphf.solve(
+            gen_vind(mf, mo_coeff, mo_occ),
+            mo_energy,
+            mo_occ,
+            h1,
+            s1,
+        )
 
-        pol = pyscf.prop.polarizability.rks.Polarizability(mf)
-        vind = pol.gen_vind(mf, mo_coeff, mo_occ)
     else:
         vind = gen_vind(mf, mo_coeff, mo_occ)
-
-    mo1, e1 = cphf.solve(vind, mo_energy, mo_occ, h1, s1, max_cycle_cphf, conv_tol_cphf)
+        mo1, e1 = cphf.solve(
+            vind, mo_energy, mo_occ, h1, s1, max_cycle_cphf, conv_tol_cphf
+        )
     return mo1[0], e1[0]
 
 

@@ -510,6 +510,100 @@ class MultiTaylor:
 
 
 class Anygrad:
+    _references = {"CP-RHF": "DOI 10.1063/5.0085817"}
+
+    def _energy_R_RHF_CP(self):
+        self._calculator.kernel()
+        grad = self._calculator.Gradients().kernel()
+        return grad.reshape(3 * self._natm)
+
+    def _energy_R_R_RHF_CP(self):
+        self._calculator.kernel()
+        hess = self._calculator.Hessian().kernel()
+        return hess.transpose(0, 2, 1, 3).reshape(3 * self._natm, -1)
+
+    def _energy_Z_RHF_CP(self):
+        ap = AP(self._calculator, sites=range(self._natm))
+        return ap.build_gradient()
+
+    def _energy_Z_Z_RHF_CP(self):
+        ap = AP(self._calculator, sites=range(self._natm))
+        return ap.build_hessian()
+
+    def _energy_R_RKS_CP(self):
+        return self._energy_R_RHF_CP()
+
+    def _energy_R_R_RKS_CP(self):
+        return self._energy_R_R_RHF_CP()
+
+    def _energy_Z_RKS_CP(self):
+        return self._energy_Z_RHF_CP()
+
+    def _energy_Z_Z_RKS_CP(self):
+        return self._energy_Z_Z_RHF_CP()
+
+    def _energy_R_Z_RHF_CP(self):
+        sites = range(self._natm)
+        ap = AP(self._calculator, sites=sites)
+        return np.array([ap.af(i).reshape(-1) for i in sites]).T
+
+    def _energy_Z_R_RHF_CP(self):
+        return self._energy_R_Z_RHF_CP().T
+
+    def _energy_R_RHF_FD(self):
+        self._build_fd_cache("RHF")
+        return self._fd_cache[1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _energy_R_RKS_FD(self):
+        self._build_fd_cache("RKS")
+        return self._fd_cache[1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _energy_Z_RKS_FD(self):
+        self._build_fd_cache("RKS")
+        return self._fd_cache[1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _energy_Z_RHF_FD(self):
+        self._build_fd_cache("RHF")
+        return self._fd_cache[1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _energy_R_R_RHF_FD(self):
+        self._build_fd_cache("RHF")
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[2][mask][:, mask]
+
+    def _energy_Z_Z_RHF_FD(self):
+        self._build_fd_cache("RHF")
+        return self._fd_cache[2][3::4, 3::4]
+
+    def _energy_R_Z_RHF_FD(self):
+        self._build_fd_cache("RHF")
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[2][mask, 3::4]
+
+    def _energy_Z_R_RHF_FD(self):
+        return self._energy_R_Z_RHF_FD().T
+
+    def _build_fd_cache(self, leveloftheory: str):
+        if not hasattr(self, "_fd_cache"):
+            if leveloftheory == "RKS":
+
+                def build_calc(mol, xc):
+                    mf = pyscf.scf.RKS(mol)
+                    mf.xc = xc
+                    return mf
+
+                calc = lambda mol: build_calc(mol, self._calculator.xc)
+            else:
+                calc = self._calculator.__class__
+
+            self._fd_cache = self._finite_differences(
+                self._atomspec,
+                self._basis,
+                calc,
+            )
+
     class Property(enum.Enum):
         ENERGY = "energy"
 
@@ -542,92 +636,17 @@ class Anygrad:
                 except NotImplementedError:
                     pass
             raise NotImplementedError("No method supports that derivative.")
-
-        if method == Anygrad.Method.FINITE_DIFFERENCES:
-            if not hasattr(self, "_fd_cache"):
-                if hasattr(self._calculator, "xc"):
-
-                    def build_calc(mol, xc):
-                        mf = pyscf.scf.RKS(mol)
-                        mf.xc = xc
-                        return mf
-
-                    calc = lambda mol: build_calc(mol, self._calculator.xc)
-                else:
-                    calc = self._calculator.__class__
-
-                self._fd_cache = self._finite_differences(
-                    self._atomspec,
-                    self._basis,
-                    calc,
-                )
-
-            if args == (Anygrad.Variable.POSITION,):
-                return self._fd_cache[1].reshape(-1, 4)[:, :3].reshape(-1)
-            elif args == (Anygrad.Variable.NUCLEAR_CHARGE,):
-                return self._fd_cache[1].reshape(-1, 4)[:, 3].reshape(-1)
-            elif args == (Anygrad.Variable.POSITION, Anygrad.Variable.POSITION):
-                mask = np.ones(4 * self._natm, dtype=bool)
-                mask[3::4] = False
-                return self._fd_cache[2][mask][:, mask]
-            elif args == (
-                Anygrad.Variable.NUCLEAR_CHARGE,
-                Anygrad.Variable.NUCLEAR_CHARGE,
-            ):
-                return self._fd_cache[2][3::4, 3::4]
-            elif args == (
-                Anygrad.Variable.POSITION,
-                Anygrad.Variable.NUCLEAR_CHARGE,
-            ):
-                mask = np.ones(4 * self._natm, dtype=bool)
-                mask[3::4] = False
-                return self._fd_cache[2][mask, 3::4]
-            elif args == (
-                Anygrad.Variable.NUCLEAR_CHARGE,
-                Anygrad.Variable.POSITION,
-            ):
-                return self.get(*args[::-1], method=method).T
-
-            raise NotImplementedError(f"Finite differences not implemented for {args}.")
-        elif method == Anygrad.Method.COUPLED_PERTURBED:
-            if args == (Anygrad.Variable.POSITION,):
-                # calculate gradient
-                self._calculator.kernel()
-                grad = self._calculator.Gradients().kernel()
-                return grad.reshape(3 * self._natm)
-            if args == (Anygrad.Variable.POSITION, Anygrad.Variable.POSITION):
-                self._calculator.kernel()
-                hess = self._calculator.Hessian().kernel()
-                return hess.transpose(0, 2, 1, 3).reshape(3 * self._natm, -1)
-            if args == (Anygrad.Variable.NUCLEAR_CHARGE,):
-
-                ap = AP(self._calculator, sites=range(self._natm))
-                return ap.build_gradient()
-
-            if args == (
-                Anygrad.Variable.NUCLEAR_CHARGE,
-                Anygrad.Variable.NUCLEAR_CHARGE,
-            ):
-
-                ap = AP(self._calculator, sites=range(self._natm))
-                return ap.build_hessian()
-            elif args == (
-                Anygrad.Variable.POSITION,
-                Anygrad.Variable.NUCLEAR_CHARGE,
-            ):
-                if hasattr(self._calculator, "xc"):
-                    raise NotImplementedError("CP not implemented for DFT.")
-
-                sites = range(self._natm)
-                ap = AP(self._calculator, sites=sites)
-                return np.array([ap.af(i).reshape(-1) for i in sites]).T
-            elif args == (
-                Anygrad.Variable.NUCLEAR_CHARGE,
-                Anygrad.Variable.POSITION,
-            ):
-                return self.get(*args[::-1], method=method).T
-
-            raise NotImplementedError(f"CP not implemented.")
+        else:
+            method = method.value
+            args = tuple(_.value for _ in args)
+            target = self._target.value
+            leveloftheory = str(self._calculator.__class__.__name__)
+            try:
+                attrname = f"_{target}_{'_'.join(args)}_{leveloftheory}_{method}"
+                callable = getattr(self, attrname)
+            except AttributeError:
+                raise NotImplementedError("This combination is not implemented.")
+            return callable()
 
     def _finite_differences(
         self,
