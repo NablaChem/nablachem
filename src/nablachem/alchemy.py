@@ -526,6 +526,28 @@ class Anygrad:
         ap = AP(self._calculator, sites=range(self._natm))
         return ap.build_gradient()
 
+    def _homo_Z_RHF_CP(self):
+        ap = AP(self._calculator, sites=range(self._natm))
+        return ap.homo_first()
+
+    def _homo_R_RHF_CP(self):
+        from pyscf import hessian
+
+        mf_h = self._calculator.Hessian()
+        h1 = hessian.rhf.make_h1(
+            mf_h, self._calculator.mo_coeff, self._calculator.mo_occ
+        )
+
+        _, mo_e1 = hessian.rhf.solve_mo1(
+            self._calculator,
+            self._calculator.mo_energy,
+            self._calculator.mo_coeff,
+            self._calculator.mo_occ,
+            h1,
+            None,
+        )
+        return np.asarray(mo_e1)[:, :, -1, -1].reshape(-1)
+
     def _energy_Z_Z_RHF_CP(self):
         ap = AP(self._calculator, sites=range(self._natm))
         return ap.build_hessian()
@@ -585,8 +607,28 @@ class Anygrad:
     def _energy_Z_R_RHF_FD(self):
         return self._energy_R_Z_RHF_FD().T
 
-    def _build_fd_cache(self, leveloftheory: str):
+    def _homo_R_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _homo_Z_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _build_fd_cache(self, leveloftheory: str, target: "Anygrad.Property"):
         if not hasattr(self, "_fd_cache"):
+            self._fd_cache = dict()
+        if not target.name in self._fd_cache:
+            callable = None
+            if target == Anygrad.Property.ENERGY:
+                callable = lambda mf: mf.kernel()
+            if target == Anygrad.Property.HOMO:
+                callable = lambda mf: mf.mo_energy[mf.mo_occ > 0][-1]
+            if callable is None:
+                raise NotImplementedError("Don't know how to get this property.")
+
             if leveloftheory == "RKS":
 
                 def build_calc(mol, xc):
@@ -598,14 +640,13 @@ class Anygrad:
             else:
                 calc = self._calculator.__class__
 
-            self._fd_cache = self._finite_differences(
-                self._atomspec,
-                self._basis,
-                calc,
+            self._fd_cache[target.name] = self._finite_differences(
+                self._atomspec, self._basis, calc, callable=callable
             )
 
     class Property(enum.Enum):
         ENERGY = "energy"
+        HOMO = "homo"
 
     class Variable(enum.Enum):
         POSITION = "R"
@@ -653,7 +694,7 @@ class Anygrad:
         atomspec: str,
         basis: str,
         baseclass: pyscf.scf.RHF,
-        callable=lambda _: _.kernel(),
+        callable,
         delta=1e-3,
     ):
         def do_one(atomspec, basis, displacement):
@@ -717,6 +758,7 @@ class Anygrad:
             gradient[i] = (f_i_plus - f_i_minus) / (2 * delta)
             hessian[i, i] = (f_i_plus - 2 * center + f_i_minus) / (delta**2)
 
+            continue
             for j in range(i + 1, ndims):
                 disp_j = np.zeros(ndims)
                 disp_j[j] = delta

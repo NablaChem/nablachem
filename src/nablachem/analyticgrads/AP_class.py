@@ -1,6 +1,6 @@
 # code originally from Giorgio Domenichini, https://github.com/giorgiodomen/Supplementary_code_for_Quantum_Alchemy
-# Reference: Alchemical predictions of relaxed geometries throughout chemical space by Giorgio Domenichini and O.Anatole von Lilienfeld.
-# revised and updated Guido von Rudorff
+# Reference: Alchemical predictions of relaxed geometries throughout chemical space by Giorgio Domenichini and O. Anatole von Lilienfeld.
+# revised and extended Guido von Rudorff
 
 import numpy as np
 from pyscf import lib
@@ -271,6 +271,15 @@ class APDFT_perturbator(lib.StreamObject):
             self.sites.append(atm_idx)
             self.perturb()
         return make_U(self.mo1s[atm_idx])
+
+    def homo_first(self):
+        mocc = self.mf.mo_occ > 0
+        homo_idx = self.mf.mo_energy[mocc].argmax()
+        self.perturb()
+        depsilon = []
+        for site in self.sites:
+            depsilon.append(np.diag(self.e1(site))[homo_idx])
+        return np.array(depsilon)
 
     def dP(self, atm_idx):
         if atm_idx not in self.sites:

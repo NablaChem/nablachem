@@ -193,6 +193,39 @@ def test_anygrad_HF_first(letter, method):
 
 
 @pytest.mark.parametrize(
+    "letter,method",
+    [
+        (letter, method)
+        for letter in "RZ"
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_homo_HF_first(letter, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+    refgrad = {
+        "Z": [-0.5610320262571244, -0.4219750535298106],
+        "R": [0.0, 0.0, 0.0617782, 0.0, 0.0, -0.0617782],
+    }
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.HOMO)
+    actual_grad = ag.get(letter, method=method)
+    expected_grad = refgrad[letter]
+    assert np.allclose(actual_grad, expected_grad, atol=1e-10)
+
+
+@pytest.mark.parametrize(
     "letters,method",
     [
         (letters, method)
