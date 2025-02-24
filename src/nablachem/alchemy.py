@@ -518,9 +518,11 @@ class Anygrad:
 
     _references = {"CP-RHF": "DOI 10.1063/5.0085817"}
 
-    def _energy_R_RHF_CP(self):
-        self._calculator.kernel()
-        grad = self._calculator.Gradients().kernel()
+    def _energy_R_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+        calculator.kernel()
+        grad = calculator.Gradients().kernel()
         return grad.reshape(3 * self._natm)
 
     def _energy_R_R_RHF_CP(self):
@@ -528,8 +530,10 @@ class Anygrad:
         hess = self._calculator.Hessian().kernel()
         return hess.transpose(0, 2, 1, 3).reshape(3 * self._natm, -1)
 
-    def _energy_Z_RHF_CP(self):
-        ap = AP(self._calculator, sites=range(self._natm))
+    def _energy_Z_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+        ap = AP(calculator, sites=range(self._natm))
         return ap.build_gradient()
 
     def _homo_Z_RHF_CP(self, calculator=None):
@@ -695,20 +699,25 @@ class Anygrad:
             if target == Anygrad.Property.ENERGY:
                 callable = lambda mf: mf.kernel()
             if target == Anygrad.Property.HOMO:
-                callable = lambda mf: mf.mo_energy[mf.mo_occ > 0][-1]
 
-                if leveloftheory == "RHFsf":
+                def get_fun(calculator):
+                    mocc = calculator.mo_occ > 0
+                    homo_idx = calculator.mo_energy[mocc].argmax()
+                    return calculator.mo_energy[mocc][homo_idx]
 
-                    def get_combined_grad(calculator):
-                        Z_grad = self._homo_Z_RHF_CP(calculator)
-                        R_grad = self._homo_R_RHF_CP(calculator)
-                        combined = np.zeros((self._natm, 4))
-                        combined[:, 3] = Z_grad
-                        combined[:, :3] = R_grad.reshape(-1, 3)
-                        return combined.reshape(-1)
+                callable = get_fun
 
-                    callable = get_combined_grad
-                    is_gradient = True
+                # if leveloftheory == "RHF-disabled":
+                #    def get_combined_grad(calculator):
+                #        Z_grad = self._homo_Z_RHF_CP(calculator)
+                #        R_grad = self._homo_R_RHF_CP(calculator)
+                #        combined = np.zeros((self._natm, 4))
+                #        combined[:, 3] = Z_grad
+                #        combined[:, :3] = R_grad.reshape(-1, 3)
+                #        return combined.reshape(-1)
+
+                #    callable = get_combined_grad
+                #    is_gradient = True
 
             if callable is None:
                 raise NotImplementedError("Don't know how to get this property.")
