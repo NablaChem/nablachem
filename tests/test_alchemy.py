@@ -1,4 +1,9 @@
-from nablachem.alchemy import MultiTaylor
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+import pyscf
+import pytest
+from nablachem.alchemy import MultiTaylor, Anygrad
 import pandas as pd
 import numpy as np
 
@@ -129,3 +134,424 @@ def test_3d():
         abs(mt.query(A=A + 1, B=B + 1, C=C + 1)["y"] - polynomial(A + 1, B + 1, C + 1))
         < 1e-4
     )
+
+
+def test_analytical_gradients():
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "sto-3g"
+
+    mf = pyscf.scf.RHF(pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False))
+    mf.kernel()
+
+    from nablachem.analyticgrads.AP_class import APDFT_perturbator as AP
+
+    ap_nn = AP(mf, sites=[0, 1])
+    val1 = 0.02656966379363701
+    assert abs(ap_nn.af(0)[0, 2] - val1) < 1e-8
+    assert abs(ap_nn.af(0)[1, 2] + val1) < 1e-8
+    val2 = 0.27339079067037564
+    assert abs(ap_nn.af(1)[0, 2] - val2) < 1e-8
+    assert abs(ap_nn.af(1)[1, 2] + val2) < 1e-8
+
+    ap_nn.build_all()
+
+
+@pytest.mark.parametrize(
+    "letter,method",
+    [
+        (letter, method)
+        for letter in "RZ"
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_HF_first(letter, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+    refgrad = {
+        "Z": [-14.62024718, -22.21964642],
+        "R": [0.0, 0.0, 0.08731793, 0.0, 0.0, -0.08731793],
+    }
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.ENERGY)
+    actual_grad = ag.get(letter, method=method)
+    expected_grad = refgrad[letter]
+    assert np.allclose(actual_grad, expected_grad, atol=1e-10)
+
+
+@pytest.mark.parametrize(
+    "letter,method",
+    [
+        (letter, method)
+        for letter in "RZ"
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_homo_HF_first(letter, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+    refgrad = {
+        "Z": [-0.5610320262571244, -0.4219750535298106],
+        "R": [0.0, 0.0, 0.0617782, 0.0, 0.0, -0.0617782],
+    }
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.HOMO)
+    actual_grad = ag.get(letter, method=method)
+    expected_grad = refgrad[letter]
+    assert np.allclose(actual_grad, expected_grad, atol=1e-10)
+
+
+@pytest.mark.parametrize(
+    "letters,method",
+    [
+        (letters, method)
+        for letters in "RR RZ ZZ ZR".split()
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_HF_second(letters, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+
+    a = 0.04200557060762389
+    b = 1.666406525587
+    refhess = {
+        "ZZ": [[-0.99917602, 0.51344271], [0.51344271, -1.73650145]],
+        "RR": [
+            [
+                -a,
+                0,
+                0,
+                a,
+                0,
+                0,
+            ],
+            [
+                0,
+                -a,
+                0,
+                0,
+                a,
+                0,
+            ],
+            [
+                0,
+                0,
+                b,
+                0,
+                0,
+                -b,
+            ],
+            [
+                a,
+                0,
+                0,
+                -a,
+                0,
+                0,
+            ],
+            [
+                0,
+                a,
+                0,
+                0,
+                -a,
+                0,
+            ],
+            [
+                0,
+                0,
+                -b,
+                0,
+                0,
+                b,
+            ],
+        ],
+        "RZ": [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [-0.227618727421941, -0.04368991568526326],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.22761870610565893, 0.043689929896117974],
+        ],
+    }
+    refhess["ZR"] = np.array(refhess["RZ"]).T
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.ENERGY)
+    actual_hess = ag.get(*list(letters), method=method)
+    expected_hess = refhess[letters]
+    if letters[0] == letters[1]:
+        assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+    assert np.allclose(actual_hess, expected_hess, atol=1e-7)
+
+
+@pytest.mark.parametrize(
+    "letters,method",
+    [
+        (letters, method)
+        for letters in "RR RZ ZZ ZR".split()
+        for method in (Anygrad.Method.FINITE_DIFFERENCES,)
+    ],
+)
+def test_anygrad_homo_HF_second(letters, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+
+    a = 0.029719673166894722
+    b = 0.15673020992146292
+    refhess = {
+        "ZZ": [
+            [-0.0368089545510486, -0.09839942277656277],
+            [-0.09839942277656277, -0.0328262166338078],
+        ],
+        "RR": [
+            [
+                -a,
+                0,
+                0,
+                a,
+                0,
+                0,
+            ],
+            [
+                0,
+                -a,
+                0,
+                0,
+                a,
+                0,
+            ],
+            [
+                0,
+                0,
+                b,
+                0,
+                0,
+                -b,
+            ],
+            [
+                a,
+                0,
+                0,
+                -a,
+                0,
+                0,
+            ],
+            [
+                0,
+                a,
+                0,
+                0,
+                -a,
+                0,
+            ],
+            [
+                0,
+                0,
+                -b,
+                0,
+                0,
+                b,
+            ],
+        ],
+        "RZ": [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [-0.0780058525551297, 0.013841397111802323],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.078005849724061, -0.013841397777936137],
+        ],
+    }
+    refhess["ZR"] = np.array(refhess["RZ"]).T
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.HOMO)
+    actual_hess = ag.get(*list(letters), method=method)
+    expected_hess = refhess[letters]
+    print(actual_hess.tolist())
+    if letters[0] == letters[1]:
+        assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+    assert np.allclose(actual_hess, expected_hess, atol=1e-7)
+
+
+@pytest.mark.parametrize(
+    "letter,method",
+    [
+        (letter, method)
+        for letter in "RZ"
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_KS_first(letter, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+    refgrad = {
+        "Z": [-14.67702969, -22.21780538],
+        "R": [0.0, 0.0, 0.16927617794167382, 0.0, 0.0, -0.16927617794167382],
+    }
+
+    mf = pyscf.scf.RKS(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.xc = "PBE"
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.ENERGY)
+    actual_grad = ag.get(letter, method=method)
+    expected_grad = refgrad[letter]
+    assert np.allclose(actual_grad, expected_grad, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "letters,method",
+    [
+        (letters, method)
+        for letters in "RR ZZ RZ".split()
+        for method in (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+    ],
+)
+def test_anygrad_KS_second(letters, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+
+    a = 0.08153317625843204
+    b = 1.6317318206865088
+    refhess = {
+        "ZZ": [
+            [-1.0532412107714622, 0.49604247244488126],
+            [0.49604247244488126, -1.6955340548450024],
+        ],
+        "RR": [
+            [
+                -a,
+                0,
+                0,
+                a,
+                0,
+                0,
+            ],
+            [
+                0,
+                -a,
+                0,
+                0,
+                a,
+                0,
+            ],
+            [
+                0,
+                0,
+                b,
+                0,
+                0,
+                -b,
+            ],
+            [
+                a,
+                0,
+                0,
+                -a,
+                0,
+                0,
+            ],
+            [
+                0,
+                a,
+                0,
+                0,
+                -a,
+                0,
+            ],
+            [
+                0,
+                0,
+                -b,
+                0,
+                0,
+                b,
+            ],
+        ],
+        "RZ": [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [-0.1604751922457126, -0.038762649978707486],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.1604751922457126, 0.038762649978707486],
+        ],
+    }
+    refhess["ZR"] = np.array(refhess["RZ"]).T
+
+    mf = pyscf.scf.RKS(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.xc = "PBE"
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.ENERGY)
+    if letters == "RZ" and method == Anygrad.Method.COUPLED_PERTURBED:
+        with pytest.raises(NotImplementedError):
+            ag.get(*list(letters), method=method)
+    else:
+        actual_hess = ag.get(*list(letters), method=method)
+        expected_hess = refhess[letters]
+
+        if letters[0] == letters[1]:
+            assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+        assert np.allclose(actual_hess, expected_hess, atol=3e-4)

@@ -4,8 +4,13 @@ import numpy as np
 import math
 import collections
 import itertools as it
+import pyscf
+import enum
 
 from scipy.optimize import minimize
+
+from .analyticgrads.AP_class import APDFT_perturbator as AP
+from .analyticgrads.AP_class import alchemy_cphf_deriv
 
 
 class Monomial:
@@ -503,3 +508,377 @@ class MultiTaylor:
             Optimal position found.
         """
         return self._optimize(True, target, bounds)
+
+
+class Anygrad:
+    """Calculates quantum chemical gradients including those w.r.t. nuclear charges analytically where possible.
+
+    Order: xyzZxyzZxyzZ... (in order of atoms)
+    """
+
+    _references = {"CP-RHF": "DOI 10.1063/5.0085817"}
+
+    def _energy_R_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+        calculator.kernel()
+        grad = calculator.Gradients().kernel()
+        return grad.reshape(3 * self._natm)
+
+    def _energy_R_R_RHF_CP(self):
+        self._calculator.kernel()
+        hess = self._calculator.Hessian().kernel()
+        return hess.transpose(0, 2, 1, 3).reshape(3 * self._natm, -1)
+
+    def _energy_Z_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+        ap = AP(calculator, sites=range(self._natm))
+        return ap.build_gradient()
+
+    def _homo_Z_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+
+        mocc = calculator.mo_occ > 0
+        homo_idx = calculator.mo_energy[mocc].argmax()
+
+        depsilon = []
+        for atomidx in range(self._natm):
+            calculator.mol.set_rinv_orig_(calculator.mol.atom_coords()[atomidx])
+            dV = -calculator.mol.intor("int1e_rinv")
+            _, e1 = alchemy_cphf_deriv(calculator, dV)
+            depsilon.append(np.diag(e1)[homo_idx])
+
+        return np.array(depsilon)
+
+    def _homo_R_RHF_CP(self, calculator=None):
+        if calculator is None:
+            calculator = self._calculator
+        from pyscf import hessian
+
+        mf_h = self._calculator.Hessian()
+        h1 = hessian.rhf.make_h1(mf_h, calculator.mo_coeff, calculator.mo_occ)
+
+        _, mo_e1 = hessian.rhf.solve_mo1(
+            calculator,
+            calculator.mo_energy,
+            calculator.mo_coeff,
+            calculator.mo_occ,
+            h1,
+            None,
+        )
+        return np.asarray(mo_e1)[:, :, -1, -1].reshape(-1)
+
+    def _energy_Z_Z_RHF_CP(self):
+        ap = AP(self._calculator, sites=range(self._natm))
+        return ap.build_hessian()
+
+    def _energy_R_RKS_CP(self):
+        return self._energy_R_RHF_CP()
+
+    def _energy_R_R_RKS_CP(self):
+        return self._energy_R_R_RHF_CP()
+
+    def _energy_Z_RKS_CP(self):
+        return self._energy_Z_RHF_CP()
+
+    def _energy_Z_Z_RKS_CP(self):
+        return self._energy_Z_Z_RHF_CP()
+
+    def _energy_R_Z_RHF_CP(self):
+        sites = range(self._natm)
+        ap = AP(self._calculator, sites=sites)
+        return np.array([ap.af(i).reshape(-1) for i in sites]).T
+
+    def _energy_Z_R_RHF_CP(self):
+        return self._energy_R_Z_RHF_CP().T
+
+    def _energy_R_RHF_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _energy_R_RKS_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RKS", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _energy_Z_RKS_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RKS", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _energy_Z_RHF_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _energy_R_R_RHF_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RHF", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask][:, mask]
+
+    def _energy_Z_Z_RHF_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][2][3::4, 3::4]
+
+    def _energy_R_Z_RHF_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RHF", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask, 3::4]
+
+    def _energy_Z_R_RHF_FD(self):
+        return self._energy_R_Z_RHF_FD().T
+
+    def _energy_R_R_RKS_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RKS", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask][:, mask]
+
+    def _energy_Z_Z_RKS_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RKS", target)
+        return self._fd_cache[target.name][2][3::4, 3::4]
+
+    def _energy_R_Z_RKS_FD(self):
+        target = Anygrad.Property.ENERGY
+        self._build_fd_cache("RKS", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask, 3::4]
+
+    def _energy_Z_R_RKS_FD(self):
+        return self._energy_R_Z_RKS_FD().T
+
+    def _homo_R_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, :3].reshape(-1)
+
+    def _homo_Z_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][1].reshape(-1, 4)[:, 3].reshape(-1)
+
+    def _homo_Z_Z_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        return self._fd_cache[target.name][2][3::4, 3::4]
+
+    def _homo_R_R_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask][:, mask]
+
+    def _homo_R_Z_RHF_FD(self):
+        target = Anygrad.Property.HOMO
+        self._build_fd_cache("RHF", target)
+        mask = np.ones(4 * self._natm, dtype=bool)
+        mask[3::4] = False
+        return self._fd_cache[target.name][2][mask, 3::4]
+
+    def _homo_Z_R_RHF_FD(self):
+        return self._homo_R_Z_RHF_FD().T
+
+    def _build_fd_cache(self, leveloftheory: str, target: "Anygrad.Property"):
+        if not hasattr(self, "_fd_cache"):
+            self._fd_cache = dict()
+        if not target.name in self._fd_cache:
+            callable = None
+            is_gradient = False
+            if target == Anygrad.Property.ENERGY:
+                callable = lambda mf: mf.kernel()
+            if target == Anygrad.Property.HOMO:
+
+                def get_fun(calculator):
+                    mocc = calculator.mo_occ > 0
+                    homo_idx = calculator.mo_energy[mocc].argmax()
+                    return calculator.mo_energy[mocc][homo_idx]
+
+                callable = get_fun
+
+                # if leveloftheory == "RHF-disabled":
+                #    def get_combined_grad(calculator):
+                #        Z_grad = self._homo_Z_RHF_CP(calculator)
+                #        R_grad = self._homo_R_RHF_CP(calculator)
+                #        combined = np.zeros((self._natm, 4))
+                #        combined[:, 3] = Z_grad
+                #        combined[:, :3] = R_grad.reshape(-1, 3)
+                #        return combined.reshape(-1)
+
+                #    callable = get_combined_grad
+                #    is_gradient = True
+
+            if callable is None:
+                raise NotImplementedError("Don't know how to get this property.")
+
+            if leveloftheory == "RKS":
+
+                def build_calc(mol, xc):
+                    mf = pyscf.scf.RKS(mol)
+                    mf.xc = xc
+                    return mf
+
+                calc = lambda mol: build_calc(mol, self._calculator.xc)
+            else:
+                calc = self._calculator.__class__
+
+            self._fd_cache[target.name] = self._finite_differences(
+                self._atomspec,
+                self._basis,
+                calc,
+                callable=callable,
+                callable_is_grad=is_gradient,
+            )
+
+    class Property(enum.Enum):
+        ENERGY = "energy"
+        HOMO = "homo"
+
+    class Variable(enum.Enum):
+        POSITION = "R"
+        NUCLEAR_CHARGE = "Z"
+
+    class Method(enum.Enum):
+        COUPLED_PERTURBED = "CP"
+        FINITE_DIFFERENCES = "FD"
+
+    def __init__(self, calculator, target: "Anygrad.Property"):
+        self._calculator = calculator
+        self._natm = calculator.mol.natm
+        self._atomspec = calculator.mol._atom
+        self._basis = calculator.mol.basis
+        self._target = target
+
+    def get(self, *args: "Anygrad.Variable", method: "Anygrad.Method" = None):
+        args = tuple(Anygrad.Variable(_) for _ in args)
+
+        # TODO: sort and auto-transpose
+        if method is None:
+            for method in (
+                Anygrad.Method.COUPLED_PERTURBED,
+                Anygrad.Method.FINITE_DIFFERENCES,
+            ):
+                try:
+                    return self.get(*args, method=method)
+                except NotImplementedError:
+                    pass
+            raise NotImplementedError("No method supports that derivative.")
+        else:
+            method = method.value
+            args = tuple(_.value for _ in args)
+            target = self._target.value
+            leveloftheory = str(self._calculator.__class__.__name__)
+            try:
+                attrname = f"_{target}_{'_'.join(args)}_{leveloftheory}_{method}"
+                callable = getattr(self, attrname)
+            except AttributeError:
+                raise NotImplementedError("This combination is not implemented.")
+            return callable()
+
+    def _finite_differences(
+        self,
+        atomspec: str,
+        basis: str,
+        baseclass: pyscf.scf.RHF,
+        callable,
+        delta=1e-3,
+        callable_is_grad=False,
+    ):
+        def do_one(atomspec, basis, displacement):
+            mol = pyscf.gto.M(
+                atom=atomspec, basis=basis, symmetry=False, verbose=0, unit="bohr"
+            )
+
+            # update positions
+            coords = mol.atom_coords(unit="Bohr")
+            dx = displacement.reshape(-1, 4)[:, :3]
+            dZ = displacement.reshape(-1, 4)[:, 3]
+            mol.set_geom_(coords + dx, unit="Bohr")
+
+            # update nuclear charges
+            mf = baseclass(mol)
+            h1 = mf.get_hcore()
+            mf.max_cycle = 500
+
+            # electronic: extend external potential
+            s = 0
+            for i, Z in enumerate(dZ):
+                mol.set_rinv_orig_(mol.atom_coords()[i])
+                s -= Z * mol.intor("int1e_rinv")
+
+            # nuclear: difference to already included NN repulsion
+            nn = 0
+            for i in range(mol.natm):
+                Z_i = mol.atom_charge(i) + dZ[i]
+
+                for j in range(i + 1, mol.natm):
+                    Z_j = mol.atom_charge(j) + dZ[j]
+
+                    if i != j:
+                        rij = np.linalg.norm(
+                            mol.atom_coords()[i] - mol.atom_coords()[j]
+                        )
+                        missing = Z_i * Z_j - mol.atom_charge(j) * mol.atom_charge(i)
+                        nn += missing / rij
+
+            mf.get_hcore = lambda *args, **kwargs: h1 + s
+            mf._kernel = mf.kernel
+            mf.kernel = lambda *args, **kwargs: mf._kernel(*args, **kwargs) + nn
+            mf.kernel()
+            if not mf.converged:
+                raise ValueError("SCF did not converge.")
+            return callable(mf)
+
+        ndims = 4 * pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False).natm
+        gradient = np.zeros(ndims)
+        hessian = np.zeros((ndims, ndims))
+
+        if callable_is_grad:
+            gradient = do_one(atomspec, basis, np.zeros(ndims))
+            for i in range(ndims):
+                disp_i = np.zeros(ndims)
+                disp_i[i] = delta
+                gradient_up = do_one(atomspec, basis, disp_i)
+                gradient_dn = do_one(atomspec, basis, -disp_i)
+                hessian[i] = (gradient_up - gradient_dn) / (2 * delta)
+            return None, gradient, hessian
+
+        center = do_one(atomspec, basis, np.zeros(ndims))
+        gradient = np.zeros(ndims)
+        hessian = np.zeros((ndims, ndims))
+
+        for i in range(ndims):
+            disp_i = np.zeros(ndims)
+            disp_i[i] = delta
+
+            f_i_plus = do_one(atomspec, basis, disp_i)
+            f_i_minus = do_one(atomspec, basis, -disp_i)
+
+            gradient[i] = (f_i_plus - f_i_minus) / (2 * delta)
+            hessian[i, i] = (f_i_plus - 2 * center + f_i_minus) / (delta**2)
+
+            for j in range(i + 1, ndims):
+                disp_j = np.zeros(ndims)
+                disp_j[j] = delta
+
+                f_pp = do_one(atomspec, basis, disp_i + disp_j)
+                f_pm = do_one(atomspec, basis, disp_i - disp_j)
+                f_mp = do_one(atomspec, basis, -disp_i + disp_j)
+                f_mm = do_one(atomspec, basis, -disp_i - disp_j)  #
+
+                hessian[i, j] = hessian[j, i] = (f_pp - f_pm - f_mp + f_mm) / (
+                    4 * delta**2
+                )
+
+        return center, gradient, hessian
