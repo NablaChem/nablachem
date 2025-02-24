@@ -322,6 +322,103 @@ def test_anygrad_HF_second(letters, method):
 
 
 @pytest.mark.parametrize(
+    "letters,method",
+    [
+        (letters, method)
+        for letters in "RR RZ ZZ ZR".split()
+        for method in (Anygrad.Method.FINITE_DIFFERENCES,)
+    ],
+)
+def test_anygrad_homo_HF_second(letters, method):
+    import pyscf.gto
+    import pyscf.scf
+
+    atomspec = "C 0 0 0; O 0 0 1.1"
+    basis = "6-31G"
+
+    a = 0.029719673166894722
+    b = 0.15673020992146292
+    refhess = {
+        "ZZ": [
+            [-0.0368089545510486, -0.09839942277656277],
+            [-0.09839942277656277, -0.0328262166338078],
+        ],
+        "RR": [
+            [
+                -a,
+                0,
+                0,
+                a,
+                0,
+                0,
+            ],
+            [
+                0,
+                -a,
+                0,
+                0,
+                a,
+                0,
+            ],
+            [
+                0,
+                0,
+                b,
+                0,
+                0,
+                -b,
+            ],
+            [
+                a,
+                0,
+                0,
+                -a,
+                0,
+                0,
+            ],
+            [
+                0,
+                a,
+                0,
+                0,
+                -a,
+                0,
+            ],
+            [
+                0,
+                0,
+                -b,
+                0,
+                0,
+                b,
+            ],
+        ],
+        "RZ": [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [-0.0780058525551297, 0.013841397111802323],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.078005849724061, -0.013841397777936137],
+        ],
+    }
+    refhess["ZR"] = np.array(refhess["RZ"]).T
+
+    mf = pyscf.scf.RHF(
+        pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False, verbose=0)
+    )
+    mf.kernel()
+
+    ag = Anygrad(mf, Anygrad.Property.HOMO)
+    actual_hess = ag.get(*list(letters), method=method)
+    expected_hess = refhess[letters]
+    print(actual_hess.tolist())
+    if letters[0] == letters[1]:
+        assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+    assert np.allclose(actual_hess, expected_hess, atol=1e-7)
+
+
+@pytest.mark.parametrize(
     "letter,method",
     [
         (letter, method)
