@@ -155,6 +155,45 @@ class MultiTaylor:
         offsets = self._filtered[variables].values - center
         return offsets, tuple(variables)
 
+    def to_constant_grad_and_hess(self, output: str):
+        """Exports the Taylor expansion for a given output as constant, gradient, and Hessian.
+
+        Parameters
+        ----------
+        output : str
+            The output variable for which this analysis is done.
+
+        Returns
+        -------
+        tuple[float, np.ndarray, np.ndarray, list[str]]
+            Constant, gradient, Hessian, and ordered list of variable names.
+        """
+        args = list(sorted(self._center.keys()))
+        nargs = len(args)
+        constant = None
+        grad = np.zeros(nargs)
+        hess = np.zeros((nargs, nargs))
+        for monomial in self._monomials[output]:
+            coef = monomial._prefactor
+            order = sum(monomial._powers.values())
+            if order == 0:
+                constant = coef
+            elif order == 1:
+                (a,) = monomial._powers.keys()
+                idx = args.index(a)
+                grad[idx] = coef
+            elif order == 2:
+                try:
+                    a, b = monomial._powers.keys()
+                except:
+                    (a,) = monomial._powers.keys()
+                    b = a
+                idx1 = args.index(a)
+                idx2 = args.index(b)
+                hess[idx1, idx2] = coef
+                hess[idx2, idx1] = coef
+        return constant, np.array(grad), np.array(hess), args
+
     def _build_monomials(
         self, term: tuple[str], shifted: tuple[np.ndarray, tuple[str]]
     ):
