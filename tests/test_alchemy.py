@@ -452,6 +452,35 @@ def test_anygrad_KS_first(letter, method):
     assert np.allclose(actual_grad, expected_grad, atol=1e-5)
 
 
+def test_hessian_case():
+    def func(x, y):
+        return x**2 + 2 * y**2 + 4 * x * y + 7 + x + 3 * y
+
+    # build data for MultiTaylor input
+    delta = 1e-3
+    displacements = (-1, 0, 1)
+    rows = []
+    for dx in displacements:
+        for dy in displacements:
+            f = func(dx * delta, dy * delta)
+            rows.append({"x": dx * delta, "y": dy * delta, "e": f})
+    df = pd.DataFrame(rows)
+    mt = MultiTaylor(df, "e")
+    mt.reset_center(x=0, y=0)
+    mt.build_model(2)
+    c, g, h, a = mt.to_constant_grad_and_hess("e")
+    assert np.allclose(c, 7)
+    assert np.allclose(
+        g,
+        [
+            1,
+            3,
+        ],
+    )
+    assert np.allclose(h, [[2, 4], [4, 4]])
+    assert a == ["x", "y"]
+
+
 @pytest.mark.parametrize(
     "letters,method",
     [
