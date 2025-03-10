@@ -433,12 +433,18 @@ class ExactCounter:
 
         letter = "a"
         elements = {}
+        used_hydrogen = False
         for atom_type, natoms in stoichiometry.components.items():
             valence = atom_type.valence
-            elements[f"A{letter}"] = atom_type.label
-            args.append(f"-EA{letter}{valence}{valence}")
-            sf += f"A{letter}{natoms}"
-            letter = chr(ord(letter) + 1)
+            if valence == 1 and not used_hydrogen and count_only:
+                elements["H"] = atom_type.label
+                sf += f"H{natoms}"
+                used_hydrogen = True
+            else:
+                elements[f"A{letter}"] = atom_type.label
+                args.append(f"-EA{letter}{valence}{valence}")
+                sf += f"A{letter}{natoms}"
+                letter = chr(ord(letter) + 1)
 
         if count_only:
             extra = "u"

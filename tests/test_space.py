@@ -990,3 +990,20 @@ def test_ring():
 def test_only_one_partition():
     space = ncs.SearchSpace("S:4")
     assert ncs.ApproximateCounter().count(space, natoms=4) > 0
+
+
+def test_shortcut_surge_hydrogen():
+    counter = ncs.ExactCounter("/bin/false")
+
+    # shortcut of using built-in special treatment of Hydrogens
+    stoichiometry = ncs.AtomStoichiometry(
+        components={ncs.AtomType("C", 4): 9, ncs.AtomType("F", 1): 20}
+    )
+    args, mapping = counter._build_cli_arguments(stoichiometry, count_only=True)
+    assert "-c4 -d4 -EAa44 -u Aa9H20" == args
+    assert mapping["H"] == "F"
+
+    # only use the shortcut if this is about counting
+    args, mapping = counter._build_cli_arguments(stoichiometry, count_only=False)
+    assert "-c4 -d4 -EAa44 -EAb11 -A Aa9Ab20" == args
+    assert mapping["Ab"] == "F"
