@@ -25,60 +25,45 @@ class Estimator:
     """
     Estimate the intrinsic dimensionality (ID) of a scalar property in chemical space.
 
-    Parameters
-    ----------
-    gradient_energy : array-like
-        Gradient of the energy with respect to 4N atomic coordinates (Z, x, y, z).
-    hessian_energy : array-like
-        Hessian of the energy with respect to 4N atomic coordinates.
-    gradient_proprety : array-like
-        Gradient of the scalar property to be approximated (can be energy or another property).
-    hessian_proprety : array-like
-        Hessian of the scalar property to be approximated.
-    dt : float
-        Threshold used to detect degeneracy between eigenvalues.
-    scaling_groups : list of bool, optional
-        Boolean mask indicating which variables belong to chemical coordinates (True) versus
-        spatial coordinates (False). Using the mask, both groups of the chemical coordinates
-        and spatial ones can be scaled separately (it is allowed because are originated from
-        different physical properties.). The porpuse is that to make the eigenvalues of the
-        Hessiam matrix degenerate.
+    Args:
+        gradient_energy (np.ndarray): Gradient of the energy with respect to 4N atomic coordinates (Z, x, y, z).
+        hessian_energy (np.ndarray): Hessian of the energy with respect to 4N atomic coordinates.
+        gradient_property (np.ndarray): Gradient of the scalar property to be approximated (can be energy or another property).
+        hessian_property (np.ndarray): Hessian of the scalar property to be approximated.
+        dt (float): Threshold used to detect degeneracy between eigenvalues.
+        scaling_groups (list[bool], optional): Boolean mask indicating which variables belong to chemical coordinates (True)
+            versus spatial coordinates (False). This allows separate scaling of both groups (from different physical origins)
+            to make the Hessian matrix's eigenvalues degenerate.
     """
 
     def __init__(
         self,
-        gradient_energy,
-        hessian_energy,
-        gradient_proprety,
-        hessian_proprety,
-        dt,
-        scaling_groups=None,
+        gradient_energy: np.ndarray,
+        hessian_energy: np.ndarray,
+        gradient_property: np.ndarray,
+        hessian_property: np.ndarray,
+        dt: float,
+        scaling_groups: list[bool] = None,
     ):
         self._g_e = np.array(gradient_energy)
         self._h_e = np.array(hessian_energy)
-        self._g_p = np.array(gradient_proprety)
-        self._h_p = np.array(hessian_proprety)
+        self._g_p = np.array(gradient_property)
+        self._h_p = np.array(hessian_property)
         self._n = self._g_e.shape[0]
         self._dt = dt
         self._scaling_groups = scaling_groups or [False] * self._n
 
-    def _my_taylor(self, g, h, x):
+    def _my_taylor(self, g: np.ndarray, h: np.ndarray, x: np.ndarray) -> float:
         """
-        Evaluate the second-order Taylor expansion of a scalar field at displacement x.
+        Evaluate the second-order Taylor expansion of a scalar at displacement x.
 
-        Parameters
-        ----------
-        g : ndarray
-            Gradient vector.
-        h : ndarray
-            Hessian matrix.
-        x : ndarray
-            Displacement vector.
+        Args:
+            g (np.ndarray): Gradient vector.
+            h (np.ndarray): Hessian matrix.
+            x (np.ndarray): Displacement vector.
 
-        Returns
-        -------
-        float
-            Value of the Taylor approximation.
+        Returns:
+            float: Value of the Taylor approximation.
         """
         sub_arrays = [x[i::4] for i in range(4)]
         reordered_array = np.concatenate(
@@ -88,23 +73,19 @@ class Estimator:
             reordered_array.T, np.dot(h, reordered_array)
         )
 
-    def get_bounds_analitical(self, mod_vec, g, h):
+    def get_bounds_analytical(
+        self, mod_vec: np.ndarray, g: np.ndarray, h: np.ndarray
+    ) -> list[list[float]]:
         """
-        Determine thermal-accessible bounds for each eigenvector using energy.
+        Determines thermally accessible bounds for each eigenvector direction using energy.
 
-        Parameters
-        ----------
-        mod_vec : ndarray
-            Eigenvectors of the Hessian.
-        g : ndarray
-            Energy gradient.
-        h : ndarray
-            Energy Hessian.
+        Args:
+            mod_vec (np.ndarray): Eigenvectors of the Hessian.
+            g (np.ndarray): Energy gradient.
+            h (np.ndarray): Energy Hessian.
 
-        Returns
-        -------
-        list of list
-            Bounds (positive and negative) for each eigenvector direction.
+        Returns:
+            list[list[float]]: Bounds (positive and negative) for each eigenvector direction.
         """
         k = len(mod_vec)
         KT = 4.75e-4
@@ -129,13 +110,11 @@ class Estimator:
         Compute the intrinsic dimensionality (ID) by incrementally selecting eigenvectors
         that minimize the property estimation error.
 
-        Returns
-        -------
-        dict
-            Dictionary with:
-            - "ID": List of dimensionality values (after degeneracy correction).
-            - "Error": Corresponding estimation errors.
-            - "natoms": Number of atoms (N).
+        Returns:
+            dict: Dictionary with the following keys:
+                - "ID" (list of int): List of dimensionality values (after degeneracy correction).
+                - "Error" (list of float): Corresponding estimation errors.
+                - "natoms" (int): Number of atoms (N).
         """
         Estimated_ID = []
         Estimated_degeneracy = [0]
@@ -143,7 +122,7 @@ class Estimator:
         Estimated_ID.append(len(kept))
 
         alleigenvalues, alleigenvectors = np.linalg.eigh(self._h_p)
-        bounds = self.get_bounds_analitical(alleigenvectors, self._g_e, self._h_e)
+        bounds = self.get_bounds_analytical(alleigenvectors, self._g_e, self._h_e)
         errors = [self._estimate_error(alleigenvalues, bounds, kept)]
 
         if (
@@ -224,23 +203,19 @@ class Estimator:
             }
         return final_result
 
-    def _estimate_error(self, mod_values, bounds, kept):
+    def _estimate_error(
+        self, mod_values: np.ndarray, bounds: list[list[float]], kept: list[int]
+    ) -> float:
         """
         Estimate squared error of reconstruction when only `kept` eigenvalues are included.
 
-        Parameters
-        ----------
-        mod_values : ndarray
-            Eigenvalues of the property Hessian.
-        bounds : list of list
-            Integration bounds for each eigenvalues.
-        kept : list of int
-            Indices of retained eigenmodes.
+        Args:
+            mod_values (np.ndarray): Eigenvalues of the property Hessian.
+            bounds (list[list[float]]): Integration bounds for each eigenvalue.
+            kept (list[int]): Indices of retained eigenmodes.
 
-        Returns
-        -------
-        float
-            Approximate estimated error.
+        Returns:
+            float: Approximate estimated error.
         """
         k = len(mod_values)
         delta_Q = 0
@@ -273,44 +248,35 @@ class Estimator:
                     )
         return np.sqrt(delta_Q)
 
-    def _apply_scaling(self, H, s):
+    def _apply_scaling(self, H: np.ndarray, s: float) -> np.ndarray:
         """
         Apply coordinate-group-based scaling to the Hessian.
 
-        Parameters
-        ----------
-        H : ndarray
-            Input Hessian matrix.
-        s : float
-            Scaling factor for selected coordinate group.
+        Args:
+            H (np.ndarray): Input Hessian matrix.
+            s (float): Scaling factor for selected coordinate group.
 
-        Returns
-        -------
-        ndarray
-            Scaled Hessian matrix.
+        Returns:
+            np.ndarray: Scaled Hessian matrix.
         """
         svec = np.ones(self._n)
         svec[self._scaling_groups] = s
         hmod = np.outer(svec, svec) * H
         return hmod
 
-    def _count_degeneracy(self, removed_indices, mod_values, mod_vec):
+    def _count_degeneracy(
+        self, removed_indices: list[int], mod_values: np.ndarray, mod_vec: np.ndarray
+    ) -> int:
         """
-        Count maximum number of nearly degenerate eigenvalues across scaling sweeps.
+        Count the maximum number of nearly degenerate eigenvalues across scaling sweeps.
 
-        Parameters
-        ----------
-        removed_indices : list of int
-            Indices of discarded eigenvalues.
-        mod_values : ndarray
-            Eigenvalues.
-        mod_vec : ndarray
-            Eigenvectors.
+        Args:
+            removed_indices (list[int]): Indices of discarded eigenvalues.
+            mod_values (np.ndarray): Eigenvalues.
+            mod_vec (np.ndarray): Eigenvectors.
 
-        Returns
-        -------
-        int
-            Maximum observed degeneracy.
+        Returns:
+            int: Maximum observed degeneracy.
         """
         mod_values_copy = mod_values.copy()
         degeneracy_l = []
@@ -327,23 +293,17 @@ class Estimator:
             degeneracy_l.append(degeneracy)
         return max(degeneracy_l)
 
-    def _gradient_check(self, removed_indices, mod_values, mod_vec):
+    def _gradient_check(self, removed_indices: list[int], mod_values, mod_vec):
         """
-        Estimate alignment between remaining eigenvectors and the property gradient.
+        Estimates the alignment between the remaining eigenvectors and the property gradient.
 
-        Parameters
-        ----------
-        removed_indices : list of int
-            Indices of discarded modes.
-        mod_values : ndarray
-            Eigenvalues.
-        mod_vec : ndarray
-            Eigenvectors.
+        Args:
+            removed_indices (list[int]): Indices of discarded modes.
+            mod_values (np.ndarray): Array of eigenvalues.
+            mod_vec (np.ndarray): Array of eigenvectors.
 
-        Returns
-        -------
-        float
-            Total projection of the normalized gradient onto selected eigenvectors.
+        Returns:
+            float: Total projection of the normalized gradient onto the selected eigenvectors.
         """
         mod_values_copy = mod_values.copy()
         mod_vec_copy = mod_vec.copy()
@@ -351,29 +311,29 @@ class Estimator:
             mod_values_copy[index] = 0
         mask = np.sort(abs(mod_values_copy))[::-1] > 0
         selected_vec = mod_vec_copy[mask]
-        projecyed_gradient = 0
+        projected_gradient = 0
         for i in range(len(selected_vec)):
-            projecyed_gradient += np.abs(
+            projected_gradient += np.abs(
                 np.dot(
                     self._g_p / np.linalg.norm(self._g_p),
                     selected_vec[i] / np.linalg.norm(selected_vec[i]),
                 )
             )
-        return projecyed_gradient
+        return projected_gradient
 
     def _data_imputation(self, data):
         """
-        Perform linear forward-fill on missing error values to complete error curve.
+        Performs linear forward-fill imputation on missing error values to complete error curves.
 
-        Parameters
-        ----------
-        data : list of dict
-            List of result records containing 'ID' and 'Error'.
+        This method processes a list of result records, each containing 'ID' and 'Error' fields,
+        and fills in missing error values by carrying forward the last known error. The result is
+        a list of records with a complete range of IDs and imputed error values.
 
-        Returns
-        -------
-        list of dict
-            List of completed records with full ID range and imputed errors.
+        Args:
+            data (list[dict]): List of result records, each with 'ID', 'Error', and 'natoms' fields.
+
+        Returns:
+            list[dict]: List of records with full ID range and imputed error values.
         """
         min_error_data = []
         for i in range(len(data)):
