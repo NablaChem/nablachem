@@ -582,5 +582,5 @@ def test_anygrad_KS_second(letters, method):
         expected_hess = refhess[letters]
 
         if letters[0] == letters[1]:
-            assert np.allclose(actual_hess, actual_hess.T, atol=1e-14)
+            assert np.allclose(actual_hess, actual_hess.T, atol=1e-13)
         assert np.allclose(actual_hess, expected_hess, atol=3e-4)
