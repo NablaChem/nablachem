@@ -434,9 +434,20 @@ class ExactCounter:
         letter = "a"
         elements = {}
         used_hydrogen = False
+
+        monovalent_counts = []
+        for atom_type, natoms in stoichiometry.components.items():
+            if atom_type.valence == 1:
+                monovalent_counts.append(natoms)
+
         for atom_type, natoms in stoichiometry.components.items():
             valence = atom_type.valence
-            if valence == 1 and not used_hydrogen and count_only:
+            if (
+                valence == 1
+                and not used_hydrogen
+                and count_only
+                and natoms == max(monovalent_counts)
+            ):
                 elements["H"] = atom_type.label
                 sf += f"H{natoms}"
                 used_hydrogen = True
@@ -936,7 +947,7 @@ class ApproximateCounter:
         paper_prefactor = prefactor
         paper_exponential = term1 + term2 + term3 + term4 + term5
 
-        # calibration via error term, see SI
+        # calibration via error term
         natoms = len(degrees)
 
         if calibrated:
@@ -1146,7 +1157,6 @@ class ApproximateCounter:
             found = int(mpmath.exp(log_asymptotic_size))
         else:
             found = self._pure_prediction(label, log_size=log_asymptotic_size)
-
         self._seen_sequences[natoms][label] = found
         return found
 
