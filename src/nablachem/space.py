@@ -811,7 +811,7 @@ class ApproximateCounter:
             ):
                 if not selection.selected_stoichiometry(stoichiometry):
                     continue
-                total += self.count_one(stoichiometry, natoms)
+                total += self.count_one(stoichiometry, natoms, validated=True)
         else:
             cached_degree_sequence = False
             for case in search_space.list_cases_bare(natoms, progress=self._progress):
@@ -821,7 +821,10 @@ class ApproximateCounter:
 
                 components = [[valence, count] for _, valence, count in case]
                 total += self.count_one_bare(
-                    tuple(sum(components, [])), natoms, cached_degree_sequence
+                    tuple(sum(components, [])),
+                    natoms,
+                    cached_degree_sequence,
+                    validated=True,
                 )
                 cached_degree_sequence = True
         return total
@@ -961,7 +964,9 @@ class ApproximateCounter:
 
         return np.log(float(paper_prefactor)) + paper_exponential + calibration
 
-    def count_one(self, stoichiometry: AtomStoichiometry, natoms: int) -> int:
+    def count_one(
+        self, stoichiometry: AtomStoichiometry, natoms: int, validated: bool = False
+    ) -> int:
         """Counts the total number of molecules in a given stoichiometry.
 
         The redundant specification of the number of atoms is a performance tweak.
@@ -972,6 +977,8 @@ class ApproximateCounter:
             The stoichiometry to count.
         natoms : int
             Number of atoms in that stoichiometry.
+        validated : bool, optional
+            Whether the given degree sequence needs to be checked for feasibility. When in doubt, True
 
         Returns
         -------
@@ -979,7 +986,9 @@ class ApproximateCounter:
             Total count of molecules.
         """
         self._fill_cache(natoms)
-        return self.count_one_bare(stoichiometry.canonical_tuple, natoms)
+        return self.count_one_bare(
+            stoichiometry.canonical_tuple, natoms, validated=validated
+        )
 
     @functools.cache
     def _cached_permutation_factor_log(self, groups: tuple[int]) -> float:
@@ -1077,7 +1086,11 @@ class ApproximateCounter:
         return self._average_path_length_to_size(prefactor * lgdu)
 
     def count_one_bare(
-        self, label: tuple[int], natoms: int, cached_degree_sequence: bool = False
+        self,
+        label: tuple[int],
+        natoms: int,
+        cached_degree_sequence: bool = False,
+        validated: bool = False,
     ) -> int:
         """Counts the number of molecules of a given colored degree sequence.
 
@@ -1091,12 +1104,35 @@ class ApproximateCounter:
             The total number of atoms.
         cached_degree_sequence : bool, optional
             Whether this case has the same pure degree sequence of the previous call, by default False
+        validated : bool, optional
+            Whether the given degree sequence needs to be checked for feasibility. When in doubt, True
 
         Returns
         -------
         int
             Total count.
         """
+        # validated: do not check again
+        if not validated:
+            total = 0
+            count = 0
+            maxvalence = 0
+            for valence, valenceatoms in zip(label[::2], label[1::2]):
+                if valenceatoms == 0:
+                    return 0
+                total += valenceatoms * valence
+                maxvalence = max(maxvalence, valence)
+                count += valenceatoms
+            if total % 2 != 0:
+                # odd number of bonds
+                return 0
+            if maxvalence * 2 > total:
+                # no self-loops allowed
+                return 0
+            dbe = int(total / 2) - (count - 1)
+            if dbe < 0:
+                return 0
+
         # done recently?
         try:
             return self._seen_sequences[natoms][label]
