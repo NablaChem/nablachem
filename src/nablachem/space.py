@@ -31,8 +31,9 @@ def label_to_stoichiometry(label: str):
     atomtypes = {}
     idx = 0
     for degree, natoms in zip(parts[0::2], parts[1::2]):
-        atomtypes[AtomType("X" + chr(ord("a") + idx), int(degree))] = int(natoms)
-        idx += 1
+        if int(natoms) > 0:
+            atomtypes[AtomType("X" + chr(ord("a") + idx), int(degree))] = int(natoms)
+            idx += 1
     return AtomStoichiometry(atomtypes)
 
 
@@ -1148,6 +1149,7 @@ class ApproximateCounter:
                 except:
                     pass
                 if found is not None:
+                    print("EXACT")
                     self._seen_sequences[natoms][label] = found
                     return found
 
@@ -1158,6 +1160,7 @@ class ApproximateCounter:
                 except:
                     pass
                 if found is not None:
+                    print("BASE", label)
                     self._seen_sequences[natoms][label] = found
                     return found
 
@@ -1168,6 +1171,7 @@ class ApproximateCounter:
                 except KeyError:
                     pass
                 if found is not None:
+                    print("PURE")
                     self._seen_sequences[natoms][label] = found
                     return found
 

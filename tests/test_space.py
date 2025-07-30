@@ -180,13 +180,18 @@ def test_case_list_bare():
     assert _compare_caselists(actual, expected)
 
 
-def test_case_count_unvalidated():
+def test_count_unvalidated():
     c = ncs.ApproximateCounter()
     assert (
         c.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30, validated=True) > 0
     )
     assert c.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30) == 0
     assert c.count_one(ncs.label_to_stoichiometry("1.1_4.9"), 9 + 30) == 0
+
+
+def test_zero_frequency():
+    c = ncs.ApproximateCounter()
+    assert c.count_one(ncs.label_to_stoichiometry("1.0_4.9"), 9) > 0
 
 
 def test_case_list_bare_sequence():
