@@ -52,7 +52,9 @@ class AtomStoichiometry:
 
     @property
     def canonical_tuple(self):
-        return tuple(sum([[e[0].valence, e[1]] for e in self._canonical_sorting], []))
+        return tuple(
+            sum([[e[0].valence, e[1]] for e in self._canonical_sorting if e[1] > 0], [])
+        )
 
     @property
     def canonical_element_sequence(self):

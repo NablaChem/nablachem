@@ -23,6 +23,7 @@ import tqdm
 import gzip
 from mpmath import mp
 import mpmath
+import msgpack
 from .utils import *
 
 
@@ -409,6 +410,9 @@ class ExactCounter:
     "infeasible" molecular graphs in surge by defining non-standard element labels.
 
     Uses surge (https://doi.org/10.1186/s13321-022-00604-9) which in turn leverages nauty.
+
+    Requires removal of the following line in surge.c as artificial constraint:
+    if (deg[i] + hyd[i] > 4 && hyd[i] > 0) return;
     """
 
     def __init__(self, binary: str, timeout: int = None):
@@ -602,6 +606,7 @@ class ApproximateCounter:
         self._p2 = x2 - half
         self._p3 = x3 - x2 + third
 
+        return  # TODO: read cache
         cachedirs = [pathlib.Path(__file__).parent.resolve() / "cache"]
         if other_cachedirs is not None:
             cachedirs += other_cachedirs
@@ -626,6 +631,17 @@ class ApproximateCounter:
             overall = max(overall, self._max_natoms_from_cache[kind])
         self._max_natoms_from_cache["all"] = overall
         self._estimated = []
+
+    @staticmethod
+    def read_db(fn: str) -> dict:
+        """Reads the database files distributed with the package."""
+        with gzip.open(fn) as fh:
+            db = msgpack.load(
+                fh,
+                strict_map_key=False,
+                use_list=False,
+            )
+        return db
 
     def estimated_in_cache(self, maxsize: int = None) -> list[str]:
         """Builds a list of all those degree sequences that are estimated only.
@@ -1016,6 +1032,27 @@ class ApproximateCounter:
             remaining -= count
         return np.log(score)
 
+    def _pure_prefactor(self, label: tuple[int]) -> float:
+        M = 0
+        logscore = 0
+
+        last_d = label[0]
+        counts = []
+        for i in range(len(label) // 2):
+            degree, count = label[i * 2 : i * 2 + 2]
+            if degree != last_d:
+                logscore += self._cached_permutation_factor_log(tuple(counts))
+                counts = sum(counts)
+                M += last_d * counts
+                last_d = degree
+                counts = []
+            counts.append(count)
+        logscore += self._cached_permutation_factor_log(tuple(counts))
+        counts = sum(counts)
+        M += last_d * counts
+
+        return logscore / M + 1
+
     def _pure_prediction(
         self, label: tuple[int], pure_size: int = None, log_size: float = None
     ) -> int:
@@ -1054,27 +1091,8 @@ class ApproximateCounter:
                 pass
             raise KeyError("Data missing in database")
 
-        M = 0
-        purespec = []
-        logscore = 0
-
-        last_d = label[0]
-        counts = []
-        for i in range(len(label) // 2):
-            degree, count = label[i * 2 : i * 2 + 2]
-            if degree != last_d:
-                logscore += self._cached_permutation_factor_log(tuple(counts))
-                counts = sum(counts)
-                purespec += [last_d, counts]
-                M += last_d * counts
-                last_d = degree
-                counts = []
-            counts.append(count)
-        logscore += self._cached_permutation_factor_log(tuple(counts))
-        counts = sum(counts)
-        purespec += [last_d, counts]
-        purespec = tuple(purespec)
-        M += last_d * counts
+        prefactor = self._pure_prefactor(label)
+        purespec = _to_pure(label)
 
         if pure_size is None:
             if log_size is None:
@@ -1082,7 +1100,6 @@ class ApproximateCounter:
             else:
                 pure_size = int(mpmath.exp(log_size))
 
-        prefactor = logscore / M + 1
         lgdu = self._size_to_average_path_length(pure_size)
         return self._average_path_length_to_size(prefactor * lgdu)
 
@@ -1149,7 +1166,6 @@ class ApproximateCounter:
                 except:
                     pass
                 if found is not None:
-                    print("EXACT")
                     self._seen_sequences[natoms][label] = found
                     return found
 
@@ -1160,7 +1176,6 @@ class ApproximateCounter:
                 except:
                     pass
                 if found is not None:
-                    print("BASE", label)
                     self._seen_sequences[natoms][label] = found
                     return found
 
@@ -1171,7 +1186,6 @@ class ApproximateCounter:
                 except KeyError:
                     pass
                 if found is not None:
-                    print("PURE")
                     self._seen_sequences[natoms][label] = found
                     return found
 
@@ -1616,7 +1630,7 @@ class ApproximateCounter:
                     random.shuffle(group)
                 permutation = sum(groups, [])
 
-                for step in range(30):
+                for step in range(300):
                     groupid = rng.choice(
                         len(groups), p=group_weights / sum(group_weights)
                     )
@@ -1698,6 +1712,7 @@ class ApproximateCounter:
         Gs = [
             ApproximateCounter.sample_connected(canonical_label) for _ in range(ngraphs)
         ]
+
         rng = np.random.default_rng()
 
         # prepare reusable data
@@ -1707,6 +1722,8 @@ class ApproximateCounter:
         adjacencies = []
         for G in Gs:
             adjacencies.append(nx.adjacency_matrix(G, nodelist=node_order(G)))
+        return adjacencies
+
         permutations = None
         if number_of_permutations() < 100:
             permutations = [all_permutations(G) for G in Gs]
@@ -1729,6 +1746,7 @@ class ApproximateCounter:
             names = list(strategies.keys())
 
             distances = [strategies[name](i, j) for name in names]
+            print(distances)
             total_path_length += min(distances)
             strategy_score.append(names[distances.index(min(distances))])
 

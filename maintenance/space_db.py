@@ -27,6 +27,7 @@ def getlines(fn):
 db_exact = {}
 db_approx = {}
 
+skiplabels = []
 for fn in glob.glob("../database/space-*"):
     lines = getlines(fn)
     is_pathlength = "." in lines[0].split()[1]
@@ -35,9 +36,22 @@ for fn in glob.glob("../database/space-*"):
         parts = line.split()
         label = label_to_dbkey(parts[0])
         if is_pathlength:
-            db_approx[label] = float(parts[1])
+            # take minimum from several sources: after all, it's about the shortest path
+            other = db_approx.get(label, float("inf"))
+            db_approx[label] = min(other, float(parts[1]))
         else:
+            # exact counts may contain "override" in file name, that's for a rerun of valences > 4
+            if "override" in fn:
+                if parts[1] == "None":
+                    skiplabels.append(label)
+                    continue
+            if label in db_exact and not "override" in fn:
+                continue
             db_exact[label] = int(parts[1])
+# remove skiplabels
+for label in skiplabels:
+    if label in db_exact:
+        del db_exact[label]
 
 db_export_approx = {}
 db_compare = {}
