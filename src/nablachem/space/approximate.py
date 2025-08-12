@@ -1,16 +1,11 @@
 import functools
-import gzip
 import pathlib
-import random
 from typing import Generator
-import mpmath
 import networkx as nx
 import numpy as np
 import random_graph
 import scipy.special as scs
 from mpmath import mp
-import msgpack
-
 from .utils import (
     AtomStoichiometry,
     Molecule,
@@ -19,6 +14,8 @@ from .utils import (
     _is_pure,
     _to_pure,
     _read_db,
+    falling_factorial,
+    factorial,
 )
 
 
@@ -55,16 +52,23 @@ class ApproximateCounter:
         self._approx_db = _read_db(cachedir / "space-approx.msgpack.gz")
 
         # transform approximate path length into integer counts
-        for key, value in self._approx_db.items():
+        keys_to_delete = []
+        updates = {}
+        for key, value in list(self._approx_db.items()):
             canonical_key = self._canonical_label(key)
             if canonical_key != key:
-                del self._approx_db[key]
-            self._approx_db[canonical_key] = self._average_path_length_to_size(value)
+                keys_to_delete.append(key)
+            updates[canonical_key] = self._average_path_length_to_size(value)
+        for key in keys_to_delete:
+            del self._approx_db[key]
+        self._approx_db.update(updates)
 
         # canonicalize exact key
-        for key in list(self._exact_db.keys()):
+        updates = {}
+        for key, value in self._exact_db.items():
             canonical_key = self._canonical_label(key)
-            self._exact_db[canonical_key] = self._exact_db.pop(key)
+            updates[canonical_key] = value
+        self._exact_db.update(updates)
 
     def estimated_in_cache(self, maxsize: int = None) -> Generator[str, None, None]:
         """Builds a list of all those degree sequences that are estimated only.
@@ -197,9 +201,7 @@ class ApproximateCounter:
     @functools.cache
     def _prefactor(M: int) -> int:
         """Cached term from the paper in _count_one_asymptotically_log."""
-        return ApproximateCounter.factorial(M) / (
-            ApproximateCounter.factorial(M // 2) * 2 ** (M // 2)
-        )
+        return factorial(M) / (factorial(M // 2) * 2 ** (M // 2))
 
     @functools.cache
     def _count_one_asymptotically_log(
@@ -229,7 +231,7 @@ class ApproximateCounter:
         def _M(ks: list[int], r: int) -> int:
             result = 0
             for k in ks:
-                result += ApproximateCounter.falling_factorial(k, r)
+                result += falling_factorial(k, r)
             return result
 
         M = _M(degrees, 1)
@@ -238,7 +240,7 @@ class ApproximateCounter:
 
         prefactor = ApproximateCounter._prefactor(M)
         for k in degrees:
-            prefactor /= ApproximateCounter.factorial(k)
+            prefactor /= factorial(k)
 
         term1 = self._p1 * M_2 / M
         term2 = self._p2 * M_2**2 / (2 * M**2)
@@ -339,12 +341,9 @@ class ApproximateCounter:
         tuple[int]
             Canonical label of the degree sequence.
         """
-        return tuple(
-            sorted(
-                [item for sublist in zip(label[::2], label[1::2]) for item in sublist],
-                reverse=True,
-            )
-        )
+        valences, counts = label[::2], label[1::2]
+        pairs = sorted(zip(valences, counts))
+        return tuple(sum([list(_) for _ in pairs], []))
 
     def count_one_bare(
         self,
@@ -419,7 +418,7 @@ class ApproximateCounter:
                 as building the cache is a time-consuming process."""
             )
         degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
-        counts = self._count_one_asymptotically_log(degrees)
+        counts = self._count_one_asymptotically_log(tuple(degrees))
         return int(counts**prefactor)
 
     @staticmethod
@@ -471,3 +470,78 @@ class ApproximateCounter:
             elements += [f"{letter}{degree}"] * int(count)
             letter = chr(ord(letter) + 1)
         return degrees, elements
+
+    def missing_parameters(
+        self,
+        search_space: SearchSpace,
+        natoms: int,
+        pure_only: bool,
+        selection: Q = None,
+    ):
+        """Returns the colored degree sequences for which no parameters are available in the database.
+
+        Parameters
+        ----------
+        search_space : SearchSpace
+            The search space.
+        natoms : int
+            Number of atoms to check for.
+        pure_only : bool
+            Whether only pure degree sequences should be precomputed for this space.
+        selection : Q, optional
+            Subselection by query string, by default None
+
+        Returns
+        -------
+        list[tuple[int]]
+            The colored degree sequences for which there are no parameters.
+        """
+        # no parameters needed for asymptotics
+        if natoms > self._minimum_natoms_for_asymptotics:
+            return []
+
+        missing = []
+
+        if selection is not None:
+            for case in search_space.list_cases_bare(natoms, progress=self._progress):
+                if case is None:
+                    continue
+
+                label = tuple(sum([[valence, count] for _, valence, count in case], []))
+                if pure_only and not _is_pure(label):
+                    continue
+
+                if selection is not None and not selection.selected_stoichiometry(
+                    sum([[element] * count for element, _, count in case], [])
+                ):
+                    continue
+
+                # check in cache
+                label = self._canonical_label(label)
+                if label in self._approx_db:
+                    continue
+                if label in self._exact_db:
+                    continue
+
+                purespec = self._canonical_label(_to_pure(label))
+                if purespec in self._approx_db:
+                    continue
+                if purespec in self._exact_db:
+                    continue
+                missing.append(label)
+        else:
+            for case in search_space.list_cases_bare(
+                natoms,
+                degree_sequences_only=True,
+                pure_sequences_only=pure_only,
+                progress=self._progress,
+            ):
+                if case is None:
+                    continue
+
+                label = tuple(sum([[valence, count] for valence, count in case], []))
+                label = self._canonical_label(label)
+                if label not in self._exact_db and label not in self._approx_db:
+                    missing.append(label)
+
+        return list(set(missing))

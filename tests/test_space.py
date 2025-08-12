@@ -180,6 +180,16 @@ def test_case_list_bare():
     assert _compare_caselists(actual, expected)
 
 
+def test_canonical_label():
+    c = ncs.ApproximateCounter()
+    for input, expected in (
+        ((1, 30, 4, 9), (1, 30, 4, 9)),
+        ((4, 9, 1, 30), (1, 30, 4, 9)),
+        ((4, 5, 4, 4, 1, 5, 1, 25), (1, 5, 1, 25, 4, 4, 4, 5)),
+    ):
+        assert c._canonical_label(input) == expected
+
+
 def test_count_unvalidated():
     c = ncs.ApproximateCounter()
     assert (
@@ -987,7 +997,7 @@ def test_filterlist():
 def test_issue4():
     space = ncs.SearchSpace("C:4 S:2,4")
     counter = ncs.ApproximateCounter()
-    counter.count(space, natoms=16)
+    counter.count(space, natoms=20)
 
 
 def test_small():
