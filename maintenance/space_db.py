@@ -1,4 +1,5 @@
 # %%
+# reads all from /database regarding chemical space and builds the distribution databases
 import msgpack
 import glob
 import gzip
@@ -10,7 +11,7 @@ def label_to_dbkey(label: str):
 
 def db_to_file(db, label):
     print(f"storing {len(db)} entries to {label}")
-    with gzip.open(f"space-{label}.msgpack.gz", "wb") as f:
+    with gzip.open(f"src/nablachem/cache/space-{label}.msgpack.gz", "wb") as f:
         msgpack.dump(db, f, use_bin_type=True)
 
 
@@ -28,7 +29,8 @@ db_exact = {}
 db_approx = {}
 
 skiplabels = []
-for fn in glob.glob("../database/space-*"):
+for fn in glob.glob("database/space-*"):
+    print("reading file ", fn)
     lines = getlines(fn)
     is_pathlength = "." in lines[0].split()[1]
 
@@ -63,4 +65,5 @@ for k, v in db_approx.items():
 
 db_to_file(db_exact, "exact")
 db_to_file(db_export_approx, "approx")
-db_to_file(db_compare, "compare")
+# optional file with those entries where exact counts and path lengths are available
+# db_to_file(db_compare, "compare")
