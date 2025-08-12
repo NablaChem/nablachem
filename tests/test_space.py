@@ -3,6 +3,12 @@ import pytest
 import nablachem.space as ncs
 
 
+@pytest.fixture(scope="session")
+def approximate_counter():
+    """Shared ApproximateCounter instance for all tests."""
+    return ncs.ApproximateCounter()
+
+
 def test_case_noatoms():
     s = ncs.SearchSpace()
     s.add_element(ncs.Element("C", [4]))
@@ -180,28 +186,34 @@ def test_case_list_bare():
     assert _compare_caselists(actual, expected)
 
 
-def test_canonical_label():
-    c = ncs.ApproximateCounter()
+def test_canonical_label(approximate_counter):
     for input, expected in (
         ((1, 30, 4, 9), (1, 30, 4, 9)),
         ((4, 9, 1, 30), (1, 30, 4, 9)),
         ((4, 5, 4, 4, 1, 5, 1, 25), (1, 5, 1, 25, 4, 4, 4, 5)),
     ):
-        assert c._canonical_label(input) == expected
+        assert approximate_counter._canonical_label(input) == expected
 
 
-def test_count_unvalidated():
-    c = ncs.ApproximateCounter()
+def test_count_unvalidated(approximate_counter):
     assert (
-        c.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30, validated=True) > 0
+        approximate_counter.count_one(
+            ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30, validated=True
+        )
+        > 0
     )
-    assert c.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30) == 0
-    assert c.count_one(ncs.label_to_stoichiometry("1.1_4.9"), 9 + 30) == 0
+    assert (
+        approximate_counter.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30)
+        == 0
+    )
+    assert (
+        approximate_counter.count_one(ncs.label_to_stoichiometry("1.1_4.9"), 9 + 30)
+        == 0
+    )
 
 
-def test_zero_frequency():
-    c = ncs.ApproximateCounter()
-    assert c.count_one(ncs.label_to_stoichiometry("1.0_4.9"), 9) > 0
+def test_zero_frequency(approximate_counter):
+    assert approximate_counter.count_one(ncs.label_to_stoichiometry("1.0_4.9"), 9) > 0
 
 
 def test_case_list_bare_sequence():
@@ -797,17 +809,16 @@ def test_selection_multiple_andor_precedence():
         )
 
 
-def test_counter_value():
-    c = ncs.ApproximateCounter()
+def test_counter_value(approximate_counter):
     s = ncs.SearchSpace.covered_search_space("B")
     q = ncs.Q("C < 4 & H > 2")
 
-    assert c.count(s, 10) == 3754609422
-    assert c.count(s, 10, q) == 7333401
+    assert approximate_counter.count(s, 10) == 3754609422
+    assert approximate_counter.count(s, 10, q) == 7333401
 
     s = ncs.SearchSpace.covered_search_space("A")
-    assert c.count(s, 10) == 11608588574694
-    assert c.count(s, 10, q) == 1486411142
+    assert approximate_counter.count(s, 10) == 11608588574694
+    assert approximate_counter.count(s, 10, q) == 1486411142
 
 
 def test_selection_eq_multiple_mixed_operators():
@@ -973,18 +984,19 @@ def test_limit_relation():
 @pytest.mark.parametrize(
     "letter,natoms", [(letter, natoms) for letter in "AB" for natoms in range(3, 30)]
 )
-def test_sum_formula_database_covered(letter, natoms):
+def test_sum_formula_database_covered(letter, natoms, approximate_counter):
     s = ncs.SearchSpace.covered_search_space(letter)
-    counter = ncs.ApproximateCounter()
     switchover = {"A": 15, "B": 22}
-    assert counter.missing_parameters(s, natoms, natoms > switchover[letter]) == []
+    assert (
+        approximate_counter.missing_parameters(s, natoms, natoms > switchover[letter])
+        == []
+    )
 
 
-def test_sum_formula_countable():
+def test_sum_formula_countable(approximate_counter):
     s = ncs.SearchSpace.covered_search_space("B")
-    c = ncs.ApproximateCounter()
     for i in range(3, 10):
-        c.count(s, i)
+        approximate_counter.count(s, i)
 
 
 @pytest.mark.timeout(2)
@@ -994,26 +1006,25 @@ def test_filterlist():
     assert list(counter.list(space, natoms=8, selection=ncs.Q("# = 0"))) == []
 
 
-def test_issue4():
+def test_issue4(approximate_counter):
     space = ncs.SearchSpace("C:4 S:2,4")
-    counter = ncs.ApproximateCounter()
-    counter.count(space, natoms=20)
+    approximate_counter.count(space, natoms=20)
 
 
-def test_small():
+def test_small(approximate_counter):
     space = ncs.SearchSpace("H:1")
-    assert ncs.ApproximateCounter().count(space, natoms=2) > 0
+    assert approximate_counter.count(space, natoms=2) > 0
 
 
-def test_ring():
+def test_ring(approximate_counter):
     space = ncs.SearchSpace("O:2")
     for natoms in range(2, 10):
-        assert ncs.ApproximateCounter().count(space, natoms=natoms) > 0
+        assert approximate_counter.count(space, natoms=natoms) > 0
 
 
-def test_only_one_partition():
+def test_only_one_partition(approximate_counter):
     space = ncs.SearchSpace("S:4")
-    assert ncs.ApproximateCounter().count(space, natoms=4) > 0
+    assert approximate_counter.count(space, natoms=4) > 0
 
 
 def test_shortcut_surge_hydrogen():
