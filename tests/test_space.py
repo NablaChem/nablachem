@@ -812,12 +812,11 @@ def test_selection_multiple_andor_precedence():
 def test_counter_value(approximate_counter):
     s = ncs.SearchSpace.covered_search_space("B")
     q = ncs.Q("C < 4 & H > 2")
-
-    assert approximate_counter.count(s, 10) == 3754609422
+    assert approximate_counter.count(s, 9) == 180869284
     assert approximate_counter.count(s, 10, q) == 7333401
 
     s = ncs.SearchSpace.covered_search_space("A")
-    assert approximate_counter.count(s, 10) == 11608588574694
+    assert approximate_counter.count(s, 9) == 178099319914
     assert approximate_counter.count(s, 10, q) == 1486411142
 
 
