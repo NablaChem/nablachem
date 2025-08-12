@@ -403,9 +403,9 @@ class ApproximateCounter:
         # try to find pure degree sequence
         pure_label = _to_pure(label)
         prefactor = self._pure_prefactor(pure_label)
-        if label in self._exact_db:
+        if pure_label in self._exact_db:
             return int(self._exact_db[pure_label] ** prefactor)
-        if label in self._approx_db:
+        if pure_label in self._approx_db:
             return int(self._approx_db[pure_label] ** prefactor)
 
         if natoms < self._minimum_natoms_for_asymptotics:

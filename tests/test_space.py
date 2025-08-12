@@ -832,6 +832,13 @@ def test_selection_eq_multiple_mixed_operators():
     )
 
 
+def test_count_by_pure_lookup(approximate_counter):
+    case_for_which_pure_entry_exists = (1, 1, 1, 14, 3, 1, 4, 7)
+    assert (
+        approximate_counter.count_one_bare(case_for_which_pure_entry_exists, 23) == 801
+    )
+
+
 def test_selection_neq():
     selection = ncs.Q("(C != 4)")
     for natoms, result in ((3, True), (4, False), (5, True)):
