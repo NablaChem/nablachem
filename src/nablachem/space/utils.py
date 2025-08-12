@@ -1,36 +1,14 @@
-import subprocess
-from collections.abc import Iterator
-import scipy.special as scs
-import functools
-import re
-import pathlib
-import networkx as nx
-import itertools as it
-import random_graph
-import random
-import scipy.optimize as sco
-import numpy as np
 import collections
-import math
-import operator
-from scipy._lib._util import check_random_state
-from scipy.optimize._optimize import _check_unknown_options
-from scipy.optimize import OptimizeResult
-import pyparsing
-import operator
-import functools
-import tqdm
-import gzip
-from mpmath import mp
-import mpmath
-import msgpack
-from .utils import *
-
-
 import dataclasses
+import functools
+import itertools as it
+import operator
+from collections.abc import Iterator
+
 import networkx as nx
-import collections
+import pyparsing
 import pysmiles
+import tqdm
 
 
 def integer_partition(total, maxelements):

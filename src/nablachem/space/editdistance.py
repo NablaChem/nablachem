@@ -1,4 +1,116 @@
-def estimate_edit_tree_average_path_length(canonical_label: str, ngraphs: int):
+import collections
+import itertools as it
+import math
+import operator
+import random
+
+import networkx as nx
+import numpy as np
+import scipy.optimize as sco
+from scipy._lib._util import check_random_state
+from scipy.optimize import OptimizeResult
+from scipy.optimize._optimize import _check_unknown_options
+
+from .utils import ApproximateCounter
+
+import nablachem.space as ncs
+import networkx as nx
+from collections import defaultdict, Counter
+
+
+def estimate_edit_tree_average_path_length(canonical_label: str, ngraphs: int = 5):
+    one = _permutation_free(canonical_label, ngraphs)
+    two = _with_permutations(canonical_label, ngraphs)[2]
+    return min(one, two)
+
+
+def _permutation_free(canonical_label: str, ngraphs: int = 5):
+    def canonicalize_by_spectral_ordering(G):
+        order = list(nx.spectral_ordering(G))  # returns nodes in spectral order
+        mapping = {node: i for i, node in enumerate(order)}
+        return nx.relabel_nodes(G, mapping, copy=True)
+
+    def extract_core_graph(G):
+        G_core = G.copy()
+
+        deg1_nodes = [n for n in G.nodes if G.degree(n) == 1]
+        element_count = Counter(G.nodes[n]["element"] for n in deg1_nodes)
+
+        if not element_count:
+            return G_core
+
+        most_common_element, _ = element_count.most_common(1)[0]
+
+        terminal_counts = defaultdict(int)
+
+        for n in deg1_nodes:
+            if G.nodes[n]["element"] != most_common_element:
+                continue
+            neighbors = list(G.neighbors(n))
+            if len(neighbors) != 1:
+                continue  # safety
+            parent = neighbors[0]
+            terminal_counts[parent] += 1
+            G_core.remove_node(n)
+
+        for n in G_core.nodes:
+            original = G_core.nodes[n]["element"]
+            count = terminal_counts.get(n, 0)
+            if count > 0:
+                G_core.nodes[n]["element"] = f"{original}+{count}"
+
+        return G_core
+
+    Gs = []
+    for _ in range(ngraphs):
+        G = ncs.ApproximateCounter.sample_connected(canonical_label)
+        G = extract_core_graph(G)
+        G = canonicalize_by_spectral_ordering(G)
+        Gs.append(G)
+
+    Gsmod = []
+    # make node insertion follow the canonical order, does not change the graph but helps optimize_edit_paths
+    for G in Gs:
+        H = nx.MultiGraph()
+        H.add_nodes_from(sorted(G.nodes(data=True)))
+        H.add_edges_from(G.edges(data=True))
+        Gsmod.append(H)
+
+    # get pairwise distances
+    costs = []
+    for i in range(ngraphs):
+        for j in range(i + 1, ngraphs):
+            # shortcut if they are isomorphic
+            if nx.is_isomorphic(
+                Gsmod[i],
+                Gsmod[j],
+                node_match=lambda n1, n2: n1["element"] == n2["element"],
+            ):
+                costs.append(0)
+                continue
+            matcher = nx.optimize_edit_paths(
+                Gsmod[i],
+                Gsmod[j],
+                node_match=lambda n1, n2: n1["element"] == n2["element"],
+                node_del_cost=lambda _: float("inf"),
+                node_ins_cost=lambda _: float("inf"),
+                edge_del_cost=lambda e: 1,
+                edge_ins_cost=lambda e: 1,
+                timeout=25,
+                strictly_decreasing=True,
+            )
+            for _ in range(20):
+                try:
+                    node_edits, _, cost = next(matcher)
+                    node_edits = [_ for _ in node_edits if _[0] != _[1]]
+                    # print(cost, node_edits)
+                except StopIteration:
+                    break
+            costs.append(cost)
+    return canonical_label, sum(costs) / len(costs)
+
+
+def _with_permutations(canonical_label: str, ngraphs: int):
     """Estimates the average path length via graph edit distance heuristics.
 
     This is done by choosing `ngraphs` random molecules and calculating their pairwise graph distance
@@ -471,7 +583,6 @@ def estimate_edit_tree_average_path_length(canonical_label: str, ngraphs: int):
         names = list(strategies.keys())
 
         distances = [strategies[name](i, j) for name in names]
-        print(distances)
         total_path_length += min(distances)
         strategy_score.append(names[distances.index(min(distances))])
 
