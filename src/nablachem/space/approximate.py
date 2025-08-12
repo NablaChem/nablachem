@@ -28,13 +28,10 @@ class ApproximateCounter:
         self._exact_cache = {}
         self._base_cache = {}
         self._pure_cache = {}
-        # see SI of the paper
-        self._a, self._b = 0.5758412256807119, -4.108765736350106
-        self._asymptotic_a = -90.26536323333897
-        self._asymptotic_b = 96.37998089390749
-        self._asymptotic_c = -0.004867110462540063
-        self._asymptotic_d = -0.5466985322004583
-        self._asymptotic_e = 47.56524350513164
+        # coefficients from the paper, obtained with maintenance/space_fit.py
+        self._a, self._b = 1.22066271, -0.72953204
+        self._asymptotic_a = 0.75617982
+        self._asymptotic_b = -14.40107699
         self._minimum_natoms_for_asymptotics = 20
 
         # cache mpf objects for performance
