@@ -1,8 +1,9 @@
 import re
 import subprocess
 from collections.abc import Iterator
+import pathlib
 
-from .utils import AtomStoichiometry, Molecule, Q, SearchSpace
+from .utils import AtomStoichiometry, Molecule, Q, SearchSpace, read_db
 
 
 class ExactCounter:
@@ -28,7 +29,8 @@ class ExactCounter:
             Limits the total runtime for counting any one chemical formula, by default None
         """
         self._binary = binary
-        self._cache = {}
+        cachedir = pathlib.Path(__file__).parent.resolve() / ".." / "cache"
+        self._exact_db = read_db(cachedir / "space-exact.msgpack.gz")
         self._timeout = timeout
 
     def _build_cli_arguments(
@@ -90,7 +92,7 @@ class ExactCounter:
 
     def count_one(self, stoichiometry: AtomStoichiometry):
         # cached?
-        label = stoichiometry.canonical_label
+        label = stoichiometry.canonical_tuple
         if label in self._cache:
             return self._cache[label]
 

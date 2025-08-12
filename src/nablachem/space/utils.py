@@ -9,6 +9,35 @@ import networkx as nx
 import pyparsing
 import pysmiles
 import tqdm
+import gzip
+import msgpack
+
+
+def read_db(fn: str) -> dict:
+    """Reads the database files distributed with the package."""
+    with gzip.open(fn) as fh:
+        db = msgpack.load(
+            fh,
+            strict_map_key=False,
+            use_list=False,
+        )
+    return db
+
+
+@functools.cache
+def factorial(n):
+    result = 1
+    for i in range(2, n + 1):
+        result *= i
+    return result
+
+
+@functools.cache
+def falling_factorial(n, k):
+    result = 1
+    for i in range(n, n - k, -1):
+        result *= i
+    return result
 
 
 def integer_partition(total, maxelements):

@@ -2,7 +2,7 @@ import functools
 import gzip
 import pathlib
 import random
-
+from typing import Generator
 import mpmath
 import networkx as nx
 import numpy as np
@@ -18,11 +18,12 @@ from .utils import (
     SearchSpace,
     _is_pure,
     _to_pure,
+    read_db,
 )
 
 
 class ApproximateCounter:
-    def __init__(self, other_cachedirs: list[pathlib.Path] = None, show_progress=True):
+    def __init__(self, show_progress=True):
         self._progress = show_progress
         self._seen_sequences = {}
         self._exact_cache = {}
@@ -48,44 +49,24 @@ class ApproximateCounter:
         self._p2 = x2 - half
         self._p3 = x3 - x2 + third
 
-        return  # TODO: read cache
-        cachedirs = [pathlib.Path(__file__).parent.resolve() / "cache"]
-        if other_cachedirs is not None:
-            cachedirs += other_cachedirs
+        # read cache
+        cachedir = pathlib.Path(__file__).parent.resolve() / ".." / "cache"
+        self._exact_db = read_db(cachedir / "space-exact.msgpack.gz")
+        self._approx_db = read_db(cachedir / "space-approx.msgpack.gz")
 
-        self._cachefiles = dict()
-        kinds = "exact base pure".split()
-        for kind in kinds:
-            self._cachefiles[kind] = dict()
+        # transform approximate path length into integer counts
+        for key, value in self._approx_db.items():
+            canonical_key = self._canonical_label(key)
+            if canonical_key != key:
+                del self._approx_db[key]
+            self._approx_db[canonical_key] = self._average_path_length_to_size(value)
 
-        for cachedir in cachedirs:
-            for kind in kinds:
-                for fn in cachedir.glob(f"space-{kind}-*.txt*"):
-                    natoms = int(str(fn).split("-")[-1].split(".")[0])
-                    if natoms not in self._cachefiles[kind]:
-                        self._cachefiles[kind][natoms] = []
-                    self._cachefiles[kind][natoms].append(fn)
+        # canonicalize exact key
+        for key in list(self._exact_db.keys()):
+            canonical_key = self._canonical_label(key)
+            self._exact_db[canonical_key] = self._exact_db.pop(key)
 
-        self._max_natoms_from_cache = dict()
-        overall = 0
-        for kind in kinds:
-            self._max_natoms_from_cache[kind] = max(self._cachefiles[kind].keys())
-            overall = max(overall, self._max_natoms_from_cache[kind])
-        self._max_natoms_from_cache["all"] = overall
-        self._estimated = []
-
-    @staticmethod
-    def read_db(fn: str) -> dict:
-        """Reads the database files distributed with the package."""
-        with gzip.open(fn) as fh:
-            db = msgpack.load(
-                fh,
-                strict_map_key=False,
-                use_list=False,
-            )
-        return db
-
-    def estimated_in_cache(self, maxsize: int = None) -> list[str]:
+    def estimated_in_cache(self, maxsize: int = None) -> Generator[str, None, None]:
         """Builds a list of all those degree sequences that are estimated only.
 
         Parameters
@@ -98,113 +79,14 @@ class ApproximateCounter:
         list[str]
             List of canonical labels
         """
-        for natoms in range(3, self._max_natoms_from_cache["all"] + 1):
-            self._fill_cache(natoms)
-
-        if maxsize is None:
-            return self._estimated
-        else:
-            smaller = []
-            for label in self._estimated:
-                lookup = self._label_to_lookup(label)
-                if lookup in self._base_cache:
-                    if self._base_cache[lookup] < maxsize:
-                        smaller.append(label)
-                    continue
-                if lookup in self._pure_cache:
-                    if self._pure_cache[lookup] < maxsize:
-                        smaller.append(label)
-                    continue
-                raise NotImplementedError("Lookup failed.")
-            return smaller
-
-    def _label_to_lookup(self, label: str) -> tuple[int]:
-        """Converts a canonical label into a cache lookup key.
-
-        Parameters
-        ----------
-        label : str
-            Canonical label ("degree.natoms_degree.natoms")
-
-        Returns
-        -------
-        tuple[int]
-            The corresponding cache key.
-        """
-        parts = label.replace(".", "_").split("_")
-        return tuple(map(int, parts))
-
-    def _parse_base_file(self, file):
-        """Parse a data file containing estimated graph counts for pure and non-pure colored degree sequences.
-
-        Parameters
-        ----------
-        file : str
-            Filename
-        """
-        with gzip.open(file, "rt") as fh:
-            for line in fh:
-                canonical_label, length = line.split()
-                lookup = self._label_to_lookup(canonical_label)
-                if lookup in self._exact_cache:
-                    # why estimate if we already know?
-                    continue
-                self._estimated.append(canonical_label)
-                self._base_cache[lookup] = self._average_path_length_to_size(length)
-                if _is_pure(lookup):
-                    self._pure_cache[lookup] = self._base_cache[lookup]
-
-    def _parse_pure_file(self, file: str):
-        """Parse a data file containing estimated graph counts for pure colored degree sequences.
-
-        Parameters
-        ----------
-        file : str
-            Filename
-        """
-        with open(file) as fh:
-            for lidx, line in enumerate(fh):
-                try:
-                    canonical_label, length = line.split()
-                    lookup = self._label_to_lookup(canonical_label)
-                    if lookup in self._exact_cache:
-                        # why estimate if we already know?
-                        continue
-                    self._estimated.append(canonical_label)
-                    self._pure_cache[lookup] = self._average_path_length_to_size(length)
-                except:
-                    raise ValueError(f"Cannot parse {file}, line {lidx}.")
-
-    def _parse_exact_file(self, file: str):
-        """Parse a data file containing exact graph counts for colored degree sequences.
-
-        Parameters
-        ----------
-        file : str
-            Filename
-        """
-        with open(file) as fh:
-            for line in fh:
-                canonical_label, count = line.split()
-                canonical_label = self._label_to_lookup(canonical_label)
-                self._exact_cache[canonical_label] = int(count)
-
-    def _size_to_average_path_length(self, size: int) -> float:
-        """Converts a total number of molecules to an expected average path length.
-
-        Parameters
-        ----------
-        size : int
-            Total count of molecules
-
-        Returns
-        -------
-        float
-            The corresponding average path length.
-        """
-        if size < 1:
-            return 0
-        return (np.log(float(size)) - self._b) / self._a
+        for key, value in self._approx_db.items():
+            if key in self._exact_db:
+                continue
+            if maxsize is not None and value > maxsize:
+                continue
+            yield "_".join(
+                [f"{degree}.{count}" for degree, count in zip(key[::2], key[1::2])]
+            )
 
     def _average_path_length_to_size(self, length: float) -> int:
         """Converts the average path length from the database to a molecule count.
@@ -220,29 +102,6 @@ class ApproximateCounter:
             Total number of molecules.
         """
         return max(int(np.exp(self._a * float(length) + self._b)), 0)
-
-    def _fill_cache(self, natoms: int):
-        """Populates the cache by parsing the file for the given number of atoms.
-
-        Parameters
-        ----------
-        natoms : int
-            Number of atoms for which to read the cache
-        """
-        functions = {
-            "exact": self._parse_exact_file,
-            "pure": self._parse_pure_file,
-            "base": self._parse_base_file,
-        }
-
-        for kind in "exact base pure".split():  # making sure exact ones are read first
-            if natoms in self._cachefiles[kind]:
-                for filename in self._cachefiles[kind][natoms]:
-                    functions[kind](filename)
-                del self._cachefiles[kind][natoms]
-
-        if natoms not in self._seen_sequences:
-            self._seen_sequences[natoms] = {}
 
     def count(self, search_space: SearchSpace, natoms: int, selection: Q = None) -> int:
         """Counts the total number of molecules in a search space.
@@ -261,7 +120,6 @@ class ApproximateCounter:
         int
             Total count of molecules in this search space.
         """
-        self._fill_cache(natoms)
         total = 0
 
         if selection:
@@ -307,7 +165,6 @@ class ApproximateCounter:
         int
             Total number of stoichiometries.
         """
-        self._fill_cache(natoms)
         total = 0
         for case in search_space.list_cases_bare(natoms, progress=self._progress):
             if case is not None:
@@ -331,27 +188,10 @@ class ApproximateCounter:
         int
             Total number of sum formulas.
         """
-        self._fill_cache(natoms)
         sum_formulas = []
         for stoichiometry in search_space.list_cases(natoms, progress=self._progress):
             sum_formulas.append(stoichiometry.sum_formula)
         return len(set(sum_formulas))
-
-    @staticmethod
-    @functools.cache
-    def factorial(n):
-        result = 1
-        for i in range(2, n + 1):
-            result *= i
-        return result
-
-    @staticmethod
-    @functools.cache
-    def falling_factorial(n, k):
-        result = 1
-        for i in range(n, n - k, -1):
-            result *= i
-        return result
 
     @staticmethod
     @functools.cache
@@ -382,8 +222,8 @@ class ApproximateCounter:
 
         Returns
         -------
-        float
-            Log of the number estimate.
+        int, float
+            Number estimate if calibrated or log estimate if not calibrated.
         """
 
         def _M(ks: list[int], r: int) -> int:
@@ -408,20 +248,12 @@ class ApproximateCounter:
 
         paper_prefactor = prefactor
         paper_exponential = term1 + term2 + term3 + term4 + term5
+        logG = np.log(float(paper_prefactor)) + paper_exponential
+        if not calibrated:
+            return logG
 
-        # calibration via error term
-        natoms = len(degrees)
-
-        if calibrated:
-            calibration = (
-                (self._asymptotic_a * natoms + self._asymptotic_b) / M
-                + (self._asymptotic_c * natoms + self._asymptotic_d) * M
-                + self._asymptotic_e
-            )
-        else:
-            calibration = 0
-
-        return np.log(float(paper_prefactor)) + paper_exponential + calibration
+        lg = self._asymptotic_a * logG + self._asymptotic_b
+        return self._average_path_length_to_size(lg)
 
     def count_one(
         self, stoichiometry: AtomStoichiometry, natoms: int, validated: bool = False
@@ -444,7 +276,6 @@ class ApproximateCounter:
         int
             Total count of molecules.
         """
-        self._fill_cache(natoms)
         return self.count_one_bare(
             stoichiometry.canonical_tuple, natoms, validated=validated
         )
@@ -495,55 +326,25 @@ class ApproximateCounter:
 
         return logscore / M + 1
 
-    def _pure_prediction(
-        self, label: tuple[int], pure_size: int = None, log_size: float = None
-    ) -> int:
-        """Estimates the non-pure size via lookup of the pure average path length.
+    def _canonical_label(self, label: tuple[int]) -> tuple[int]:
+        """Converts a degree sequence to a canonical label.
 
         Parameters
         ----------
         label : tuple[int]
-            Case key: degree and count, alternating.
-        pure_size : int
-            If the size of the protomolecule list of the pure degree sequence is known, pass it here.
+            Degree sequence in groups ((degree, natoms), (degree, natoms))
 
         Returns
         -------
-        int
-            Estimated number of molecules
-
-        Raises
-        ------
-        KeyError
-            If no pure average path length is known.
+        tuple[int]
+            Canonical label of the degree sequence.
         """
-
-        def _from_cache():
-            try:
-                return self._pure_cache[purespec]
-            except:
-                pass
-            try:
-                return self._exact_cache[purespec]
-            except:
-                pass
-            try:
-                return pure_size or self._base_cache[purespec]
-            except:
-                pass
-            raise KeyError("Data missing in database")
-
-        prefactor = self._pure_prefactor(label)
-        purespec = _to_pure(label)
-
-        if pure_size is None:
-            if log_size is None:
-                pure_size = _from_cache()
-            else:
-                pure_size = int(mpmath.exp(log_size))
-
-        lgdu = self._size_to_average_path_length(pure_size)
-        return self._average_path_length_to_size(prefactor * lgdu)
+        return tuple(
+            sorted(
+                [item for sublist in zip(label[::2], label[1::2]) for item in sublist],
+                reverse=True,
+            )
+        )
 
     def count_one_bare(
         self,
@@ -593,45 +394,20 @@ class ApproximateCounter:
             if dbe < 0:
                 return 0
 
-        # done recently?
-        try:
-            return self._seen_sequences[natoms][label]
-        except:
-            pass
+        # canonical lookup
+        label = self._canonical_label(label)
+        if label in self._exact_db:
+            return self._exact_db[label]
+        if label in self._approx_db:
+            return self._approx_db[label]
 
-        found = None
-        if natoms < self._max_natoms_from_cache["all"]:
-            # exact data
-            if natoms <= self._max_natoms_from_cache["exact"]:
-                try:
-                    found = self._exact_cache[label]
-                except:
-                    pass
-                if found is not None:
-                    self._seen_sequences[natoms][label] = found
-                    return found
-
-            # average path length available
-            if natoms <= self._max_natoms_from_cache["base"]:
-                try:
-                    found = self._base_cache[label]
-                except:
-                    pass
-                if found is not None:
-                    self._seen_sequences[natoms][label] = found
-                    return found
-
-            # reduction on pure
-            if natoms <= self._max_natoms_from_cache["pure"]:
-                try:
-                    found = self._pure_prediction(label)
-                except KeyError:
-                    pass
-                if found is not None:
-                    self._seen_sequences[natoms][label] = found
-                    return found
-
-        # only use asymptotic scaling relations if the number of atoms is large enough
+        # try to find pure degree sequence
+        pure_label = _to_pure(label)
+        prefactor = self._pure_prefactor(pure_label)
+        if label in self._exact_db:
+            return int(self._exact_db[pure_label] ** prefactor)
+        if label in self._approx_db:
+            return int(self._approx_db[pure_label] ** prefactor)
 
         if natoms < self._minimum_natoms_for_asymptotics:
             raise ValueError(
@@ -642,19 +418,9 @@ class ApproximateCounter:
                 so we can distribute the extended cache in a new version of this library, 
                 as building the cache is a time-consuming process."""
             )
-        if cached_degree_sequence:
-            log_asymptotic_size = self._cached_log_asymptotic_size
-        else:
-            degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
-            log_asymptotic_size = self._count_one_asymptotically_log(tuple(degrees))
-            self._cached_log_asymptotic_size = log_asymptotic_size
-
-        if _is_pure(label):
-            found = int(mpmath.exp(log_asymptotic_size))
-        else:
-            found = self._pure_prediction(label, log_size=log_asymptotic_size)
-        self._seen_sequences[natoms][label] = found
-        return found
+        degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
+        counts = self._count_one_asymptotically_log(degrees)
+        return int(counts**prefactor)
 
     @staticmethod
     def sample_connected(spec: str) -> nx.MultiGraph:
@@ -705,268 +471,3 @@ class ApproximateCounter:
             elements += [f"{letter}{degree}"] * int(count)
             letter = chr(ord(letter) + 1)
         return degrees, elements
-
-    @staticmethod
-    @staticmethod
-    def _weighted_choose(items: list, weights: list[int]):
-        """Weighted random selection with support for arbitrarily large integer weights.
-
-        Parameters
-        ----------
-        items : list
-            Items to choose from.
-        weights : list[int]
-            Integer weights for each item.
-
-        Returns
-        -------
-        any
-            One item.
-        """
-        total = sum(weights)
-        choice = random.randint(0, total)
-        for item, weight in zip(items, weights):
-            choice -= weight
-            if choice <= 0:
-                return item
-
-    def _sum_formula_database(
-        self, search_space: SearchSpace, natoms: int, selection: Q = None
-    ):
-        """Builds a size database of the sizes of all sum formulas in randomized order.
-
-        Parameters
-        ----------
-        search_space : SearchSpace
-            The search space.
-        natoms : int
-            The number of atoms to cover.
-        selection : Q, optional
-            A selection via query string, by default None
-
-        Returns
-        -------
-        tuple[list[str], list[int], dict[str, list[utils.AtomStoichiometry]]]
-            Sum formulas in random order, their molecule count and all stoichiometries for all sum formulas.
-        """
-        sum_formula_size = {}
-        stoichiometries = {}
-        for stoichiometry in search_space.list_cases(natoms, progress=self._progress):
-            if selection is not None and not selection.selected_stoichiometry(
-                stoichiometry
-            ):
-                continue
-            sum_formula = stoichiometry.sum_formula
-            magnitude = self.count_one(stoichiometry, natoms)
-            if sum_formula not in stoichiometries:
-                stoichiometries[sum_formula] = [stoichiometry]
-                sum_formula_size[sum_formula] = 0
-            sum_formula_size[sum_formula] += magnitude
-
-        random_order = list(sum_formula_size.keys())
-        random.shuffle(random_order)
-        sizes = [sum_formula_size[_] for _ in random_order]
-
-        return random_order, sizes, stoichiometries
-
-    def random_sample(
-        self,
-        search_space: SearchSpace,
-        natoms: int,
-        nmols: int,
-        selection: Q = None,
-    ) -> list[Molecule]:
-        """Builds a fixed size random sample from a search space for a given number of atoms.
-
-        Parameters
-        ----------
-        search_space : SearchSpace
-            The total search space.
-        natoms : int
-            The total number of atoms of the chosen molecules.
-        nmols : int
-            Number of random molecules to be drawn.
-        selection : Q, optional
-            Selecting subsets via query string, by default None
-
-        Returns
-        -------
-        list[Molecule]
-            Random molecules.
-
-        Raises
-        ------
-        ValueError
-            If selection is empty.
-        """
-        random_order, sizes, stoichiometries = self._sum_formula_database(
-            search_space, natoms, selection
-        )
-        if len(random_order) == 0 or sum(sizes) == 0:
-            raise ValueError("Search space and selection yield no feasible molecule.")
-
-        # sample molecules
-        molecules = []
-        while len(molecules) < nmols:
-            sum_formula = ApproximateCounter._weighted_choose(random_order, sizes)
-            ss = stoichiometries[sum_formula]
-            ws = [self.count_one(_, natoms) for _ in ss]
-            stoichiometry = ApproximateCounter._weighted_choose(ss, ws)
-            spec = stoichiometry.canonical_label
-
-            # try a few times to find a concrete graph
-            # needs to stop eventually, since there might be stoichiometries
-            # for which the estimate is non-zero but which are actually
-            # infeasible
-            tries_selection = 0
-            while True and tries_selection < 1e4:
-                graph = ApproximateCounter.sample_connected(spec)
-
-                # correct for isomorphisms which skew MC sampling
-                degrees, _ = ApproximateCounter.spec_to_sequence(spec)
-                underlying = nx.Graph(graph)
-                nx.set_node_attributes(underlying, dict(enumerate(degrees)), "element")
-                underlying_isomorphisms = len(
-                    list(
-                        nx.vf2pp_all_isomorphisms(
-                            underlying, underlying, node_label="element"
-                        )
-                    )
-                )
-                graph_iso = len(
-                    list(nx.vf2pp_all_isomorphisms(graph, graph, node_label="element"))
-                )
-
-                weight = graph_iso / underlying_isomorphisms
-                if random.random() < weight:
-                    sorted_nodes = sorted(
-                        graph.nodes, key=lambda x: graph.nodes[x]["element"]
-                    )
-                    labels = stoichiometry.canonical_element_sequence
-                    graph = nx.relabel_nodes(
-                        graph, dict(zip(sorted_nodes, range(len(labels)))), copy=True
-                    )
-                    mol = Molecule(labels, list(graph.edges(data=False)))
-                    if selection and not selection.selected_molecule(mol):
-                        tries_selection += 1
-                        continue
-                    molecules.append(mol)
-                    break
-
-        return molecules
-
-    def score_database(
-        self,
-        search_space: SearchSpace,
-        natoms: int,
-        sum_formulas: dict[str, int],
-        selection: Q = None,
-    ) -> float:
-        """Implements the Kolmogorov-Smirnov statistic comparing the distribution of the database to the expected distribution.
-
-        The best score is 0, the worst is 1.
-
-        This does not test the distribution of molecules within a given sum formula."""
-
-        random_order, sizes, _ = self._sum_formula_database(
-            search_space, natoms, selection=selection
-        )
-
-        xs = np.cumsum(sizes)
-        ys_expected = xs / xs[-1]
-        ys = []
-        for sum_formula in random_order:
-            if sum_formula in sum_formulas:
-                ys.append(sum_formulas[sum_formula])
-            else:
-                ys.append(0)
-        ys = np.cumsum(ys)
-        ys = ys / ys[-1]
-
-        return max(abs(ys - ys_expected))
-
-    def missing_parameters(
-        self,
-        search_space: SearchSpace,
-        natoms: int,
-        pure_only: bool,
-        selection: Q = None,
-    ):
-        """Returns the colored degree sequences for which no parameters are available in the database.
-
-        Parameters
-        ----------
-        search_space : SearchSpace
-            The search space.
-        natoms : int
-            Number of atoms to check for.
-        pure_only : bool
-            Whether only pure degree sequences should be precomputed for this space.
-        selection : Q, optional
-            Subselection by query string, by default None
-
-        Returns
-        -------
-        list[tuple[int]]
-            The colored degree sequences for which there are no parameters.
-        """
-        # no parameters needed for asymptotics
-        if natoms > self._minimum_natoms_for_asymptotics:
-            return []
-
-        self._fill_cache(natoms)
-        missing = []
-
-        if selection is not None:
-            for case in search_space.list_cases_bare(natoms, progress=self._progress):
-                if case is None:
-                    continue
-
-                label = tuple(sum([[valence, count] for _, valence, count in case], []))
-                if pure_only and not _is_pure(label):
-                    continue
-
-                if selection is not None and not selection.selected_stoichiometry(
-                    sum([[element] * count for element, _, count in case], [])
-                ):
-                    continue
-
-                # check in cache
-                if natoms <= self._max_natoms_from_cache["exact"]:
-                    if label in self._exact_cache:
-                        continue
-
-                if natoms <= self._max_natoms_from_cache["base"]:
-                    if label in self._base_cache:
-                        continue
-
-                # reduction on pure
-                if natoms <= self._max_natoms_from_cache["pure"]:
-                    if pure_only:
-                        purespec = label
-                    else:
-                        purespec = _to_pure(label)
-
-                    if purespec in self._pure_cache or purespec in self._base_cache:
-                        continue
-
-                missing.append(label)
-        else:
-            for case in search_space.list_cases_bare(
-                natoms,
-                degree_sequences_only=True,
-                pure_sequences_only=pure_only,
-                progress=self._progress,
-            ):
-                if case is None:
-                    continue
-
-                label = tuple(sum([[valence, count] for valence, count in case], []))
-                if (
-                    label not in self._exact_cache
-                    and label not in self._base_cache
-                    and label not in self._pure_cache
-                ):
-                    missing.append(label)
-
-        return list(set(missing))
