@@ -13,7 +13,7 @@ import gzip
 import msgpack
 
 
-def read_db(fn: str) -> dict:
+def _read_db(fn: str) -> dict:
     """Reads the database files distributed with the package."""
     with gzip.open(fn) as fh:
         db = msgpack.load(

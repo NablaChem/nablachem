@@ -18,7 +18,7 @@ from .utils import (
     SearchSpace,
     _is_pure,
     _to_pure,
-    read_db,
+    _read_db,
 )
 
 
@@ -51,8 +51,8 @@ class ApproximateCounter:
 
         # read cache
         cachedir = pathlib.Path(__file__).parent.resolve() / ".." / "cache"
-        self._exact_db = read_db(cachedir / "space-exact.msgpack.gz")
-        self._approx_db = read_db(cachedir / "space-approx.msgpack.gz")
+        self._exact_db = _read_db(cachedir / "space-exact.msgpack.gz")
+        self._approx_db = _read_db(cachedir / "space-approx.msgpack.gz")
 
         # transform approximate path length into integer counts
         for key, value in self._approx_db.items():

@@ -3,7 +3,7 @@ import subprocess
 from collections.abc import Iterator
 import pathlib
 
-from .utils import AtomStoichiometry, Molecule, Q, SearchSpace, read_db
+from .utils import AtomStoichiometry, Molecule, Q, SearchSpace, _read_db
 
 
 class ExactCounter:
@@ -30,7 +30,7 @@ class ExactCounter:
         """
         self._binary = binary
         cachedir = pathlib.Path(__file__).parent.resolve() / ".." / "cache"
-        self._exact_db = read_db(cachedir / "space-exact.msgpack.gz")
+        self._exact_db = _read_db(cachedir / "space-exact.msgpack.gz")
         self._timeout = timeout
 
     def _build_cli_arguments(

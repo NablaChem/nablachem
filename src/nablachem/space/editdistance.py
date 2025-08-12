@@ -11,11 +11,10 @@ from scipy._lib._util import check_random_state
 from scipy.optimize import OptimizeResult
 from scipy.optimize._optimize import _check_unknown_options
 
-from .utils import ApproximateCounter
-
 import nablachem.space as ncs
 import networkx as nx
 from collections import defaultdict, Counter
+from .approximate import ApproximateCounter
 
 
 def estimate_edit_tree_average_path_length(canonical_label: str, ngraphs: int = 5):
