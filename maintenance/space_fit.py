@@ -4,15 +4,13 @@ import matplotlib.pyplot as plt
 import sys
 
 basedir = "../"
-sys.path.insert(0, f"{basedir}src")
+sys.path.insert(0, f"{basedir}src/")
 import nablachem.space as ncs
 
 c = ncs.ApproximateCounter()
-db_approx = ncs.ApproximateCounter.read_db(
-    f"{basedir}maintenance/space-approx.msgpack.gz"
-)
-db_compare = ncs.ApproximateCounter.read_db(
-    f"{basedir}maintenance/space-compare.msgpack.gz"
+db_approx = ncs.utils._read_db(f"{basedir}src/nablachem/cache/space-approx.msgpack.gz")
+db_compare = ncs.utils._read_db(
+    f"{basedir}src/nablachem/cache/space-compare.msgpack.gz"
 )
 
 # styling, fully optional
@@ -48,7 +46,7 @@ pure_lgs = []
 degree_sequences = []
 scaling_relation_log_counts = []
 for label, count in db_approx.items():
-    if ncs._is_pure(label):
+    if ncs.utils._is_pure(label):
         pure_lgs.append(count)
         degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
         degree_sequences.append(degrees)
@@ -152,8 +150,8 @@ axs[1].set_ylabel("cumulative distribution")
 expected_pure_lgs = []
 actual_nonpure_lgs = []
 for k, v in db_approx.items():
-    if not ncs._is_pure(k):
-        pure_k = ncs._to_pure(k)
+    if not ncs.utils._is_pure(k):
+        pure_k = ncs.utils._to_pure(k)
         try:
             expected_pure_lgs.append(db_approx[pure_k] * c._pure_prefactor(k))
             actual_nonpure_lgs.append(v)
