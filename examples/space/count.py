@@ -8,5 +8,10 @@ selection = ncs.Q("C + O + N + F <= 9")
 
 # max number of atoms can be all carbon chain (9 of them) with otherwise H or F
 max_natoms = 9 + 2 * 3 + 7 * 2
-for i in range(3, max_natoms + 1):
-    print(i, c.count(s, i, selection))
+total = 0
+for i in range(1, max_natoms + 1):
+    this_i = c.count(s, i, selection)
+    print(i, this_i)
+    total += this_i
+
+print("Total:", total)

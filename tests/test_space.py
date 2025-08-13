@@ -956,8 +956,15 @@ def test_pure_permutation_prefactor(approximate_counter):
 
 def test_count_by_pure_lookup(approximate_counter):
     case_for_which_pure_entry_exists = (1, 1, 1, 14, 3, 1, 4, 7)
+    # pure value: 801
+    # Np: (14+1 choose 14) * (1 choose 1) = 15 * 1 = 15
+    # M: 1*1+14*1+1*3+4*7 = 46
+    # prefactor: (1+log(Np)/M) = (1+log(15)/46) = 1.0588706565457
+    # lg_pure = (log(801) + 0.7295) / 1.220 = 6.07816
+    # lg_nonpure = lg_pure * prefactor = 6.07816 * 1.0588706565457 = 6.435985269789811912
+    # count = exp(1.220*lg_nonpure - 0.7295) = 1239
     assert (
-        approximate_counter.count_one_bare(case_for_which_pure_entry_exists, 23) == 801
+        approximate_counter.count_one_bare(case_for_which_pure_entry_exists, 23) == 1239
     )
 
 
