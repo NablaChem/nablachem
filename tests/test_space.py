@@ -1,6 +1,7 @@
 import pyparsing
 import pytest
 import nablachem.space as ncs
+import numpy as np
 
 
 @pytest.fixture(scope="session")
@@ -820,6 +821,119 @@ def test_counter_value(approximate_counter):
     assert approximate_counter.count(s, 10, q) == 1486411142
 
 
+def test_count_one_paths(approximate_counter):
+    ## pure
+    # exact in database
+    label = (1, 2)
+    assert label in approximate_counter._exact_db
+    assert approximate_counter.count_one_bare(label, 2) == 1
+
+    # avg path length in db, but not exact
+    ## count = exp(1.220*lg - 0.7295)
+    ## lg = 55.0 for 6.20
+    label = (6, 20)
+    assert label not in approximate_counter._exact_db
+    assert label in approximate_counter._approx_db
+    assert approximate_counter.count_one_bare(label, 20) == np.exp(
+        1.22066271 * 55.0 - 0.72953204
+    )
+
+    # avg path length not in db, use asymptotics
+    # 6.21 not in db
+    ## M = 6*21 = 126
+    ## M_2 = 30*21 = 630
+    ## M_3 = 120*21 = 2520
+    ## y1 = 0
+    ## x2 = 1
+    ## x3 = 1
+    ## prefactor = M! / ((M/2)! * 2**(M/2) * (6!)**21)
+    ##           = 23721732428800468856771473051394170805702085973808045661837377170052497697783313457227249544076486314839447086187187275319400401837013955325179315652376928996065123321190898603130880000000000000000000000000000000 /
+    ##             (1982608315404440064116146708361898137544773690227268628106279599612729753600000000000000 * 9223372036854775808 * 1009212044656507725162109374628859215872000000000000000000000)
+    ##           = 2752775426286713065002722116483278236963996020922703261154808938845230629735001 / 2141575821672727144116749598720000 ~ 1.2853971353377506e+45
+    ## term1 = (y1-1/2) * M_2/M = (0-1/2) * 630/126 = -5 / 2
+    ## term2 = (x2-1/2) * M_2**2 / (2*M**2) = (1-1/2) * 630**2 / (2*126**2) = 25 / 4
+    ## term3 = M_2**4 / (4*M**5)  = 630**4 / (4*126**5) = 625 / 504
+    ## term4 = -M_2**2*M_3/ (2*M**4) = -630**2*2520/ (2*126**4) =-125/63
+    ## term5 = (x3-x2+1/3) * M_3**2/(2*M**3) = 1/3 * 2520**2/(2*126**3) = 100/189
+    ## term1+...+term5 = -5 / 2 + 25 / 4 + 625 / 504 - 125/63 + 100/189 = 5345/1512 ~ 3.53505291005291
+    ## G = 1.2853971353377506e+45 * np.exp(3.53505291005291) = 4.408504615045374e+46
+    ## lG = 0.7561 * log(G) - 14.4 = 66.81448818253898
+    ## count = exp(1.220*lg - 0.7295) = 1.2686380422711015e+35
+    label = (6, 21)
+    assert label not in approximate_counter._exact_db
+    assert label not in approximate_counter._approx_db
+    assert approximate_counter.count_one_bare(label, 21) == pytest.approx(
+        1.2686380422711015e35
+    )
+
+    ## non-pure
+    # exact in database
+    label = (4, 1, 4, 8)
+    assert label in approximate_counter._exact_db
+    assert approximate_counter.count_one_bare(label, 2) == 5463
+
+    # avg path length in db
+    ## count = exp(1.220*lg - 0.7295)
+    ## lg = 32.4 for (3, 1, 3, 1, 5, 14)
+    label = (3, 1, 3, 1, 5, 14)
+    assert label not in approximate_counter._exact_db
+    assert label in approximate_counter._approx_db
+    assert approximate_counter.count_one_bare(label, 16) == np.exp(
+        1.22066271 * 32.4 - 0.72953204
+    )
+
+    # only pure avg path length in db but non-pure avg path not in db
+    label = (6, 2, 6, 8, 6, 10)
+    pure_label = (6, 20)
+    assert label not in approximate_counter._exact_db
+    assert label not in approximate_counter._approx_db
+    assert pure_label not in approximate_counter._exact_db
+    assert pure_label in approximate_counter._approx_db
+    ## Np = (2+8+10 choose 2) * (8+10 choose 8) * (10 choose 10) = 190 * 43758 * 1 = 8314020
+    ## M = (20*6) = 120
+    ## prefactor = log(Np) / M +1 = log(8314020) / 120 +1= 1.13277878170310645
+    ## lg_pure for (6, 20) is 55.0
+    ## lg_nonpure = prefactor * lg_pure = 1.13277878170310645 * 55.0 = 62.302832
+    ## count = exp(1.220*lg_nonpure - 0.7295)
+    assert approximate_counter.count_one_bare(label, 20) == pytest.approx(
+        np.exp(1.22066271 * 62.302832 - 0.72953204), 1e-4
+    )
+
+    # avg path length not in db, also pure avg path not in db use asymptotics
+    label = (6, 19, 6, 2)
+    pure_label = (6, 21)
+    assert label not in approximate_counter._exact_db
+    assert label not in approximate_counter._approx_db
+    assert pure_label not in approximate_counter._exact_db
+    assert pure_label not in approximate_counter._approx_db
+    # same case as above, only non-pure prefactor needs checking
+    ## Np = (19+2 choose 19) * (2 choose 2) = 210 * 1
+    ## M = (21*6) = 126
+    ## prefactor = log(Np) / M + 1 = log(210) / 126 + 1 = 1.042437361354900
+    ## lg_pure for (6, 21) is 66.81448818253898 (see above)
+    ## lg_nonpure = prefactor * lg_pure = 1.042437361354900 * 66.81448818253898 = 69.64991876128408
+    ## count = exp(1.220*lg_nonpure - 0.7295)
+    assert approximate_counter.count_one_bare(label, 21) == pytest.approx(
+        4.040882863399748e36
+    )
+
+
+def test_inverse_path_length(approximate_counter):
+    lg = 10
+    size = approximate_counter._average_path_length_to_size(lg)
+    lgnew = approximate_counter._size_to_average_path_length(size)
+    assert lg == pytest.approx(lgnew, rel=1e-5)
+
+
+def test_inverse_path_length_big_number(approximate_counter):
+    size = 10000000000000000000000
+    approximate_counter._size_to_average_path_length(size)
+
+
+def test_min_zero_count(approximate_counter):
+    assert approximate_counter._average_path_length_to_size(-1) == 0
+
+
 def test_selection_eq_multiple_mixed_operators():
     selection = ncs.Q("C = 1 and N = 1 & F = 0 and Cl = 0")
     assert selection.selected_stoichiometry(
@@ -830,6 +944,14 @@ def test_selection_eq_multiple_mixed_operators():
             }
         )
     )
+
+
+def test_pure_permutation_prefactor(approximate_counter):
+    groups = (2, 3, 4)
+    # (2+3+4 choose 2) * (3+4 choose 3) * (4 choose 4) = 36 * 35 * 1 = 1260
+    assert approximate_counter._cached_permutation_factor_log(groups) == np.log(1260)
+    groups = (2,)
+    assert approximate_counter._cached_permutation_factor_log(groups) == np.log(1)
 
 
 def test_count_by_pure_lookup(approximate_counter):
