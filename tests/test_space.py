@@ -199,12 +199,12 @@ def test_canonical_label(approximate_counter):
 def test_count_unvalidated(approximate_counter):
     assert (
         approximate_counter.count_one(
-            ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30, validated=True
+            ncs.label_to_stoichiometry("1.32_4.14"), 9 + 30, validated=True
         )
         > 0
     )
     assert (
-        approximate_counter.count_one(ncs.label_to_stoichiometry("1.30_4.9"), 9 + 30)
+        approximate_counter.count_one(ncs.label_to_stoichiometry("1.32_4.14"), 9 + 30)
         == 0
     )
     assert (

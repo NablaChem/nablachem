@@ -426,7 +426,11 @@ class ApproximateCounter:
                 as building the cache is a time-consuming process."""
             )
         degrees = sum([[v] * c for v, c in zip(label[::2], label[1::2])], [])
-        counts = self._count_one_asymptotically_log(tuple(degrees))
+        terminals = sum(1 for d in degrees if d == 1)
+        counts = self._count_one_asymptotically_log(tuple(degrees)) // factorial(
+            terminals
+        )
+
         if _is_pure(label):
             return counts
         else:
