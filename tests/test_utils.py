@@ -1,4 +1,4 @@
-import nablachem.utils as ncu
+import nablachem.space.utils as ncu
 import pytest
 
 
