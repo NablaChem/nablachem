@@ -67,7 +67,7 @@ def chemspace_to_string(chemspace: dict[str, list[int]]) -> str:
 
 
 st.write(
-    "Molecules shown here are representative of the selected chemical space. Publication in preparation. Contact: vonrudorff@uni-kassel.de."
+    "Molecules shown here are representative of the selected chemical space. Publication on arxiv: https://arxiv.org/abs/2508.20609. Contact: vonrudorff@uni-kassel.de."
 )
 tab_simple, tab_advanced = st.tabs([":bike: Simple", ":car: Advanced"])
 criterion = None
@@ -166,15 +166,15 @@ if criterion:
         st.code(
             f"""# pip install --upgrade nablachem
 import nablachem.space as ncs
+counter = ncs.ApproximateCounter(show_progress=False)
 space = ncs.SearchSpace("{spacecompact}")
-c = ncs.ApproximateCounter()
 criterion = ncs.Q("{criterion}")
 natoms = {natoms}
-total_molecule_count = c.count(space, natoms, criterion)
-mols = c.random_sample(space, 
-    natoms=natoms, 
-    nmols=5, 
-    selection=criterion)""",
+
+total_molecule_count = counter.count(space, natoms, criterion)
+mols = ncs.random_sample(
+    counter, space, natoms=natoms, nmols=3, selection=criterion
+)""",
             language="python",
         )
 
@@ -204,8 +204,8 @@ mols = c.random_sample(space,
             else:
                 st.write(f"Here are {nmols} random molecules.")
 
-            mols = c.random_sample(
-                space, natoms=natoms, nmols=nmols, selection=q_criterion
+            mols = ncs.random_sample(
+                c, space, natoms=natoms, nmols=nmols, selection=q_criterion
             )
 
             table_columns = st.columns(columns)

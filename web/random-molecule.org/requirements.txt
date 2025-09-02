@@ -1,3 +1,4 @@
 leruli
-nablachem
+msgpack
+nablachem>=25.8
 streamlit
