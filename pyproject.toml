@@ -20,6 +20,7 @@ networkx = "^3.4.2"
 pyparsing = "^3.2.1"
 tqdm = "^4.67.1"
 mpmath = "^1.3.0"
+msgpack = "^1.1.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
