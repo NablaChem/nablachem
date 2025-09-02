@@ -69,7 +69,7 @@ def chemspace_to_string(chemspace: dict[str, list[int]]) -> str:
 st.write(
     "Molecules shown here are representative of the selected chemical space. Publication on arxiv: https://arxiv.org/abs/2508.20609. Contact: vonrudorff@uni-kassel.de."
 )
-tab_simple, tab_advanced = st.tabs([":bike: Simple", ":car: Advanced"])
+tab_simple, tab_advanced = st.tabs([":bike: Simple", ":rocket: Advanced"])
 criterion = None
 chemspace = {
     "C": [4],
@@ -143,7 +143,7 @@ with tab_advanced:
             "Select a number of atoms",
             min_value=2,
             max_value=30,
-            value=30,
+            value=29,
         )
         filterinput = st.text_input(
             "Filter condition", value="(C + O + N + F <= 9) & (C > 3)"
