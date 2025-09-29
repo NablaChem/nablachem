@@ -791,6 +791,7 @@ class Anygrad:
     class Method(enum.Enum):
         COUPLED_PERTURBED = "CP"
         FINITE_DIFFERENCES = "FD"
+        AUTOMATIC_DIFFERENTIATION = "AD"
 
     def __init__(self, calculator, target: "Anygrad.Property"):
         self._calculator = calculator
@@ -798,29 +799,189 @@ class Anygrad:
         self._atomspec = calculator.mol._atom
         self._basis = calculator.mol.basis
         self._target = target
+        self._methodorder = (
+            Anygrad.Method.COUPLED_PERTURBED,
+            Anygrad.Method.AUTOMATIC_DIFFERENTIATION,
+            Anygrad.Method.FINITE_DIFFERENCES,
+        )
+
+    @staticmethod
+    def supported_methods():
+        """Returns all supported combinations of properties, derivatives, level of theory, and methods.
+
+        Returns
+        -------
+        dict
+            Nested dictionary with structure: {property: {derivative_kind: {leveloftheory: [methods]}}}
+        """
+        import inspect
+
+        # Get all method names from the Anygrad class
+        method_names = [
+            name
+            for name, method in inspect.getmembers(
+                Anygrad, predicate=inspect.isfunction
+            )
+            if name.startswith("_") and not name.startswith("__")
+        ]
+
+        # Parse method names to extract components
+        supported = {}
+
+        for method_name in method_names:
+            parts = method_name.split("_")
+            if len(parts) < 4:
+                continue
+
+            # Skip non-property methods
+            if parts[1] not in ["energy", "homo"]:
+                continue
+
+            property_name = parts[1]
+            method_type = parts[-1]  # CP or FD
+            leveloftheory = parts[-2]  # RHF or RKS
+
+            # Extract derivative arguments (everything between property and leveloftheory)
+            derivative_parts = parts[2:-2]
+            derivative_kind = "_".join(derivative_parts) if derivative_parts else "0"
+
+            # Initialize nested dictionaries
+            if property_name not in supported:
+                supported[property_name] = {}
+            if derivative_kind not in supported[property_name]:
+                supported[property_name][derivative_kind] = {}
+            if leveloftheory not in supported[property_name][derivative_kind]:
+                supported[property_name][derivative_kind][leveloftheory] = []
+
+            # Add method if not already present
+            if (
+                method_type
+                not in supported[property_name][derivative_kind][leveloftheory]
+            ):
+                supported[property_name][derivative_kind][leveloftheory].append(
+                    method_type
+                )
+
+        return supported
+
+    @staticmethod
+    def print_supported_methods_tables():
+        """Prints markdown tables showing supported methods for each property."""
+        supported = Anygrad.supported_methods()
+
+        # Method precedence (CP is preferred over FD)
+        method_priority = {"CP": 1, "FD": 2}
+
+        for property_name in sorted(supported.keys()):
+            print(f"\n## {property_name.upper()} Property\n")
+
+            property_data = supported[property_name]
+
+            # Get all unique level of theories and derivative kinds
+            all_leveloftheory = set()
+            all_derivative_kinds = set()
+
+            for derivative_kind in property_data:
+                all_derivative_kinds.add(derivative_kind)
+                for leveloftheory in property_data[derivative_kind]:
+                    all_leveloftheory.add(leveloftheory)
+
+            # Sort for consistent output
+            all_leveloftheory = sorted(all_leveloftheory)
+            all_derivative_kinds = sorted(
+                all_derivative_kinds, key=lambda x: (len(x.split("_")), x)
+            )
+
+            # Create table header
+            header = "| Derivative | " + " | ".join(all_leveloftheory) + " |"
+            separator = "|" + "|".join([" --- "] * (len(all_leveloftheory) + 1)) + "|"
+
+            print(header)
+            print(separator)
+
+            # Create table rows
+            for derivative_kind in all_derivative_kinds:
+                # Format derivative kind for display
+                if derivative_kind == "0":
+                    display_derivative = "∇⁰ (value)"
+                else:
+                    # Convert R and Z to more readable format
+                    parts = derivative_kind.split("_")
+                    derivative_symbols = []
+                    r_count = parts.count("R")
+                    z_count = parts.count("Z")
+
+                    if r_count > 0:
+                        if r_count == 1:
+                            derivative_symbols.append("∇ᴿ")
+                        else:
+                            derivative_symbols.append(f"∇ᴿ{r_count}")
+
+                    if z_count > 0:
+                        if z_count == 1:
+                            derivative_symbols.append("∇ᶻ")
+                        else:
+                            derivative_symbols.append(f"∇ᶻ{z_count}")
+
+                    display_derivative = "".join(derivative_symbols)
+
+                row = f"| {display_derivative} |"
+
+                for leveloftheory in all_leveloftheory:
+                    cell_content = ""
+
+                    if (
+                        derivative_kind in property_data
+                        and leveloftheory in property_data[derivative_kind]
+                    ):
+                        methods = property_data[derivative_kind][leveloftheory]
+
+                        # Sort methods by priority (CP first, then FD)
+                        sorted_methods = sorted(
+                            methods, key=lambda x: method_priority.get(x, 999)
+                        )
+
+                        # Join methods with comma, emphasize the best (first) one
+                        if len(sorted_methods) > 0:
+                            best_method = sorted_methods[0]
+                            method_strs = []
+                            for method in sorted_methods:
+                                if method == best_method and method != "FD":
+                                    method_strs.append(f"**{method}**")
+                                else:
+                                    method_strs.append(method)
+                            cell_content = ", ".join(method_strs)
+
+                    row += f" {cell_content} |"
+
+                print(row)
+
+    def _get_callable(
+        self,
+        target: "Anygrad.Property",
+        args: tuple[str],
+        leveloftheory: str,
+        method: "Anygrad.Method",
+    ):
+        attrname = f"_{target.value}_{'_'.join(args)}_{leveloftheory}_{method}"
+        return getattr(self, attrname)
 
     def get(self, *args: "Anygrad.Variable", method: "Anygrad.Method" = None):
         args = tuple(Anygrad.Variable(_) for _ in args)
 
         # TODO: sort and auto-transpose
         if method is None:
-            for method in (
-                Anygrad.Method.COUPLED_PERTURBED,
-                Anygrad.Method.FINITE_DIFFERENCES,
-            ):
+            for method in self._methodorder:
                 try:
                     return self.get(*args, method=method)
                 except NotImplementedError:
                     pass
             raise NotImplementedError("No method supports that derivative.")
         else:
-            method = method.value
             args = tuple(_.value for _ in args)
-            target = self._target.value
             leveloftheory = str(self._calculator.__class__.__name__)
             try:
-                attrname = f"_{target}_{'_'.join(args)}_{leveloftheory}_{method}"
-                callable = getattr(self, attrname)
+                callable = self._get_callable(self._target, args, leveloftheory, method)
             except AttributeError:
                 raise NotImplementedError("This combination is not implemented.")
             return callable()
