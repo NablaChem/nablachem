@@ -3,12 +3,10 @@ import pathlib
 from typing import Generator
 import networkx as nx
 import numpy as np
-import random_graph
 import scipy.special as scs
 from mpmath import mp
 from .utils import (
     AtomStoichiometry,
-    Molecule,
     Q,
     SearchSpace,
     _is_pure,
