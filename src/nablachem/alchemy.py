@@ -981,7 +981,9 @@ class Anygrad:
             args = tuple(_.value for _ in args)
             leveloftheory = str(self._calculator.__class__.__name__)
             try:
-                callable = self._get_callable(self._target, args, leveloftheory, method)
+                callable = self._get_callable(
+                    self._target, args, leveloftheory, method.value
+                )
             except AttributeError:
                 raise NotImplementedError("This combination is not implemented.")
             return callable()
