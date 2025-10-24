@@ -17,6 +17,7 @@ from .utils import (
     falling_factorial,
     factorial,
 )
+from ..utils.graph import random_connected_graph
 
 
 class ApproximateCounter:
@@ -453,16 +454,10 @@ class ApproximateCounter:
             The resulting graph
         """
         degrees, elements = ApproximateCounter.spec_to_sequence(spec)
-        while True:
-            edges = random_graph.sample_multi_hypergraph(
-                degrees, [2] * (sum(degrees) // 2), n_iter=1000
-            )
-            G = nx.MultiGraph(edges)
-            if nx.connected.is_connected(G):
-                nx.set_node_attributes(
-                    G, dict(zip(range(len(degrees)), elements)), "element"
-                )
-                return G
+
+        G = random_connected_graph(degrees)
+        nx.set_node_attributes(G, dict(zip(range(len(degrees)), elements)), "element")
+        return G
 
     @staticmethod
     def spec_to_sequence(spec: str) -> tuple[list[int], list[str]]:

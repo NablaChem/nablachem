@@ -2,7 +2,8 @@ from .utils import Q, SearchSpace, Molecule
 import random
 from .exact import ExactCounter
 from .approximate import ApproximateCounter
-import networkx as nx
+import tqdm
+from ..utils.graph import count_automorphisms
 
 
 def chemical_formula_database(
@@ -31,7 +32,7 @@ def chemical_formula_database(
     """
     sum_formula_size = {}
     stoichiometries = {}
-    for stoichiometry in search_space.list_cases(natoms):
+    for stoichiometry in search_space.list_cases(natoms, progress=False):
         if selection is not None and not selection.selected_stoichiometry(
             stoichiometry
         ):
@@ -79,6 +80,7 @@ def random_sample(
     natoms: int,
     nmols: int,
     selection: Q = None,
+    progress: bool = True,
 ) -> list[Molecule]:
     """Builds a fixed size random sample from a search space for a given number of atoms.
 
@@ -94,6 +96,8 @@ def random_sample(
         Number of random molecules to be drawn.
     selection : Q, optional
         Selecting subsets via query string, by default None
+    progress : bool, optional
+        Show progress bar, by default True
 
     Returns
     -------
@@ -113,50 +117,31 @@ def random_sample(
 
     # sample molecules
     molecules = []
-    while len(molecules) < nmols:
+    for _ in tqdm.trange(nmols, disable=not progress):
         sum_formula = _weighted_choose(random_order, sizes)
         ss = stoichiometries[sum_formula]
         ws = [counter.count_one(_, natoms) for _ in ss]
         stoichiometry = _weighted_choose(ss, ws)
         spec = stoichiometry.canonical_label
 
-        # try a few times to find a concrete graph
-        # needs to stop eventually, since there might be stoichiometries
-        # for which the estimate is non-zero but which are actually
-        # infeasible
-        tries_selection = 0
-        while True and tries_selection < 1e4:
-            graph = counter.sample_connected(spec)
+        # random uniform unlabeled graph with given degree sequence
+        graph = counter.sample_connected(spec)
 
-            # correct for isomorphisms which skew MC sampling
-            degrees, _ = counter.spec_to_sequence(spec)
-            underlying = nx.Graph(graph)
-            nx.set_node_attributes(underlying, dict(enumerate(degrees)), "element")
-            underlying_isomorphisms = len(
-                list(
-                    nx.vf2pp_all_isomorphisms(
-                        underlying, underlying, node_label="element"
-                    )
-                )
-            )
-            graph_iso = len(
-                list(nx.vf2pp_all_isomorphisms(graph, graph, node_label="element"))
-            )
+        # assign element labels respecting isomorphisms
+        underlying_isomorphisms = count_automorphisms(graph, "none")
+        while True:
+            labels = stoichiometry.atom_types_per_valency.copy()
+            for key in labels:
+                random.shuffle(labels[key])
+            for node in graph.nodes:
+                valence = graph.degree[node]
+                graph.nodes[node]["element"] = labels[valence].pop()
 
-            weight = graph_iso / underlying_isomorphisms
+            this_isomorphisms = count_automorphisms(graph, "element")
+            weight = this_isomorphisms / underlying_isomorphisms
             if random.random() < weight:
-                sorted_nodes = sorted(
-                    graph.nodes, key=lambda x: graph.nodes[x]["element"]
-                )
-                labels = stoichiometry.canonical_element_sequence
-                graph = nx.relabel_nodes(
-                    graph, dict(zip(sorted_nodes, range(len(labels)))), copy=True
-                )
-                mol = Molecule(labels, list(graph.edges(data=False)))
-                if selection and not selection.selected_molecule(mol):
-                    tries_selection += 1
-                    continue
-                molecules.append(mol)
                 break
 
+        mol = Molecule(None, None, graph=graph)
+        molecules.append(mol)
     return molecules

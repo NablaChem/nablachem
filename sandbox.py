@@ -1,5 +1,4 @@
 # %%
-from functools import lru_cache
 import random
 import networkx as nx
 import igraph as ig
@@ -121,26 +120,6 @@ def run_chain(current, steps):
         proposition = apply_two_switch(current, proposition)
         proposition_targets = enumerate_valid_two_switch_moves(proposition)
 
-        # moves_forward = 0
-        # for state in possible_targets:
-        #    if nx.isomorphism.is_isomorphic(state, proposition):
-        #        moves_forward += 1
-        # moves_backward = 0
-        # for state in proposition_targets:
-        #    if nx.isomorphism.is_isomorphic(state, current):
-        #        moves_backward += 1
-
-        # expected = moves_forward / moves_backward
-        # alternative = aut_edge_size_exact(current) / aut_edge_size_exact(proposition)
-        # if expected != alternative:
-        #    print(
-        #        moves_forward,
-        #        moves_backward,
-        #        aut_edge_size_exact(current),
-        #        aut_edge_size_exact(proposition),
-        #        expected,
-        #        alternative,
-        #    )
         moves_backward = aut_edge_size_exact(proposition)
 
         q_fwd = moves_forward / len(possible_targets)
@@ -193,4 +172,13 @@ do_line(1000)
 # do_line(1000)
 # do_line(2000)
 plt.axhline(1.0)
+# %%
+import collections
+
+# %%
+
+for i in range(100):
+    cases = [random.randint(0, 72) for _ in range(1000)]
+    counter = collections.Counter(cases)
+    plt.plot([_ / (1000 / 73) for _ in sorted(counter.values())])
 # %%

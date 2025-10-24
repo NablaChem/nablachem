@@ -83,6 +83,13 @@ class AtomStoichiometry:
         return sorted(self.components.items(), key=lambda x: (x[0].valence, x[1]))
 
     @property
+    def atom_types_per_valency(self) -> dict[int, list[str]]:
+        valency_dict = {v: [] for v in set(atom.valence for atom in self.components)}
+        for atom_type, count in self.components.items():
+            valency_dict[atom_type.valence].extend([atom_type.label] * count)
+        return dict(valency_dict)
+
+    @property
     def canonical_label(self):
         return "_".join([f"{e[0].valence}.{e[1]}" for e in self._canonical_sorting])
 
@@ -147,7 +154,12 @@ class Molecule:
         self,
         node_labels: list[str],
         edges: list[tuple[int, int, int]] | list[tuple[int, int]],
+        graph: nx.MultiGraph = None,
     ):
+        if graph is not None:
+            self._G = graph
+            return
+
         myedges = []
         # convert (idx1, idx2, order) into repeated (idx1, idx2) for networkx
         if len(edges[0]) == 3:
