@@ -67,7 +67,7 @@ def chemspace_to_string(chemspace: dict[str, list[int]]) -> str:
 
 
 st.write(
-    "Molecules shown here are representative of the selected chemical space. Publication on arxiv: https://arxiv.org/abs/2508.20609. Contact: vonrudorff@uni-kassel.de."
+    "Molecules shown here are representative of the selected chemical space. Publication on arxiv, accepted in JCTC: https://arxiv.org/abs/2508.20609. Contact: vonrudorff@uni-kassel.de."
 )
 tab_simple, tab_advanced = st.tabs([":bike: Simple", ":rocket: Advanced"])
 criterion = None
