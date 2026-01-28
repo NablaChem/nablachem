@@ -1,10 +1,8 @@
 import numpy as np
+import pandas as pd
 import ase
 import ase.io
-import gzip
-import json
-import random
-from typing import Union, Callable
+from typing import Union
 from io import StringIO
 
 from utils import info, debug, warning, error
@@ -14,85 +12,80 @@ class DataSet:
     def __init__(
         self,
         filename: str,
-        labelname: Union[str, Callable[[dict], float]],
-        limit: int,
-        baseline: str = None,
+        labelname: str,
+        limit: int = None,
+        select: str = None,
     ):
         """Read gzipped JSONL file.
 
         Args:
             filename: Path to .gz file containing JSON lines
-            labelname: Property name to extract as labels, or callable that takes a data row and returns a numeric value
-                      Examples:
-                        - String: "energy" (extracts data["energy"])
-                        - Callable: lambda row: row["E_high"] - row["E_low"] (computes difference)
-            limit: Maximum number of molecules to load (randomly selected)
-            baseline: Optional baseline column name. If provided, labels will be labelname - baseline
+            labelname: String expression for pandas DataFrame.eval() to compute labels
+                      Examples: "energy", "energy - baseline", "E_high - E_low"
+            limit: Maximum number of molecules to load (None = no limit)
+            select: Optional selection expression for pandas DataFrame.query()
         """
-        with gzip.open(filename, "rt") as f:
-            all_lines = f.readlines()
+        try:
+            df = pd.read_json(filename, lines=True)
+        except Exception as e:
+            error("Failed to load JSONL file", filename=filename, error_msg=str(e))
 
-        if limit is not None and len(all_lines) > limit:
-            selected_lines = random.sample(all_lines, limit)
-        else:
-            selected_lines = all_lines
+        if "xyz" not in df.columns:
+            error(
+                "Required 'xyz' column not found in dataset",
+                columns=df.columns.tolist(),
+            )
+
+        found_keys = [col for col in df.columns if col != "xyz"]
+        info(
+            "Dataset columns",
+            columns=found_keys,
+            total_columns=len(df.columns),
+            total_rows=len(df),
+        )
+
+        if select is not None:
+            try:
+                df = df.query(select)
+                info("Applied selection", select=select, remaining_rows=len(df))
+            except Exception as e:
+                error("Failed to apply selection", select=select, error_msg=str(e))
+
+        df = df.sample(frac=1).reset_index(drop=True)
+
+        if limit is not None:
+            df = df.head(limit)
+            info("Applied limit", limit=limit, final_rows=len(df))
+
+        try:
+            labels = df.eval(labelname)
+            self.labels = np.array(labels, dtype=float)
+            info(
+                "Computed labels",
+                labelname=labelname,
+                sample_labels=self.labels[:5].tolist(),
+            )
+        except Exception as e:
+            error(
+                "Failed to evaluate labelname expression",
+                labelname=labelname,
+                error_msg=str(e),
+            )
+            raise
 
         molecules = []
-        raw_labels = []
-
-        # make everything a callable
-        if isinstance(labelname, str):
-            if baseline is not None:
-                extractor = lambda row: row[labelname] - row[baseline]
-            else:
-                extractor = lambda row: row[labelname]
-        else:
-            if baseline is not None:
-                extractor = lambda row: labelname(row) - row[baseline]
-            else:
-                extractor = labelname
-
-        first = True
-        for line_idx, line in enumerate(selected_lines):
+        for idx, xyz_data in enumerate(df["xyz"]):
             try:
-                data = json.loads(line.strip())
-            except json.JSONDecodeError as e:
-                error("JSON decode error", line_idx=line_idx, error_msg=str(e))
-            if first:
-                found_keys = [key for key in data.keys() if key != "xyz"]
-                info(
-                    "First molecule keys", keys=found_keys, total_keys=len(data.keys())
-                )
-                first = False
-
-            try:
-                molecules.append(ase.io.read(StringIO(data["xyz"]), format="xyz"))
+                molecules.append(ase.io.read(StringIO(xyz_data), format="xyz"))
             except Exception as e:
                 error(
                     "Failed to parse XYZ for molecule",
-                    line_idx=line_idx,
+                    molecule_idx=idx,
                     error_msg=str(e),
                 )
 
-            try:
-                label_value = extractor(data)
-                raw_labels.append(float(label_value))
-            except Exception as e:
-                error(
-                    "Failed to extract label from molecule",
-                    line_idx=line_idx,
-                )
-
-        raw_labels = np.array(raw_labels)
-
         self.molecules = molecules
-        self.labels = raw_labels
-
-        # shuffle
-        indices = np.arange(len(molecules))
-        np.random.shuffle(indices)
-        self.molecules = [self.molecules[i] for i in indices]
-        self.labels = self.labels[indices]
+        del df
 
     def __len__(self):
         return len(self.molecules)

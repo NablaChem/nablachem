@@ -97,7 +97,6 @@ class Kernel:
     def wu_c4(self, dr):
         pos_part = np.maximum(1 - dr, 0)
         k_vals = pos_part**6 * (35 * dr**2 + 18 * dr + 3) / 3
-        norm_const = 3 / 3  # k(0) = 1^6 * 3 / 3 = 1
         return k_vals
 
     def wu_c6(self, dr):

@@ -21,9 +21,9 @@ import features
     "--maxcount", default=2048, help="Maximum training size (rest used as holdout)"
 )
 @click.option(
-    "--baseline",
+    "--select",
     default=None,
-    help="Baseline column name for differential learning (target - baseline)",
+    help="Selection expression for filtering dataset rows",
 )
 @click.option(
     "--detrend-atomic/--no-detrend-atomic",
@@ -42,14 +42,17 @@ def main(
     limit,
     mincount,
     maxcount,
-    baseline,
+    select,
     detrend_atomic,
     holdout_residuals,
 ):
     """Train KRR models on molecular data.
 
     JSONL_PATH: Path to gzipped JSONL file containing molecular data
-    COLUMN_NAME: Name of the property column to predict
+    COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax.
+                Can be a simple column name like 'energy' or a calculated expression
+                like 'energy - baseline' or 'E_high - E_low'. For column names with
+                special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
     REPRESENTATION_NAME: Name of the molecular representation to use
 
     The dataset is split with the first maxcount molecules used for training,
@@ -65,7 +68,7 @@ def main(
         jsonl_path,
         column_name,
         limit=limit,
-        baseline=baseline,
+        select=select,
     )
 
     # Get the representation class
