@@ -7,7 +7,24 @@ from krr import AutoKRR
 import features
 
 
-@click.command()
+# Generate dynamic docstring with available representations
+available_representations = features.list_available()
+MAIN_DOCSTRING = f"""Train KRR models on molecular data.
+
+JSONL_PATH: Path to gzipped JSONL file containing molecular data
+COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax.
+            Can be a simple column name like 'energy' or a calculated expression
+            like 'energy - baseline' or 'E_high - E_low'. For column names with
+            special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
+REPRESENTATION_NAME: Name of the molecular representation to use.
+                 Available representations: {', '.join(available_representations)}
+
+The dataset is split with the first maxcount molecules used for training,
+and the remaining molecules used as holdout/test data.
+"""
+
+
+@click.command(help=MAIN_DOCSTRING)
 @click.argument("jsonl_path", type=click.Path(exists=True))
 @click.argument("column_name")
 @click.argument("representation_name")
@@ -46,18 +63,6 @@ def main(
     detrend_atomic,
     holdout_residuals,
 ):
-    """Train KRR models on molecular data.
-
-    JSONL_PATH: Path to gzipped JSONL file containing molecular data
-    COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax.
-                Can be a simple column name like 'energy' or a calculated expression
-                like 'energy - baseline' or 'E_high - E_low'. For column names with
-                special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
-    REPRESENTATION_NAME: Name of the molecular representation to use
-
-    The dataset is split with the first maxcount molecules used for training,
-    and the remaining molecules used as holdout/test data.
-    """
     # Set default limit if not specified
     if limit is None:
         limit = maxcount + 2000
@@ -75,19 +80,16 @@ def main(
         select=select,
     )
 
-    # Get the representation class
-    rep_class_map = {
-        "cMBDFGlobal": features.cMBDFGlobal,
-        "cMBDFLocal": features.cMBDFLocal,
-        "SLATMGlobal": features.SLATMGlobal,
-        "SLATMLocal": features.SLATMLocal,
-    }
+    # Get the representation class dynamically
+    rep_class_map = {}
+    for name in available_representations:
+        rep_class_map[name] = getattr(features, name)
 
     if representation_name not in rep_class_map:
         error(
             "Unknown representation",
             requested=representation_name,
-            available=list(rep_class_map.keys()),
+            available=available_representations,
         )
 
     rep = rep_class_map[representation_name]()

@@ -1,16 +1,12 @@
-import ase
 import numpy as np
-import cmbdf
+from deps import cmbdf
 import dataset
 import qmllib.representations
+import inspect
 
 
 class BaseRepresenter:
     def build(self, datasets: list[dataset.DataSet]) -> None: ...
-
-    def exponential_kernel(
-        self, X: list[np.ndarray], Y: list[np.ndarray], gamma: float
-    ) -> np.ndarray: ...
 
 
 class _cMBDF(BaseRepresenter):
@@ -113,3 +109,21 @@ class SLATMLocal(_SLATM):
 class SLATMGlobal(_SLATM):
     def __init__(self):
         super().__init__(local=False)
+
+
+def list_available():
+    """Return string names of all BaseRepresenter subclasses that don't start with underscore."""
+    current_module = inspect.getmembers(
+        inspect.getmodule(inspect.currentframe()), inspect.isclass
+    )
+
+    available = []
+    for name, cls in current_module:
+        if (
+            name != "BaseRepresenter"
+            and issubclass(cls, BaseRepresenter)
+            and not name.startswith("_")
+        ):
+            available.append(name)
+
+    return available
