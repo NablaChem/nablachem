@@ -488,7 +488,7 @@ class AutoKRR:
 
         # Loop: sigma outer, splits inner
         factors = 1.5 ** np.arange(-10, 20)
-        lam_grid = 10.0 ** np.arange(-14, -2)
+        lam_grid = 10.0 ** np.arange(-14, -1)
         shufs = 20
         validation = 50
 
@@ -531,6 +531,8 @@ class AutoKRR:
 
                 split_rmse = []
                 split_mae = []
+                split_train_rmse = []
+                split_train_mae = []
                 for shuf_idx in range(shufs):
                     np.random.shuffle(idx)
                     y_shuf = y[idx]
@@ -557,12 +559,21 @@ class AutoKRR:
                         except linalg.LinAlgError:
                             continue
 
+                    # validation
                     pred = K_full[idx[-validation:]][:, idx[:-validation]] @ alpha
                     rmse = np.sqrt(((pred - y_shuf[-validation:]) ** 2).mean())
                     mae = np.abs(pred - y_shuf[-validation:]).mean()
-
                     split_rmse.append(rmse)
                     split_mae.append(mae)
+
+                    # training
+                    pred_train = K_full[idx[:-validation]][:, idx[:-validation]] @ alpha
+                    rmse_train = np.sqrt(
+                        ((pred_train - y_shuf[:-validation]) ** 2).mean()
+                    )
+                    mae_train = np.abs(pred_train - y_shuf[:-validation]).mean()
+                    split_train_rmse.append(rmse_train)
+                    split_train_mae.append(mae_train)
 
                     if len(split_rmse) > 5:
                         one = np.median(split_rmse[::2])
@@ -580,6 +591,8 @@ class AutoKRR:
                         "lambda": lam,
                         "val_rmse": split_rmse,
                         "val_mae": split_mae,
+                        "train_rmse": split_train_rmse,
+                        "train_mae": split_train_mae,
                     }
                 )
 
@@ -665,6 +678,7 @@ class AutoKRR:
         test_rmse = np.sqrt(((mean_prediction - y_holdout) ** 2).mean())
         test_mae = np.abs(mean_prediction - y_holdout).mean()
 
+        utils.info("Nullmodel results", test_rmse=float(test_rmse))
         self.results[1] = {
             "sigma_opt": np.inf,
             "val_rmse": float(val_rmse),

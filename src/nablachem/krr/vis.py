@@ -29,28 +29,67 @@ def process_hyperopt_data(hyperopt_data):
         ntrain = entry["ntrain"]
         sigma = entry["sigma"]
         lambda_val = entry["lambda"]
+
+        # Calculate medians for all available metrics
         val_rmse_median = np.median(entry["val_rmse"])
+        val_mae_median = np.median(entry["val_mae"])
+        train_rmse_median = np.median(entry["train_rmse"])
+        train_mae_median = np.median(entry["train_mae"])
+
+        # Calculate max of training and validation RMSE
+        max_rmse_median = max(train_rmse_median, val_rmse_median)
 
         processed_data[ntrain].append(
             {
                 "sigma": sigma,
                 "lambda": lambda_val,
                 "val_rmse_median": val_rmse_median,
+                "val_mae_median": val_mae_median,
+                "train_rmse_median": train_rmse_median,
+                "train_mae_median": train_mae_median,
+                "max_rmse_median": max_rmse_median,
                 "log_sigma": np.log10(sigma),
                 "log_lambda": np.log10(lambda_val),
                 "log_val_rmse_median": np.log10(val_rmse_median),
+                "log_val_mae_median": np.log10(val_mae_median),
+                "log_train_rmse_median": np.log10(train_rmse_median),
+                "log_train_mae_median": np.log10(train_mae_median),
+                "log_max_rmse_median": np.log10(max_rmse_median),
             }
         )
 
     return processed_data
 
 
-def create_heatmap_plot(data_for_ntrain, ntrain, vmin=None, vmax=None):
+def create_heatmap_plot(data_for_ntrain, ntrain, metric_key, metric_display_name, vmin=None, vmax=None):
     df = pd.DataFrame(data_for_ntrain)
 
-    # Find the minimum val_rmse_median point
-    min_idx = df["val_rmse_median"].idxmin()
-    min_point = df.loc[min_idx]
+    # Define metric mappings
+    metric_to_median_key = {
+        "val_rmse": "val_rmse_median",
+        "val_mae": "val_mae_median",
+        "train_rmse": "train_rmse_median",
+        "train_mae": "train_mae_median",
+        "max_rmse": "max_rmse_median"
+    }
+
+    metric_to_log_key = {
+        "val_rmse": "log_val_rmse_median",
+        "val_mae": "log_val_mae_median",
+        "train_rmse": "log_train_rmse_median",
+        "train_mae": "log_train_mae_median",
+        "max_rmse": "log_max_rmse_median"
+    }
+
+    median_key = metric_to_median_key[metric_key]
+    log_key = metric_to_log_key[metric_key]
+
+    # Find the minimum point (only for validation metrics, not for training or max metrics)
+    min_point = None
+    show_best_point = metric_key.startswith("val_")
+    if show_best_point:
+        min_idx = df[median_key].idxmin()
+        min_point = df.loc[min_idx]
 
     # Get unique values for lambda and sigma (original values, not log)
     unique_lambda = sorted(df["lambda"].unique())
@@ -65,9 +104,9 @@ def create_heatmap_plot(data_for_ntrain, ntrain, vmin=None, vmax=None):
     for _, row in df.iterrows():
         sigma_idx = unique_sigma.index(row["sigma"])
         lambda_idx = unique_lambda.index(row["lambda"])
-        Z[sigma_idx, lambda_idx] = row["log_val_rmse_median"]
+        Z[sigma_idx, lambda_idx] = row[log_key]
         hover_text[sigma_idx, lambda_idx] = (
-            f"λ: {row['lambda']:.2e}<br>σ: {row['sigma']:.6f}<br>median val_rmse: {row['val_rmse_median']:.3f}"
+            f"λ: {row['lambda']:.2e}<br>σ: {row['sigma']:.6f}<br>median {metric_display_name.lower()}: {row[median_key]:.3e}"
         )
 
     # Create heatmap using plotly
@@ -80,7 +119,7 @@ def create_heatmap_plot(data_for_ntrain, ntrain, vmin=None, vmax=None):
             zmin=vmin,
             zmax=vmax,
             colorbar=dict(
-                title="median val_rmse",
+                title=f"median {metric_display_name.lower()}",
                 tickmode="array",
                 tickvals=(
                     np.arange(np.ceil(vmin), np.floor(vmax) + 1)
@@ -102,29 +141,29 @@ def create_heatmap_plot(data_for_ntrain, ntrain, vmin=None, vmax=None):
         )
     )
 
-    # Add marker for best point
-    fig.add_trace(
-        go.Scatter(
-            x=[min_point["lambda"]],
-            y=[min_point["sigma"]],
-            mode="markers",
-            marker=dict(
-                color="red",
-                size=15,
-                symbol="circle-open",
-                line=dict(width=3, color="red"),
-            ),
-            name="Best Performance",
-            hovertemplate=f"<b>Best Point</b><br>"
-            + f'λ: {min_point["lambda"]:.2e}<br>'
-            + f'σ: {min_point["sigma"]:.6f}<br>'
-            + f'median val_rmse: {min_point["val_rmse_median"]:.3f}<extra></extra>',
+    # Add marker for best point (only for validation metrics)
+    if show_best_point and min_point is not None:
+        fig.add_trace(
+            go.Scatter(
+                x=[min_point["lambda"]],
+                y=[min_point["sigma"]],
+                mode="markers",
+                marker=dict(
+                    color="red",
+                    size=15,
+                    symbol="circle-open",
+                    line=dict(width=3, color="red"),
+                ),
+                name="Best Performance",
+                hovertemplate=f"<b>Best Point</b><br>"
+                + f'λ: {min_point["lambda"]:.2e}<br>'
+                + f'σ: {min_point["sigma"]:.6f}<br>'
+                + f'median {metric_display_name.lower()}: {min_point[median_key]:.3e}<extra></extra>',
+            )
         )
-    )
 
     # Update layout
     fig.update_layout(
-        title="Hyperparameter Optimization Results",
         xaxis=dict(
             title=dict(text="λ", font=dict(size=24)),
             type="log",
@@ -143,7 +182,7 @@ def create_heatmap_plot(data_for_ntrain, ntrain, vmin=None, vmax=None):
         ),
         width=800,
         height=400,
-        showlegend=True,
+        showlegend=show_best_point,
     )
 
     return fig, min_point
@@ -393,18 +432,51 @@ def main():
         with tabs[i + 1]:
             data_for_ntrain = processed_data[ntrain]
 
-            # Calculate individual color range for this dataset
-            df = pd.DataFrame(data_for_ntrain)
-            local_vmin = df["log_val_rmse_median"].min()
-            local_vmax = df["log_val_rmse_median"].quantile(0.90)
+            # Define metric options for dropdown
+            metric_options = {
+                "Validation RMSE": "val_rmse",
+                "Validation MAE": "val_mae",
+                "Training RMSE": "train_rmse",
+                "Training MAE": "train_mae",
+                "Max(Training RMSE, Validation RMSE)": "max_rmse"
+            }
 
             # Create side-by-side columns for plots
             col1, col2 = st.columns(2)
 
             with col1:
+                # Add dropdown for metric selection
+                selected_metric_display = st.selectbox(
+                    "Select metric to display:",
+                    options=list(metric_options.keys()),
+                    index=0,  # Default to "Validation RMSE"
+                    key=f"metric_selector_{ntrain}"
+                )
+                selected_metric_key = metric_options[selected_metric_display]
+
+                # Calculate color range for the selected metric
+                df = pd.DataFrame(data_for_ntrain)
+                metric_to_log_key = {
+                    "val_rmse": "log_val_rmse_median",
+                    "val_mae": "log_val_mae_median",
+                    "train_rmse": "log_train_rmse_median",
+                    "train_mae": "log_train_mae_median",
+                    "max_rmse": "log_max_rmse_median"
+                }
+                log_key = metric_to_log_key[selected_metric_key]
+
+                if selected_metric_key.startswith("train_"):
+                    # For training metrics: use full data domain
+                    local_vmin = df[log_key].min()
+                    local_vmax = df[log_key].max()
+                else:
+                    # For validation metrics and max_rmse: use current logic (90th percentile)
+                    local_vmin = df[log_key].min()
+                    local_vmax = df[log_key].quantile(0.90)
+
                 # Create and display hyperparameter optimization plot
                 fig, min_point = create_heatmap_plot(
-                    data_for_ntrain, ntrain, local_vmin, local_vmax
+                    data_for_ntrain, ntrain, selected_metric_key, selected_metric_display, local_vmin, local_vmax
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -418,10 +490,19 @@ def main():
 
             # Show raw hyperopt data
             df = pd.DataFrame(data_for_ntrain)
-            display_df = df[["sigma", "lambda", "val_rmse_median"]].copy()
+            metric_to_median_key = {
+                "val_rmse": "val_rmse_median",
+                "val_mae": "val_mae_median",
+                "train_rmse": "train_rmse_median",
+                "train_mae": "train_mae_median",
+                "max_rmse": "max_rmse_median"
+            }
+            median_key = metric_to_median_key[selected_metric_key]
+
+            display_df = df[["sigma", "lambda", median_key]].copy()
             display_df["sigma"] = display_df["sigma"].apply(lambda x: f"{x:.3e}")
             display_df["lambda"] = display_df["lambda"].apply(lambda x: f"{x:.3e}")
-            display_df.columns = ["σ", "λ", "Median validation RMSE"]
+            display_df.columns = ["σ", "λ", f"Median {selected_metric_display.lower()}"]
             st.dataframe(display_df, use_container_width=True)
 
 

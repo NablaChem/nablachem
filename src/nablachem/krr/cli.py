@@ -31,6 +31,7 @@ and the remaining molecules used as holdout/test data.
 @click.option(
     "--limit",
     default=None,
+    type=int,
     help="Maximum number of molecules to load (includes training + holdout). Defaults to maxcount + 2000",
 )
 @click.option("--mincount", default=128, help="Minimum training size")
