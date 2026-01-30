@@ -358,6 +358,8 @@ class AutoKRR:
             self._kernel_matrix = GlobalKernelMatrix(self._X_train, self._X_holdout)
 
         learning_curve_start = time.time()
+        last_rmse = None
+        last_size = None
         for i, ntrain in enumerate(self._training_sizes):
             length_heuristic = self._kernel_matrix.length_scale(ntrain)
             best_parameters, best_val_rmse, best_val_mae = (
@@ -365,12 +367,32 @@ class AutoKRR:
             )
             test_rmse, test_mae = self._evaluate_model(ntrain, best_parameters)
 
+            improvement = {}
+            if last_rmse is not None:
+                improvement["test_slope"] = float(
+                    np.log(test_rmse / last_rmse) / np.log(ntrain / last_size)
+                )
+            else:
+                improvement["test_slope"] = None
+
+            last_rmse = test_rmse
+            last_size = ntrain
+
+            utils.info(
+                "Training size completed",
+                ntrain=ntrain,
+                test_rmse=float(test_rmse),
+                test_mae=float(test_mae),
+                **improvement,
+            )
+
             self.results[ntrain] = {
                 "parameters": best_parameters,
                 "val_rmse": float(best_val_rmse),
                 "val_mae": float(best_val_mae),
                 "test_rmse": float(test_rmse),
                 "test_mae": float(test_mae),
+                **improvement,
             }
 
         learning_curve_end = time.time()
