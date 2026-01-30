@@ -94,6 +94,7 @@ def main(
 
     rep = rep_class_map[representation_name]()
     rep.build([ds])
+    info("Built representation", shape=ds.representations[0].shape)
     autokrr = AutoKRR(ds, mincount, maxcount, detrend_atomic=detrend_atomic)
     autokrr.store_archive("archive.json")
 

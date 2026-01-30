@@ -10,9 +10,9 @@ class BaseRepresenter:
 
 
 class _DF(BaseRepresenter):
-    def __init__(self, local: bool, callable):
+    def __init__(self, local: bool, call):
         self._local = local
-        self._call = callable
+        self._call = call
 
     def build(self, datasets: list[dataset.DataSet]):
         mols_charges = []
