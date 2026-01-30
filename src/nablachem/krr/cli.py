@@ -13,10 +13,10 @@ import features
 @click.argument("representation_name")
 @click.option(
     "--limit",
-    default=10000,
-    help="Maximum number of molecules to load (includes training + holdout)",
+    default=None,
+    help="Maximum number of molecules to load (includes training + holdout). Defaults to maxcount + 2000",
 )
-@click.option("--mincount", default=64, help="Minimum training size")
+@click.option("--mincount", default=128, help="Minimum training size")
 @click.option(
     "--maxcount", default=2048, help="Maximum training size (rest used as holdout)"
 )
@@ -58,6 +58,10 @@ def main(
     The dataset is split with the first maxcount molecules used for training,
     and the remaining molecules used as holdout/test data.
     """
+    # Set default limit if not specified
+    if limit is None:
+        limit = maxcount + 2000
+
     # Compute SHA256 hash of the input file for logging
     with open(jsonl_path, "rb") as f:
         digest = hashlib.file_digest(f, "sha256")
