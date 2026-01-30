@@ -489,6 +489,8 @@ class AutoKRR:
             # choose algorithm based on condition number
             eigvals, Q = np.linalg.eigh(K_full)
             condition_number = eigvals[-1] / eigvals[0]
+            if condition_number > 1e15:
+                continue
             if condition_number < 5e6 and ntrain > 64:
                 mode = "eig"
             else:
