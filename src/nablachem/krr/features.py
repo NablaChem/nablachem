@@ -1,5 +1,5 @@
 import numpy as np
-from deps import cmbdf
+from deps import cmbdf, mbdf
 import dataset
 import qmllib.representations
 import inspect
@@ -9,9 +9,10 @@ class BaseRepresenter:
     def build(self, datasets: list[dataset.DataSet]) -> None: ...
 
 
-class _cMBDF(BaseRepresenter):
-    def __init__(self, local: bool = False):
+class _DF(BaseRepresenter):
+    def __init__(self, local: bool, callable):
         self._local = local
+        self._call = callable
 
     def build(self, datasets: list[dataset.DataSet]):
         mols_charges = []
@@ -22,7 +23,7 @@ class _cMBDF(BaseRepresenter):
                 mols_charges.append(mol.get_atomic_numbers())
                 mols_coords.append(mol.get_positions())
                 natoms.append(len(mol.get_atomic_numbers()))
-        reps = cmbdf.generate_mbdf(
+        reps = self._call(
             mols_charges, mols_coords, progress_bar=False, local=self._local
         )
 
@@ -39,14 +40,24 @@ class _cMBDF(BaseRepresenter):
             offset += len(ds.molecules)
 
 
-class cMBDFLocal(_cMBDF):
+class MBDFLocal(_DF):
     def __init__(self):
-        super().__init__(local=True)
+        super().__init__(local=True, call=mbdf.generate_mbdf)
 
 
-class cMBDFGlobal(_cMBDF):
+class MBDFGlobal(_DF):
     def __init__(self):
-        super().__init__(local=False)
+        super().__init__(local=False, call=mbdf.generate_mbdf)
+
+
+class cMBDFLocal(_DF):
+    def __init__(self):
+        super().__init__(local=True, call=cmbdf.generate_mbdf)
+
+
+class cMBDFGlobal(_DF):
+    def __init__(self):
+        super().__init__(local=False, call=cmbdf.generate_mbdf)
 
 
 class _SLATM(BaseRepresenter):

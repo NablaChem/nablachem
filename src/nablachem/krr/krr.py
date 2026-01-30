@@ -382,7 +382,6 @@ class AutoKRR:
                 "Training size completed",
                 ntrain=ntrain,
                 test_rmse=float(test_rmse),
-                test_mae=float(test_mae),
                 **improvement,
             )
 
