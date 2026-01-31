@@ -61,7 +61,9 @@ def process_hyperopt_data(hyperopt_data):
     return processed_data
 
 
-def create_heatmap_plot(data_for_ntrain, ntrain, metric_key, metric_display_name, vmin=None, vmax=None):
+def create_heatmap_plot(
+    data_for_ntrain, ntrain, metric_key, metric_display_name, vmin=None, vmax=None
+):
     df = pd.DataFrame(data_for_ntrain)
 
     # Define metric mappings
@@ -70,7 +72,7 @@ def create_heatmap_plot(data_for_ntrain, ntrain, metric_key, metric_display_name
         "val_mae": "val_mae_median",
         "train_rmse": "train_rmse_median",
         "train_mae": "train_mae_median",
-        "max_rmse": "max_rmse_median"
+        "max_rmse": "max_rmse_median",
     }
 
     metric_to_log_key = {
@@ -78,7 +80,7 @@ def create_heatmap_plot(data_for_ntrain, ntrain, metric_key, metric_display_name
         "val_mae": "log_val_mae_median",
         "train_rmse": "log_train_rmse_median",
         "train_mae": "log_train_mae_median",
-        "max_rmse": "log_max_rmse_median"
+        "max_rmse": "log_max_rmse_median",
     }
 
     median_key = metric_to_median_key[metric_key]
@@ -158,7 +160,7 @@ def create_heatmap_plot(data_for_ntrain, ntrain, metric_key, metric_display_name
                 hovertemplate=f"<b>Best Point</b><br>"
                 + f'λ: {min_point["lambda"]:.2e}<br>'
                 + f'σ: {min_point["sigma"]:.6f}<br>'
-                + f'median {metric_display_name.lower()}: {min_point[median_key]:.3e}<extra></extra>',
+                + f"median {metric_display_name.lower()}: {min_point[median_key]:.3e}<extra></extra>",
             )
         )
 
@@ -300,12 +302,13 @@ def create_learning_curve_plot(learning_curve_data):
     )
 
     # Add nullmodel horizontal line
-    if nullmodel_rmse:
-        max_training_size = max(training_sizes) if training_sizes else 1
+    if nullmodel_rmse and training_sizes:
+        min_training_size = min(training_sizes)
+        max_training_size = max(training_sizes)
         fig.add_shape(
             type="line",
-            x0=1,
-            x1=max_training_size * 1.1,
+            x0=min_training_size * 0.9,
+            x1=max_training_size * 1.2,
             y0=nullmodel_rmse,
             y1=nullmodel_rmse,
             line=dict(color="gray", width=1, dash="dash"),
@@ -321,28 +324,57 @@ def create_learning_curve_plot(learning_curve_data):
 
     # Set layout to match matplotlib style
     if training_sizes and val_rmse and test_rmse and val_mae and test_mae:
-        min_error = min(min(val_rmse), min(test_rmse), min(val_mae), min(test_mae))
+        all_errors = val_rmse + test_rmse + val_mae + test_mae
+        min_error = min(all_errors)
+        max_error = max(all_errors)
         max_training_size = max(training_sizes)
-        y_lower_bound = 0.8 * min_error
+        min_training_size = min(training_sizes)
+
+        # Tight bounds with minimal padding
+        y_lower_bound = min_error * 0.9
         y_upper_bound = (
-            nullmodel_rmse * 1.1
+            max(nullmodel_rmse, max_error) * 1.05
             if nullmodel_rmse
-            else max(max(val_rmse), max(test_rmse)) * 1.1
+            else max_error * 1.05
         )
 
         fig.update_layout(
             title="Learning Curve",
             xaxis=dict(
-                title="ntrain",
+                title=dict(text="Training points", font=dict(size=24)),
                 type="log",
-                range=[np.log10(1), np.log10(max_training_size * 1.1)],
-                tickfont=dict(size=12),
+                range=[
+                    np.log10(min_training_size * 0.9),
+                    np.log10(max_training_size * 1.2),
+                ],
+                tickfont=dict(size=20),
+                tickmode="array",
+                tickvals=training_sizes,
+                ticktext=[str(int(n)) for n in training_sizes],
+                showline=True,
+                linewidth=1,
+                linecolor="black",
             ),
             yaxis=dict(
-                title="RMSE/MAE",
+                title=dict(text="RMSE/MAE", font=dict(size=24)),
                 type="log",
+                showgrid=True,
+                dtick=1,
+                gridcolor="#555",
+                ticks="inside",
+                minor={"dtick": 0, "showgrid": True, "ticks": "inside"},
+                minorloglabels="none",
                 range=[np.log10(y_lower_bound), np.log10(y_upper_bound)],
-                tickfont=dict(size=12),
+                tickfont=dict(size=20),
+                # tickmode="array",
+                # tickvals=([10**i for i in range(-6, 2)] +  # Major ticks: 10^-6 to 10^1
+                #         [j * 10**i for i in range(-6, 1) for j in [2,3,4,5,6,7,8,9]]),  # Minor ticks
+                # ticktext=([f"10<sup>{i}</sup>" for i in range(-6, 2)] +  # Labels for major ticks
+                #         ["" for i in range(-6, 1) for j in [2,3,4,5,6,7,8,9]]),  # No labels for minor ticks
+                # ticks="inside",
+                showline=True,
+                linewidth=1,
+                linecolor="black",
             ),
             legend=dict(x=0.02, y=0.02, bgcolor="rgba(255,255,255,0.8)"),
             width=800,
@@ -354,7 +386,6 @@ def create_learning_curve_plot(learning_curve_data):
 
 
 def main():
-    st.title("Hyperparameter Optimization Visualization")
     st.markdown("Interactive visualization of hyperopt results from archive.json")
 
     # Load and process data
@@ -438,7 +469,7 @@ def main():
                 "Validation MAE": "val_mae",
                 "Training RMSE": "train_rmse",
                 "Training MAE": "train_mae",
-                "Max(Training RMSE, Validation RMSE)": "max_rmse"
+                "Max(Training RMSE, Validation RMSE)": "max_rmse",
             }
 
             # Create side-by-side columns for plots
@@ -450,7 +481,7 @@ def main():
                     "Select metric to display:",
                     options=list(metric_options.keys()),
                     index=0,  # Default to "Validation RMSE"
-                    key=f"metric_selector_{ntrain}"
+                    key=f"metric_selector_{ntrain}",
                 )
                 selected_metric_key = metric_options[selected_metric_display]
 
@@ -461,7 +492,7 @@ def main():
                     "val_mae": "log_val_mae_median",
                     "train_rmse": "log_train_rmse_median",
                     "train_mae": "log_train_mae_median",
-                    "max_rmse": "log_max_rmse_median"
+                    "max_rmse": "log_max_rmse_median",
                 }
                 log_key = metric_to_log_key[selected_metric_key]
 
@@ -476,7 +507,12 @@ def main():
 
                 # Create and display hyperparameter optimization plot
                 fig, min_point = create_heatmap_plot(
-                    data_for_ntrain, ntrain, selected_metric_key, selected_metric_display, local_vmin, local_vmax
+                    data_for_ntrain,
+                    ntrain,
+                    selected_metric_key,
+                    selected_metric_display,
+                    local_vmin,
+                    local_vmax,
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -495,7 +531,7 @@ def main():
                 "val_mae": "val_mae_median",
                 "train_rmse": "train_rmse_median",
                 "train_mae": "train_mae_median",
-                "max_rmse": "max_rmse_median"
+                "max_rmse": "max_rmse_median",
             }
             median_key = metric_to_median_key[selected_metric_key]
 
