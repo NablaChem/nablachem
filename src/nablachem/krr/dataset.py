@@ -97,9 +97,11 @@ class DataSet:
             np.ndarray: Matrix of shape (N, k) where N is the number of molecules
                        and k is the number of unique elements. Each entry (i, j)
                        contains the count of element j in molecule i.
+            list[int]: List of unique atomic numbers corresponding to columns
+                       in the element count matrix.
         """
         if not self.molecules:
-            return np.array([]).reshape(0, 0)
+            return np.array([]).reshape(0, 0), []
 
         # Get all unique atomic numbers across all molecules
         all_atomic_numbers = set()
@@ -119,7 +121,7 @@ class DataSet:
                     atomic_numbers == atomic_num
                 )
 
-        return element_counts
+        return element_counts, unique_atomic_numbers
 
     def write_holdout_residuals_jsonl(
         self,

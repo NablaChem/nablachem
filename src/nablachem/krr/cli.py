@@ -5,10 +5,12 @@ from utils import info, error, result
 from dataset import DataSet
 from krr import AutoKRR
 import features
+import kernels
 
 
 # Generate dynamic docstring with available representations
 available_representations = features.list_available()
+available_kernels = kernels.list_available()
 MAIN_DOCSTRING = f"""Train KRR models on molecular data.
 
 JSONL_PATH: Path to gzipped JSONL file containing molecular data
@@ -18,6 +20,8 @@ COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax
             special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
 REPRESENTATION_NAME: Name of the molecular representation to use.
                  Available representations: {', '.join(available_representations)}
+KERNEL_NAME: Name of the kernel function to use.
+         Available kernels: {', '.join(available_kernels)}
 
 The dataset is split with the first maxcount molecules used for training,
 and the remaining molecules used as holdout/test data.
@@ -28,6 +32,7 @@ and the remaining molecules used as holdout/test data.
 @click.argument("jsonl_path", type=click.Path(exists=True))
 @click.argument("column_name")
 @click.argument("representation_name")
+@click.argument("kernel_name")
 @click.option(
     "--limit",
     default=None,
@@ -57,6 +62,7 @@ def main(
     jsonl_path,
     column_name,
     representation_name,
+    kernel_name,
     limit,
     mincount,
     maxcount,
@@ -96,7 +102,22 @@ def main(
     rep = rep_class_map[representation_name]()
     rep.build([ds])
     info("Built representation", shape=ds.representations[0].shape)
-    autokrr = AutoKRR(ds, mincount, maxcount, detrend_atomic=detrend_atomic)
+
+    # Validate kernel name
+    if kernel_name not in available_kernels:
+        error(
+            "Unknown kernel",
+            requested=kernel_name,
+            available=available_kernels,
+        )
+
+    # Instantiate kernel and get callable method
+    k = kernels.Kernel()
+    kernel_func = getattr(k, kernel_name)
+
+    autokrr = AutoKRR(
+        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
+    )
     autokrr.store_archive("archive.json")
 
     # Print learning curve table

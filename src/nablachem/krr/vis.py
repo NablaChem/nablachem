@@ -10,7 +10,6 @@ import sys
 st.set_page_config(page_title="Training details", layout="wide")
 
 
-@st.cache_data
 def load_data():
     if len(sys.argv) > 1:
         filename = sys.argv[1]
@@ -262,8 +261,8 @@ def create_learning_curve_plot(learning_curve_data):
             y=val_rmse,
             mode="lines+markers",
             name="val RMSE",
-            line=dict(color="#1f77b4", width=1),
-            marker=dict(symbol="circle", size=6),
+            line=dict(color="#1f77b4", width=2),
+            marker=dict(symbol="circle", size=10),
         )
     )
 
@@ -273,8 +272,8 @@ def create_learning_curve_plot(learning_curve_data):
             y=test_rmse,
             mode="lines+markers",
             name="test RMSE",
-            line=dict(color="#ff7f0e", width=1),
-            marker=dict(symbol="square", size=6),
+            line=dict(color="#ff7f0e", width=2),
+            marker=dict(symbol="square", size=10),
         )
     )
 
@@ -285,7 +284,7 @@ def create_learning_curve_plot(learning_curve_data):
             y=val_mae,
             mode="lines",
             name="val MAE",
-            line=dict(color="#1f77b4", width=1),
+            line=dict(color="#1f77b4", width=2),
             showlegend=True,
         )
     )
@@ -296,7 +295,7 @@ def create_learning_curve_plot(learning_curve_data):
             y=test_mae,
             mode="lines",
             name="test MAE",
-            line=dict(color="#ff7f0e", width=1),
+            line=dict(color="#ff7f0e", width=2),
             showlegend=True,
         )
     )
@@ -339,7 +338,6 @@ def create_learning_curve_plot(learning_curve_data):
         )
 
         fig.update_layout(
-            title="Learning Curve",
             xaxis=dict(
                 title=dict(text="Training points", font=dict(size=24)),
                 type="log",

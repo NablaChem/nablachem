@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.special import gamma, kv
+import inspect
 
 
 class Kernel:
@@ -70,24 +71,34 @@ class Kernel:
     def generalized_cauchy(self, dr, alpha, beta):
         return (1 + dr**beta) ** (-alpha / beta)  # k(0) = 1^(-alpha/beta) = 1
 
-    def wendland_c0(self, dr):
-        pos_part = np.maximum(1 - dr, 0)
-        return pos_part  # k(0) = 1
-
-    def wendland_c2(self, dr):
-        pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**3 * (3 * dr + 1)
-        return k_vals  # k(0) = 1^3 * (0 + 1) = 1
-
-    def wendland_c4(self, dr):
-        pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**5 * (8 * dr**2 + 5 * dr + 1)
-        return k_vals  # k(0) = 1^5 * (0 + 0 + 1) = 1
-
-    def wendland_c6(self, dr):
-        pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**7 * (21 * dr**3 + 19 * dr**2 + 7 * dr + 1)
-        return k_vals  # k(0) = 1^7 * (0 + 0 + 0 + 1) = 1
+    def wendland(self, dr: float, k: int, d: int) -> float:
+        l = int(np.floor(d / 2) + k + 1)
+        if k == 0:
+            p = lambda r: 1
+        elif k == 1:
+            p = lambda r: (l + 1) * r + 1
+        elif k == 2:
+            p = lambda r: (l + 3) * (l + 1) * r**2 + 3 * (l + 2) * r + 3
+        elif k == 3:
+            p = (
+                lambda r: (l + 5) * (l + 3) * (l + 1) * r**3
+                + (45 + 6 * l * (l + 6)) * r**2
+                + (15 * (l + 3)) * r
+                + 15
+            )
+        elif k == 4:
+            p = (
+                lambda r: (l + 7) * (l + 5) * (l + 3) * (l + 1) * r**4
+                + (5 * (l + 4) * (21 + 2 * l * (8 + l))) * r**3
+                + (45 * (14 + l * (l + 8))) * r**2
+                + (105 * (l + 4)) * r
+                + 105
+            )
+        else:
+            raise NotImplementedError()
+        p0 = p(0)
+        e = l + k
+        return np.maximum(1 - dr, 0) ** e * p(dr) / p0
 
     def wu_c2(self, dr):
         pos_part = np.maximum(1 - dr, 0)
@@ -125,3 +136,12 @@ class Kernel:
         k_vals = (1 + dr**2) ** alpha * np.exp(-beta * dr**2)
         norm_const = (1 + 0) ** alpha * np.exp(-beta * 0)  # k(0) = 1 * 1 = 1
         return k_vals / norm_const
+
+
+def list_available():
+    """Return string names of all kernel methods from the Kernel class."""
+    kernel_methods = []
+    for name, method in inspect.getmembers(Kernel, predicate=inspect.isfunction):
+        if not name.startswith("_") and name != "list_available":
+            kernel_methods.append(name)
+    return kernel_methods

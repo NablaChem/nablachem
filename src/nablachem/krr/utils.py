@@ -1,5 +1,6 @@
 import structlog
 import logging
+import ase
 import sys
 import math
 
@@ -91,3 +92,8 @@ def get_training_sizes(mincount: int, maxcount: int) -> list[int]:
         training_sizes.append(maxcount)
 
     return sorted(set(training_sizes))
+
+
+def Z_to_element_symbol(Z: int) -> str:
+    """Convert atomic number to element symbol."""
+    return ase.data.chemical_symbols[Z]

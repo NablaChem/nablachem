@@ -10,15 +10,19 @@ from dataset import DataSet
 class KernelMatrix:
     """Base class for kernel matrix computation and management"""
 
-    def __init__(self, X: np.ndarray, X_holdout: np.ndarray = None):
+    def __init__(
+        self, X: np.ndarray, X_holdout: np.ndarray = None, kernel_func: callable = None
+    ):
         """Initialize kernel matrix with training and optional holdout data
 
         Args:
             X: Training data
             X_holdout: Holdout/test data (optional)
+            kernel_func: Kernel function to use (optional)
         """
         self._X = X
         self._X_holdout = X_holdout
+        self._kernel_func = kernel_func
 
         # Compute distance matrices
         self._D2 = self._dist_squared(X)
@@ -309,7 +313,8 @@ class GlobalKernelMatrix(KernelMatrix):
     def compute_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute training kernel matrix for global representations"""
         D2_train = self._D2[:ntrain, :ntrain]
-        K_train = np.exp(-D2_train / sigma**2)
+        # K_train = np.exp(-D2_train / sigma**2)
+        K_train = self._kernel_func(np.sqrt(D2_train) / sigma)
         return K_train
 
     def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
@@ -318,7 +323,7 @@ class GlobalKernelMatrix(KernelMatrix):
             raise ValueError("Holdout data not provided")
 
         D2_test = self._D2_test[:, :ntrain]
-        K_test = np.exp(-D2_test / sigma**2)
+        K_test = self._kernel_func(np.sqrt(D2_test) / sigma)
         return K_test
 
     def length_scale(self, ntrain: int) -> float:
@@ -336,6 +341,7 @@ class AutoKRR:
         dataset: DataSet,
         mincount: int,
         maxcount: int,
+        kernel_func: callable,
         detrend_atomic: bool = True,
     ) -> None:
         self._archive = {}
@@ -355,7 +361,9 @@ class AutoKRR:
                 self._X_train, self._train_counts, self._X_holdout, self._holdout_counts
             )
         else:
-            self._kernel_matrix = GlobalKernelMatrix(self._X_train, self._X_holdout)
+            self._kernel_matrix = GlobalKernelMatrix(
+                self._X_train, self._X_holdout, kernel_func
+            )
 
         learning_curve_start = time.time()
         last_rmse = None
@@ -473,7 +481,7 @@ class AutoKRR:
             self._X_holdout = np.stack(self._X_holdout, axis=0)
 
         if self._detrend_atomic:
-            element_counts = self.dataset.get_element_counts()
+            element_counts, self._elements_Z = self.dataset.get_element_counts()
             self._elements_train = element_counts[:max_training_size]
             self._elements_holdout = element_counts[max_training_size:]
 
@@ -498,6 +506,11 @@ class AutoKRR:
         if self._detrend_atomic:
             A = self._elements_train[:ntrain]
             coefs = linalg.lstsq(A, y)[0]
+            mapping = {
+                utils.Z_to_element_symbol(Z): float(c)
+                for Z, c in zip(self._elements_Z, coefs)
+            }
+            utils.info("Atomic detrending coefficients", **mapping)
             trend = A @ coefs
             y -= trend
         y -= np.mean(y)
