@@ -112,14 +112,30 @@ def main(
             available=available_kernels,
         )
 
+    execution_commands = {
+        "jsonl file":jsonl_path,
+        "Column analyzed":column_name,
+        "Representation method":representation_name,
+        "Kernel employed":kernel_name,
+        "Run with limit":limit,
+        "Minimum count considered":mincount,
+        "Maximum count considered":maxcount,
+        "Filters applied":select,
+        "Atomic detrending":detrend_atomic,
+        "Holdout":holdout_residuals,
+    }
+
+
+
+
     # Instantiate kernel and get callable method
     k = kernels.Kernel()
     kernel_func = getattr(k, kernel_name)
 
     autokrr = AutoKRR(
-        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
+        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func, execution_commands=execution_commands
     )
-    autokrr.store_archive("archive.json")
+    autokrr.store_archive("archive.json", execution_commands=execution_commands)
 
     # Print learning curve table
     print("\nLearning Curve Results:")

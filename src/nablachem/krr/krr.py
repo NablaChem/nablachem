@@ -342,6 +342,7 @@ class AutoKRR:
         mincount: int,
         maxcount: int,
         kernel_func: callable,
+        execution_commands: dict, 
         detrend_atomic: bool = True,
     ) -> None:
         self._archive = {}
@@ -408,7 +409,7 @@ class AutoKRR:
             duration=f"{learning_curve_end - learning_curve_start:.1f}s",
         )
 
-    def store_archive(self, filename: str) -> None:
+    def store_archive(self, filename: str, execution_commands: dict) -> None:
         """Store hyperparameter optimization archive and learning curve data to JSON file"""
         # Add learning curve data to archive
         learning_curve_data = []
@@ -441,7 +442,8 @@ class AutoKRR:
             )
 
         self._archive["learning_curve"] = learning_curve_data
-
+        self._archive["Commands"] = execution_commands
+        
         with open(filename, "w") as f:
             json.dump(self._archive, f, indent=2)
 

@@ -387,7 +387,7 @@ def main():
     st.markdown("Interactive visualization of hyperopt results from archive.json")
 
     # Load and process data
-    hyperopt_data, spectrum_data, learning_curve_data = load_data()
+    hyperopt_data, spectrum_data, learning_curve_data, commands = load_data()
     processed_data = process_hyperopt_data(hyperopt_data)
 
     # Get unique ntrain values and sort them
@@ -539,6 +539,22 @@ def main():
             display_df.columns = ["σ", "λ", f"Median {selected_metric_display.lower()}"]
             st.dataframe(display_df, use_container_width=True)
 
+    # Add some spacing
+    st.markdown("---")
+    # Display commands/configuration as a table at the top
+    st.markdown("### Run Configuration")
+    
+    config_df = pd.DataFrame(
+        list(commands.items()), 
+        columns=['Parameter', 'Value']
+    )
+    
+    st.dataframe(
+        config_df, 
+        use_container_width=True,
+        hide_index=True
+    )
+    
 
 if __name__ == "__main__":
     main()
