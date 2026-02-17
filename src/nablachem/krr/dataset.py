@@ -15,6 +15,7 @@ class DataSet:
         labelname: str,
         limit: int = None,
         select: str = None,
+        representation_name: str = None,
     ):
         """Read gzipped JSONL file.
 
@@ -46,10 +47,33 @@ class DataSet:
 
         if select is not None:
             try:
+                starting_rows = len(df)
                 df = df.query(select)
-                info("Applied selection", select=select, remaining_rows=len(df))
+                remaining_rows = len(df)
+                if remaining_rows == starting_rows:
+                    warning("Selection without effect", select=select)
+                elif remaining_rows == 0:
+                    error("There are no more rows to process", filename=filename, error_msg=str(e))
+                else:
+                    info("Applied selection", select=select, remaining_rows=remaining_rows)
+
             except Exception as e:
                 error("Failed to apply selection", select=select, error_msg=str(e))
+
+        if "cmbdf" in representation_name.lower():
+            # Count atoms in each molecule and filter
+            starting_rows = len(df)
+            df["atom_count"] = df["xyz"].apply(lambda xyz: int(xyz.split('\n')[0]))
+            
+            df = df[df["atom_count"] > 2]
+            remaining_rows = len(df)
+            removed = starting_rows - remaining_rows
+
+            if removed != 0:
+                info("Remove molecules with < 3 atoms", 
+                    removed=removed, 
+                    remaining_rows=remaining_rows
+                    )
 
         df = df.sample(frac=1).reset_index(drop=True)
 
