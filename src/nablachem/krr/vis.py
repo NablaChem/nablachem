@@ -19,7 +19,7 @@ def load_data():
 
     with open(filename, "r") as f:
         data = json.load(f)
-    return data["hyperopt"], data.get("spectrum", {}), data["learning_curve"]
+    return data["hyperopt"], data.get("spectrum", {}), data["learning_curve"], data["Commands"]
 
 
 def process_hyperopt_data(hyperopt_data):
