@@ -85,7 +85,6 @@ def main(
         column_name,
         limit=limit,
         select=select,
-        representasssssstion_name=representation_name,
     )
 
     # Get the representation class dynamically
