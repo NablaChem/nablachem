@@ -344,6 +344,7 @@ class AutoKRR:
         kernel_func: callable,
         execution_commands: dict, 
         detrend_atomic: bool = True,
+        output_name: str = "archive",
     ) -> None:
         self._archive = {}
         self._archive["hyperopt"] = []
@@ -402,7 +403,8 @@ class AutoKRR:
                 "test_mae": float(test_mae),
                 **improvement,
             }
-
+            self.store_archive(f"{output_name}.json",execution_commands)
+            print()
         learning_curve_end = time.time()
         utils.info(
             "Learning curve calculation",
@@ -443,7 +445,7 @@ class AutoKRR:
 
         self._archive["learning_curve"] = learning_curve_data
         self._archive["Commands"] = execution_commands
-        
+
         with open(filename, "w") as f:
             json.dump(self._archive, f, indent=2)
 

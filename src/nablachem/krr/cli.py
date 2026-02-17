@@ -58,6 +58,13 @@ and the remaining molecules used as holdout/test data.
     default=None,
     help="Output JSONL file path for holdout residuals",
 )
+@click.option(
+    "--output-name",
+    default="archive",
+    type=str,
+    help="Name for output JSONL file path",
+)
+
 def main(
     jsonl_path,
     column_name,
@@ -69,6 +76,7 @@ def main(
     select,
     detrend_atomic,
     holdout_residuals,
+    output_name,
 ):
     # Set default limit if not specified
     if limit is None:
@@ -123,6 +131,7 @@ def main(
         "Filters applied":select,
         "Atomic detrending":detrend_atomic,
         "Holdout":holdout_residuals,
+        "output_name":output_name,
     }
 
 
@@ -133,9 +142,9 @@ def main(
     kernel_func = getattr(k, kernel_name)
 
     autokrr = AutoKRR(
-        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func, execution_commands=execution_commands
+        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func, execution_commands=execution_commands, output_name=output_name,
     )
-    autokrr.store_archive("archive.json", execution_commands=execution_commands)
+
 
     # Print learning curve table
     print("\nLearning Curve Results:")
