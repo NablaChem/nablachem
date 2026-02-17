@@ -370,10 +370,26 @@ class AutoKRR:
         learning_curve_start = time.time()
         last_rmse = None
         last_size = None
+        factor_min = -10 
+        factor_max =  20
+        lambda_min = -14
+        lambda_max = -1
+        extended_range = 6
+        speed_up_factors = []
+        speed_up_lambdas = []
+
         for i, ntrain in enumerate(self._training_sizes):
+            combinations_tested = (factor_max-factor_min) * (lambda_max-lambda_min)
+            utils.info(
+                f"Training size: {ntrain}",
+                combinations_tested = combinations_tested,
+                λ_range=(lambda_min,lambda_max),
+                σ_range=(factor_min,factor_max),
+            )
+
             length_heuristic = self._kernel_matrix.length_scale(ntrain)
             best_parameters, best_val_rmse, best_val_mae = (
-                self._optimize_hyperparameters(ntrain, length_heuristic)
+                self._optimize_hyperparameters(ntrain, length_heuristic,(factor_min,factor_max),(lambda_min,lambda_max))
             )
             test_rmse, test_mae = self._evaluate_model(ntrain, best_parameters)
 
@@ -401,8 +417,27 @@ class AutoKRR:
                 "val_mae": float(best_val_mae),
                 "test_rmse": float(test_rmse),
                 "test_mae": float(test_mae),
+                "combinations_tested": int(combinations_tested),
                 **improvement,
             }
+            
+            if ntrain >= 128 and ntrain <= 1024:
+                factor_exp = np.log(best_parameters["sigma"] / length_heuristic) / np.log(1.5)
+                speed_up_factors.append(int(round(factor_exp)))
+                speed_up_lambdas.append(int(round(np.log10(best_parameters["lambda"]))))
+                
+            if ntrain == 1024:
+                # New values are in a range between the lower and upper values from those best parameters with an expanded range 
+                new_factor_min = min(speed_up_factors) - extended_range
+                new_factor_max = max(speed_up_factors) + extended_range
+                new_lambda_min = min(speed_up_lambdas) - extended_range
+                new_lambda_max = max(speed_up_lambdas) + extended_range
+                
+                factor_min = max(factor_min,new_factor_min) 
+                factor_max = min(factor_max,new_factor_max)
+                lambda_min = max(lambda_min,new_lambda_min)
+                lambda_max = min(lambda_max,new_lambda_max)
+            
             self.store_archive(f"{output_name}.json",execution_commands)
             print()
         learning_curve_end = time.time()
@@ -426,6 +461,7 @@ class AutoKRR:
                     "val_mae": self.results[1]["val_mae"],
                     "test_mae": self.results[1]["test_mae"],
                     "hyperparameters": {"sigma": float("inf")},
+                    "combinations_tested": self.results[1]["combinations_tested"]
                 }
             )
 
@@ -440,6 +476,7 @@ class AutoKRR:
                     "val_mae": result["val_mae"],
                     "test_mae": result["test_mae"],
                     "hyperparameters": result["parameters"],
+                    "combinations_tested": result["combinations_tested"],
                 }
             )
 
@@ -490,7 +527,10 @@ class AutoKRR:
             self._elements_holdout = element_counts[max_training_size:]
 
     def _optimize_hyperparameters(
-        self, ntrain: int, length_heuristic: float
+        self, ntrain: int, 
+        length_heuristic: float,
+        factors_range: tuple[float,float],
+        lambdas_range: tuple[float,float],
     ) -> tuple[float, float, float]:
         # other tricks which are not used yet:
         # when shuffling, in-group shuffles (validation vs training) could be ignored
@@ -499,8 +539,8 @@ class AutoKRR:
         best_params, best_val_rmse, best_val_mae = None, np.inf, None
 
         # Loop: sigma outer, splits inner
-        factors = 1.5 ** np.arange(-10, 20)
-        lam_grid = 10.0 ** np.arange(-14, -1)
+        factors = 1.5 ** np.arange(factors_range[0], factors_range[1])
+        lam_grid = 10.0 ** np.arange(lambdas_range[0], lambdas_range[1])
         shufs = 20
         validation = 50
 
@@ -626,6 +666,8 @@ class AutoKRR:
             "Hyperparameter optimization",
             ntrain=ntrain,
             duration=f"{opt_end - opt_start:.1f}s",
+            σ = float(best_params["sigma"]),
+            λ = float(best_params["lambda"]),
         )
         return best_params, best_val_rmse, best_val_mae
 
