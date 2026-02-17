@@ -9,6 +9,7 @@ import sys
 
 st.set_page_config(page_title="Training details", layout="wide")
 
+MHA_TO_KCAL = 0.6275095
 
 def load_data():
     if len(sys.argv) > 1:
@@ -409,6 +410,18 @@ def main():
         with col2:
             # Create learning curve data table
             st.markdown("### Learning Curve Data")
+
+            # Add unit toggle
+            energy_unit = st.radio(
+                "Energy units:",
+                options=["mHa", "kcal/mol"],
+                horizontal=True,
+                key="lc_unit_toggle"
+            )
+            
+            # Determine conversion factor
+            unit_factor = MHA_TO_KCAL if energy_unit == "kcal/mol" else 1.0
+
             lc_df = pd.DataFrame(learning_curve_data)
 
             # Format the data for display
@@ -438,23 +451,25 @@ def main():
                     "test_mae",
                     "sigma",
                     "lambda",
+                    "combinations_tested",
                 ]
             ]
             display_lc_df.columns = [
                 "ntrain",
-                "val_rmse",
-                "test_rmse",
-                "val_mae",
-                "test_mae",
+                f"val_rmse ({energy_unit})",
+                f"test_rmse ({energy_unit})",
+                f"val_mae ({energy_unit})",
+                f"test_mae ({energy_unit})",
                 "σ",
                 "λ",
+                "combinations_tested",
             ]
 
             # Format numerical columns
-            for col in ["val_rmse", "test_rmse", "val_mae", "test_mae"]:
-                display_lc_df[col] = display_lc_df[col].apply(lambda x: f"{x:.4f}")
+            for col in [f"val_rmse" ({energy_unit}), f"test_rmse ({energy_unit})", f"val_mae ({energy_unit})", f"test_mae ({energy_unit})"]:
+                display_lc_df[col] = display_lc_df[col].apply(lambda x: f"{x * unit_factor:.4f}")
 
-            st.dataframe(display_lc_df, use_container_width=True)
+            st.dataframe(display_lc_df, use_container_width=True, hide_index=True)
 
     # Hyperopt tabs (offset by 1 due to learning curve tab)
     for i, ntrain in enumerate(ntrain_values):
@@ -474,6 +489,9 @@ def main():
             col1, col2 = st.columns(2)
 
             with col1:
+                num_combinations = len(data_for_ntrain)
+                st.markdown(f"**{num_combinations} hyperparameter combinations tested**")
+
                 # Add dropdown for metric selection
                 selected_metric_display = st.selectbox(
                     "Select metric to display:",
@@ -522,6 +540,15 @@ def main():
                 else:
                     st.info(f"No spectrum data available for ntrain={ntrain}")
 
+            energy_unit_hyperopt = st.radio(
+                "Energy units:",
+                options=["mHa", "kcal/mol"],
+                horizontal=True,
+                key=f"hyperopt_unit_toggle_{ntrain}"
+            )
+            
+            unit_factor_hyperopt = MHA_TO_KCAL if energy_unit_hyperopt == "kcal/mol" else 1.0
+
             # Show raw hyperopt data
             df = pd.DataFrame(data_for_ntrain)
             metric_to_median_key = {
@@ -536,8 +563,10 @@ def main():
             display_df = df[["sigma", "lambda", median_key]].copy()
             display_df["sigma"] = display_df["sigma"].apply(lambda x: f"{x:.3e}")
             display_df["lambda"] = display_df["lambda"].apply(lambda x: f"{x:.3e}")
-            display_df.columns = ["σ", "λ", f"Median {selected_metric_display.lower()}"]
-            st.dataframe(display_df, use_container_width=True)
+            display_df.columns = ["σ", "λ", f"Median {selected_metric_display.lower()} ({energy_unit_hyperopt})"]
+            
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
 
     # Add some spacing
     st.markdown("---")
