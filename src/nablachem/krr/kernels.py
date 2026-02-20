@@ -71,7 +71,7 @@ class Kernel:
     def generalized_cauchy(self, dr, alpha, beta):
         return (1 + dr**beta) ** (-alpha / beta)  # k(0) = 1^(-alpha/beta) = 1
 
-    def wendland(self, dr: float, k: int, d: int) -> float:
+    def _wendland(self, dr: float, k: int, d: int) -> float:
         l = int(np.floor(d / 2) + k + 1)
         if k == 0:
             p = lambda r: 1
@@ -99,6 +99,21 @@ class Kernel:
         p0 = p(0)
         e = l + k
         return np.maximum(1 - dr, 0) ** e * p(dr) / p0
+
+    def wendland_k0(self, dr, d):
+        return self._wendland(dr, k=0, d=d)
+
+    def wendland_k1(self, dr, d):
+        return self._wendland(dr, k=1, d=d)
+
+    def wendland_k2(self, dr, d):
+        return self._wendland(dr, k=2, d=d)
+
+    def wendland_k3(self, dr, d):
+        return self._wendland(dr, k=3, d=d)
+
+    def wendland_k4(self, dr, d):
+        return self._wendland(dr, k=4, d=d)
 
     def wu_c2(self, dr):
         pos_part = np.maximum(1 - dr, 0)

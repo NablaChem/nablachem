@@ -9,7 +9,7 @@ from ..utils.graph import count_automorphisms
 def chemical_formula_database(
     counter: ExactCounter | ApproximateCounter,
     search_space: SearchSpace,
-    natoms: int,
+    natoms: list[int] | int,
     selection: Q = None,
 ):
     """Builds a size database of the sizes of all chemical formulas in randomized order.
@@ -32,17 +32,19 @@ def chemical_formula_database(
     """
     sum_formula_size = {}
     stoichiometries = {}
-    for stoichiometry in search_space.list_cases(natoms, progress=False):
-        if selection is not None and not selection.selected_stoichiometry(
-            stoichiometry
-        ):
-            continue
-        sum_formula = stoichiometry.sum_formula
-        magnitude = counter.count_one(stoichiometry, natoms)
-        if sum_formula not in stoichiometries:
-            stoichiometries[sum_formula] = [stoichiometry]
-            sum_formula_size[sum_formula] = 0
-        sum_formula_size[sum_formula] += magnitude
+    nsatoms = [natoms] if isinstance(natoms, int) else natoms
+    for natoms in nsatoms:
+        for stoichiometry in search_space.list_cases(natoms, progress=False):
+            if selection is not None and not selection.selected_stoichiometry(
+                stoichiometry
+            ):
+                continue
+            sum_formula = stoichiometry.sum_formula
+            magnitude = counter.count_one(stoichiometry, natoms)
+            if sum_formula not in stoichiometries:
+                stoichiometries[sum_formula] = [stoichiometry]
+                sum_formula_size[sum_formula] = 0
+            sum_formula_size[sum_formula] += magnitude
 
     random_order = list(sum_formula_size.keys())
     random.shuffle(random_order)
@@ -67,17 +69,18 @@ def _weighted_choose(items: list, weights: list[int]):
         One item.
     """
     total = sum(weights)
-    choice = random.randint(0, total)
-    for item, weight in zip(items, weights):
-        choice -= weight
-        if choice <= 0:
+    r = random.uniform(0, total)
+    upto = 0
+    for item, w in zip(items, weights):
+        upto += w
+        if r <= upto:
             return item
 
 
 def random_sample(
     counter: ApproximateCounter,
     search_space: SearchSpace,
-    natoms: int,
+    natoms: list[int] | int,
     nmols: int,
     selection: Q = None,
     progress: bool = True,
@@ -112,6 +115,7 @@ def random_sample(
     random_order, sizes, stoichiometries = chemical_formula_database(
         counter, search_space, natoms, selection
     )
+
     if len(random_order) == 0 or sum(sizes) == 0:
         raise ValueError("Search space and selection yield no feasible molecule.")
 
