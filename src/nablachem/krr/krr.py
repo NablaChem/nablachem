@@ -44,9 +44,11 @@ class KernelMatrix:
         D2 = np.maximum(D2, 0.0)
         return D2
 
-    def compute_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
+    def compute_train_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute training kernel matrix for given sigma and training size"""
-        raise NotImplementedError("Subclasses must implement compute_kernel_matrix")
+        raise NotImplementedError(
+            "Subclasses must implement compute_train_kernel_matrix"
+        )
 
     def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute test kernel matrix for given sigma and training size"""
@@ -194,22 +196,24 @@ class LocalKernelMatrix(KernelMatrix):
         Kp = S[a1, b1] - S[a0, b1] - S[a1, b0] + S[a0, b0]
         return Kp
 
-    def compute_kernel_matrix(self, sigma, ntrain):
+    def compute_train_kernel_matrix(self, sigma, ntrain):
         # approx only pays off for larger ntrain
         if ntrain <= 128:
-            return self.compute_kernel_matrix_exact(sigma, ntrain)
+            return self.compute_train_kernel_matrix_exact(sigma, ntrain)
 
         failsigma = self._approx_fail_sigma.get(ntrain, None)
         if failsigma is not None and sigma >= failsigma:
-            return self.compute_kernel_matrix_exact(sigma, ntrain)
-        approx = self.compute_kernel_matrix_approx(sigma, ntrain)
+            return self.compute_train_kernel_matrix_exact(sigma, ntrain)
+        approx = self.compute_train_kernel_matrix_approx(sigma, ntrain)
         if approx is None:
             self._approx_fail_sigma[ntrain] = sigma
-            res = self.compute_kernel_matrix_exact(sigma, ntrain)
+            res = self.compute_train_kernel_matrix_exact(sigma, ntrain)
             return res
         return approx
 
-    def compute_kernel_matrix_approx(self, sigma: float, ntrain: int) -> np.ndarray:
+    def compute_train_kernel_matrix_approx(
+        self, sigma: float, ntrain: int
+    ) -> np.ndarray:
         """Compute training local kernel matrix using approximation"""
         if not self._cache_built:
             raise RuntimeError("Cache must be built before computing kernel matrix")
@@ -244,7 +248,9 @@ class LocalKernelMatrix(KernelMatrix):
             return None
         return K_sub
 
-    def compute_kernel_matrix_exact(self, sigma: float, ntrain: int) -> np.ndarray:
+    def compute_train_kernel_matrix_exact(
+        self, sigma: float, ntrain: int
+    ) -> np.ndarray:
         if self._X_holdout is None:
             raise ValueError("Holdout data not provided")
 
@@ -310,7 +316,7 @@ class LocalKernelMatrix(KernelMatrix):
 class GlobalKernelMatrix(KernelMatrix):
     """Kernel matrix for global (molecule-based) representations"""
 
-    def compute_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
+    def compute_train_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute training kernel matrix for global representations"""
         D2_train = self._D2[:ntrain, :ntrain]
         # K_train = np.exp(-D2_train / sigma**2)
@@ -518,7 +524,7 @@ class AutoKRR:
         for factor in factors:
             # get kernel matrix
             sigma = length_heuristic * factor
-            K_full = self._kernel_matrix.compute_kernel_matrix(sigma, ntrain)
+            K_full = self._kernel_matrix.compute_train_kernel_matrix(sigma, ntrain)
 
             # choose algorithm based on condition number
             eigvals, Q = np.linalg.eigh(K_full)
@@ -646,7 +652,9 @@ class AutoKRR:
         y_train -= shift
         y_test -= shift
 
-        K_train = self._kernel_matrix.compute_kernel_matrix(params["sigma"], ntrain)
+        K_train = self._kernel_matrix.compute_train_kernel_matrix(
+            params["sigma"], ntrain
+        )
         K_test = self._kernel_matrix.compute_test_kernel_matrix(params["sigma"], ntrain)
 
         # store eigenvalues for analysis
