@@ -1,6 +1,6 @@
 import numpy as np
-from deps import cmbdf, mbdf
-import dataset
+from .deps import cmbdf, mbdf
+from . import dataset
 import qmllib.representations
 import inspect
 

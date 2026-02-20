@@ -1,11 +1,11 @@
 import click
 import hashlib
 
-from utils import info, error, result
-from dataset import DataSet
-from krr import AutoKRR
-import features
-import kernels
+from .utils import info, error
+from .dataset import DataSet
+from .krr import AutoKRR
+from . import features
+from . import kernels
 
 
 # Generate dynamic docstring with available representations
