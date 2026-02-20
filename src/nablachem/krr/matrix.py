@@ -254,22 +254,16 @@ class LocalKernelMatrix(KernelMatrix):
 
         # Compute atomic kernel between test and train
         K_atom = np.exp(-self._D2[:natoms, :natoms] / sigma**2)
-        K_test = self.aggregate_atomic_kernel(K_atom, atom_counts_A, atom_counts_A)
-
-        # Compute normalization factors
-        # For training: get unnormalized diagonal first
-        atom_counts_A = self._train_counts[:ntrain]
-        natoms = sum(atom_counts_A)
-        K_atom_train = np.exp(-self._D2[:natoms, :natoms] / sigma**2)
-        K_train_unnorm = self.aggregate_atomic_kernel(
-            K_atom_train, atom_counts_A, atom_counts_A
+        K_atom_train = self.aggregate_atomic_kernel(
+            K_atom, atom_counts_A, atom_counts_A
         )
-        d_train_sqrt = np.sqrt(np.diag(K_train_unnorm))
+
+        d_train_sqrt = np.sqrt(np.diag(K_atom_train))
 
         # Apply normalization
-        K_test /= np.outer(d_train_sqrt, d_train_sqrt)
+        K_train = K_atom_train / np.outer(d_train_sqrt, d_train_sqrt)
 
-        return K_test
+        return K_train
 
     def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute test kernel matrix for local representations"""
