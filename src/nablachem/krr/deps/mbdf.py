@@ -151,7 +151,7 @@ def angular_integrals(
         arr[i] = f1, f2
         theta += 0.02
 
-    trapz = [np.trapz(arr[:, i], dx=0.02) for i in range(arr.shape[1])]
+    trapz = [np.trapezoid(arr[:, i], dx=0.02) for i in range(arr.shape[1])]
 
     return trapz
 
@@ -194,7 +194,7 @@ def radial_integrals(size, rlength, twob, step_r, a=1, normalized=False):
         r += step_r
         arr[i] = f1, f2, f3, f4
 
-    trapz = [np.trapz(arr[:, i], dx=step_r) for i in range(arr.shape[1])]
+    trapz = [np.trapezoid(arr[:, i], dx=step_r) for i in range(arr.shape[1])]
 
     return trapz
 
