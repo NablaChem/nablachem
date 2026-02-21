@@ -158,6 +158,18 @@ class AutoKRR:
             self._elements_train = element_counts[:max_training_size]
             self._elements_holdout = element_counts[max_training_size:]
 
+    def get_hyperparameter_grid(self, ntrain: int):
+        factors = 1.5 ** np.arange(-10, 20)
+        lam_grid = 10.0 ** np.arange(-14, -1)
+        return factors, lam_grid
+
+    def validation_size(self, ntrain: int) -> int:
+        # default: 20%
+        valcount = int(ntrain * 0.8)
+
+        # if too large, far from ntrain, if too small, noisy
+        return min(valcount, 200)
+
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
     ) -> tuple[float, float, float]:
@@ -168,10 +180,9 @@ class AutoKRR:
         best_params, best_val_rmse, best_val_mae = None, np.inf, None
 
         # Loop: sigma outer, splits inner
-        factors = 1.5 ** np.arange(-10, 20)
-        lam_grid = 10.0 ** np.arange(-14, -1)
+        factors, lam_grid = self.get_hyperparameter_grid(ntrain)
         shufs = 20
-        validation = 50
+        validation = self.validation_size(ntrain)
 
         idx = np.arange(ntrain)
 
