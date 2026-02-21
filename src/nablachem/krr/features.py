@@ -1,6 +1,6 @@
 import numpy as np
-from deps import cmbdf, mbdf
-import dataset
+from .deps import cmbdf, mbdf
+from . import dataset
 import qmllib.representations
 import inspect
 
@@ -99,7 +99,7 @@ class _SLATM(BaseRepresenter):
             reps_short = []
             for idx, natom in enumerate(natoms):
                 if isinstance(reps[idx], list):
-                    reps_short.append(reps[idx][:natom])
+                    reps_short.append(np.array(reps[idx][:natom]))
                 else:
                     reps_short.append(reps[idx][:natom, :])
         else:

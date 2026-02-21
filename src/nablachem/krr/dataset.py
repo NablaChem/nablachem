@@ -3,10 +3,9 @@ from numpy.char import isdigit
 import pandas as pd
 import ase
 import ase.io
-from typing import Union
 from io import StringIO
 
-from utils import info, debug, warning, error
+from .utils import info, warning, error
 
 
 class DataSet:
@@ -40,7 +39,7 @@ class DataSet:
         atom_cols = pd.DataFrame(df["xyz"].apply(self._parse_xyz_counts).tolist())
         atom_cols = atom_cols.fillna(0).astype(int)
 
-        df = pd.concat([df, atom_cols], axis=1)        
+        df = pd.concat([df, atom_cols], axis=1)
 
         found_keys = [col for col in df.columns if col != "xyz"]
         info(
@@ -50,8 +49,6 @@ class DataSet:
             total_rows=len(df),
         )
 
-        
-
         if select is not None:
             try:
                 starting_rows = len(df)
@@ -60,15 +57,18 @@ class DataSet:
                 if remaining_rows == starting_rows:
                     warning("Selection without effect", select=select)
                 elif remaining_rows == 0:
-                    error("There are no remaining rows", filename=filename, select=select)
+                    error(
+                        "There are no remaining rows", filename=filename, select=select
+                    )
                 else:
-                    info("Applied selection", select=select, remaining_rows=remaining_rows)
+                    info(
+                        "Applied selection",
+                        select=select,
+                        remaining_rows=remaining_rows,
+                    )
 
             except Exception as e:
                 error("Failed to apply selection", select=select, error_msg=str(e))
-
-
-
 
         df = df.sample(frac=1).reset_index(drop=True)
 
@@ -146,18 +146,18 @@ class DataSet:
     def _parse_xyz_counts(xyz: str) -> dict:
         import ase.data
 
-        lines = xyz.split('\n')
+        lines = xyz.split("\n")
         number_atoms = int(lines[0].strip())
         counts = {"n_atoms": number_atoms}
-        
-        for line in lines[2:2 + number_atoms]:
+
+        for line in lines[2 : 2 + number_atoms]:
             atom = line.split()[0]
-            
+
             if atom.isdigit():
                 symbol = ase.data.chemical_symbols[int(atom)]
             else:
                 symbol = atom
-            
+
             counts[f"n_{symbol}"] = counts.get(f"n_{symbol}", 0) + 1
         return counts
 
