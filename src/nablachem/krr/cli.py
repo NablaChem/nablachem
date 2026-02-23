@@ -111,10 +111,9 @@ def main(
             available=available_kernels,
         )
 
-    # Instantiate kernel and get callable method
-    k = kernels.Kernel()
-    kernel_func = getattr(k, kernel_name)
-    kernel_func = kernels.ExponentialKernel()
+    # Instantiate kernel by name
+    kernel_cls_map = {name: getattr(kernels, name) for name in available_kernels}
+    kernel_func = kernel_cls_map[kernel_name]()
     autokrr = AutoKRR(
         ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
     )

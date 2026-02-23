@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from scipy.special import gamma, kv
 import inspect
@@ -9,27 +10,30 @@ class Kernel:
     def __init__(self):
         pass
 
-    def gaussian(self, dr):
-        return np.exp(-(dr**2))
+    def __call__(self, dr, **kwargs):
+        return self.exact(dr, **kwargs)
 
-    def exponential(self, dr):
-        return np.exp(-dr)
 
-    def matern_32(self, dr):
+class Matern32(Kernel):
+    def exact(self, dr):
         scaled_r = np.sqrt(3) * dr
         return (1 + scaled_r) * np.exp(-scaled_r)
 
-    def matern_52(self, dr):
+
+class Matern52(Kernel):
+    def exact(self, dr):
         scaled_r = np.sqrt(5) * dr
         return (1 + scaled_r + scaled_r**2 / 3) * np.exp(-scaled_r)
 
-    def matern_general(self, dr, nu):
+
+class MaternGeneral(Kernel):
+    def exact(self, dr, nu):
         if nu == 0.5:
-            return self.exponential(dr)
+            return ExponentialKernel().exact(dr)
         elif nu == 1.5:
-            return self.matern_32(dr)
+            return Matern32().exact(dr)
         elif nu == 2.5:
-            return self.matern_52(dr)
+            return Matern52().exact(dr)
         else:
             scaled_r = np.sqrt(2 * nu) * dr
 
@@ -58,22 +62,35 @@ class Kernel:
 
             return result
 
-    def rational_quadratic(self, dr, alpha):
+
+class RationalQuadratic(Kernel):
+    def exact(self, dr, alpha):
         return (1 + dr**2 / (2 * alpha)) ** (-alpha)
 
-    def inverse_multiquadric(self, dr):
+
+class InverseMultiquadric(Kernel):
+    def exact(self, dr):
         return 1 / np.sqrt(1 + dr**2)  # k(0) = 1/sqrt(1) = 1
 
-    def inverse_quadratic(self, dr):
+
+class InverseQuadratic(Kernel):
+    def exact(self, dr):
         return 1 / (1 + dr**2)  # k(0) = 1/(1) = 1
 
-    def power(self, dr, alpha):
+
+class Power(Kernel):
+    def exact(self, dr, alpha):
         return (1 + dr**2) ** (-alpha)  # k(0) = 1^(-alpha) = 1
 
-    def generalized_cauchy(self, dr, alpha, beta):
+
+class GeneralizedCauchy(Kernel):
+    def exact(self, dr, alpha, beta):
         return (1 + dr**beta) ** (-alpha / beta)  # k(0) = 1^(-alpha/beta) = 1
 
-    def _wendland(self, dr: float, k: int, d: int) -> float:
+
+class _Wendland(Kernel):
+    def exact(self, dr, d):
+        k = self._k
         l = int(np.floor(d / 2) + k + 1)
         if k == 0:
             p = lambda r: 1
@@ -102,37 +119,47 @@ class Kernel:
         e = l + k
         return np.maximum(1 - dr, 0) ** e * p(dr) / p0
 
-    def wendland_k0(self, dr, d):
-        return self._wendland(dr, k=0, d=d)
 
-    def wendland_k1(self, dr, d):
-        return self._wendland(dr, k=1, d=d)
+class WendlandK0(_Wendland):
+    _k = 0
 
-    def wendland_k2(self, dr, d):
-        return self._wendland(dr, k=2, d=d)
 
-    def wendland_k3(self, dr, d):
-        return self._wendland(dr, k=3, d=d)
+class WendlandK1(_Wendland):
+    _k = 1
 
-    def wendland_k4(self, dr, d):
-        return self._wendland(dr, k=4, d=d)
 
-    def wu_c2(self, dr):
+class WendlandK2(_Wendland):
+    _k = 2
+
+
+class WendlandK3(_Wendland):
+    _k = 3
+
+
+class WendlandK4(_Wendland):
+    _k = 4
+
+
+class WuC2(Kernel):
+    def exact(self, dr):
         pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**4 * (4 * dr + 1)
-        return k_vals  # k(0) = 1^4 * (0 + 1) = 1
+        return pos_part**4 * (4 * dr + 1)  # k(0) = 1^4 * (0 + 1) = 1
 
-    def wu_c4(self, dr):
+
+class WuC4(Kernel):
+    def exact(self, dr):
         pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**6 * (35 * dr**2 + 18 * dr + 3) / 3
-        return k_vals
+        return pos_part**6 * (35 * dr**2 + 18 * dr + 3) / 3
 
-    def wu_c6(self, dr):
+
+class WuC6(Kernel):
+    def exact(self, dr):
         pos_part = np.maximum(1 - dr, 0)
-        k_vals = pos_part**8 * (16 * dr**3 + 25 * dr**2 + 10 * dr + 1)
-        return k_vals  # k(0) = 1^8 * (0 + 0 + 0 + 1) = 1
+        return pos_part**8 * (16 * dr**3 + 25 * dr**2 + 10 * dr + 1)  # k(0) = 1
 
-    def bump(self, dr):
+
+class Bump(Kernel):
+    def exact(self, dr):
         inside_mask = dr < 1
         k_vals = np.zeros_like(dr) if hasattr(dr, "__len__") else 0.0
         if hasattr(dr, "__len__"):
@@ -143,13 +170,17 @@ class Kernel:
         norm_const = np.exp(-1)  # k(0) = exp(-1/(1-0)) = exp(-1)
         return k_vals / norm_const
 
-    def sigmoid_kernel(self, dr, a, b):
+
+class Sigmoid(Kernel):
+    def exact(self, dr, a, b):
         arg = a - b * dr
         k_vals = 1 / (1 + np.exp(-arg))
         norm_const = 1 / (1 + np.exp(-a))  # k(0) = 1/(1+exp(-a))
         return k_vals / norm_const
 
-    def polynomial_kernel(self, dr, alpha, beta):
+
+class Polynomial(Kernel):
+    def exact(self, dr, alpha, beta):
         k_vals = (1 + dr**2) ** alpha * np.exp(-beta * dr**2)
         norm_const = (1 + 0) ** alpha * np.exp(-beta * 0)  # k(0) = 1 * 1 = 1
         return k_vals / norm_const
@@ -252,7 +283,7 @@ class ExponentialToChebychev:
         return K_sub
 
 
-class GaussianKernel(Kernel):
+class Gaussian(Kernel):
     def exact(self, dr):
         return np.exp(-(dr**2))
 
@@ -263,7 +294,7 @@ class GaussianKernel(Kernel):
         return self._chebytrick(sigma**2, ntrain)
 
 
-class ExponentialKernel(Kernel):
+class Exponential(Kernel):
     def exact(self, dr):
         return np.exp(-dr)
 
@@ -275,9 +306,9 @@ class ExponentialKernel(Kernel):
 
 
 def list_available():
-    """Return string names of all kernel methods from the Kernel class."""
-    kernel_methods = []
-    for name, method in inspect.getmembers(Kernel, predicate=inspect.isfunction):
-        if not name.startswith("_") and name != "list_available":
-            kernel_methods.append(name)
-    return kernel_methods
+    """Return names of all public Kernel subclasses."""
+    result = []
+    for name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
+        if issubclass(cls, Kernel) and cls is not Kernel and not name.startswith("_"):
+            result.append(name)
+    return result

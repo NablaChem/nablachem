@@ -150,9 +150,6 @@ class LocalKernelMatrix(KernelMatrix):
     def compute_train_kernel_matrix_exact(
         self, sigma: float, ntrain: int
     ) -> np.ndarray:
-        if self._X_holdout is None:
-            raise ValueError("Holdout data not provided")
-
         atom_counts_A = self._train_counts[:ntrain]
         natoms = sum(atom_counts_A)
 
