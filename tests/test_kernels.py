@@ -1,66 +1,66 @@
 import pytest
 import numpy as np
 from scipy.linalg import eigvals
-from nablachem.krr.kernels import Kernel
+from nablachem.krr import kernels as kernels_module
 
 
 # Define reasonable hyperparameters for each kernel
 KERNEL_PARAMS = {
-    "gaussian": {},
-    "exponential": {},
-    "matern_32": {},
-    "matern_52": {},
-    "matern_general": {"nu": 1.5},
-    "rational_quadratic": {"alpha": 2.0},
-    "inverse_multiquadric": {},
-    "inverse_quadratic": {},
-    "power": {"alpha": 1.0},
-    "generalized_cauchy": {"alpha": 1.0, "beta": 2.0},
-    "wendland_k0": {"d": 1},
-    "wendland_k1": {"d": 1},
-    "wendland_k2": {"d": 1},
-    "wendland_k3": {"d": 1},
-    "wendland_k4": {"d": 1},
-    "wu_c2": {},
-    "wu_c4": {},
-    "wu_c6": {},
-    "bump": {},
-    "sigmoid_kernel": {"a": 2.0, "b": 1.0},
-    "polynomial_kernel": {"alpha": -1.0, "beta": 1.0},
+    "Gaussian": {},
+    "Exponential": {},
+    "Matern32": {},
+    "Matern52": {},
+    "MaternGeneral": {"nu": 1.5},
+    "RationalQuadratic": {"alpha": 2.0},
+    "InverseMultiquadric": {},
+    "InverseQuadratic": {},
+    "Power": {"alpha": 1.0},
+    "GeneralizedCauchy": {"alpha": 1.0, "beta": 2.0},
+    "WendlandK0": {"d": 1},
+    "WendlandK1": {"d": 1},
+    "WendlandK2": {"d": 1},
+    "WendlandK3": {"d": 1},
+    "WendlandK4": {"d": 1},
+    "WuC2": {},
+    "WuC4": {},
+    "WuC6": {},
+    "Bump": {},
+    "Sigmoid": {"a": 2.0, "b": 1.0},
+    "Polynomial": {"alpha": -1.0, "beta": 1.0},
 }
 
 
 @pytest.fixture
 def kernel():
-    return Kernel()
+    return {name: getattr(kernels_module, name)() for name in KERNEL_PARAMS}
 
 
 class TestKernels:
     def setup_method(self):
         # Define which kernels have compact support (exactly zero beyond some point)
         self.compact_kernels = [
-            "wendland_k0",
-            "wendland_k1",
-            "wendland_k2",
-            "wendland_k3",
-            "wendland_k4",
-            "wu_c2",
-            "wu_c4",
-            "wu_c6",
-            "bump",
+            "WendlandK0",
+            "WendlandK1",
+            "WendlandK2",
+            "WendlandK3",
+            "WendlandK4",
+            "WuC2",
+            "WuC4",
+            "WuC6",
+            "Bump",
         ]
 
         # Define kernel-specific validity ranges (beyond which they become invalid/problematic)
         self.kernel_ranges = {
-            "bump": 1.0,  # undefined for dr >= 1
-            "wendland_k0": np.inf,  # valid everywhere, but zero for dr > 1
-            "wendland_k1": np.inf,
-            "wendland_k2": np.inf,
-            "wendland_k3": np.inf,
-            "wendland_k4": np.inf,
-            "wu_c2": np.inf,
-            "wu_c4": np.inf,
-            "wu_c6": np.inf,
+            "Bump": 1.0,  # undefined for dr >= 1
+            "WendlandK0": np.inf,  # valid everywhere, but zero for dr > 1
+            "WendlandK1": np.inf,
+            "WendlandK2": np.inf,
+            "WendlandK3": np.inf,
+            "WendlandK4": np.inf,
+            "WuC2": np.inf,
+            "WuC4": np.inf,
+            "WuC6": np.inf,
         }
 
     def get_test_range(self, kernel_name):
@@ -80,7 +80,7 @@ class TestKernels:
     @pytest.mark.parametrize("kernel_name", list(KERNEL_PARAMS.keys()))
     def test_exact_normalization(self, kernel, kernel_name):
         """Test that k(0) = 1 for all kernels"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         k_zero = method(0.0, **params)
@@ -95,7 +95,7 @@ class TestKernels:
     @pytest.mark.parametrize("seed", [42, 123, 456, 789, 999])
     def test_positive_semi_definiteness(self, kernel, kernel_name, n, seed):
         """Test PSD property with multiple matrix sizes and seeds"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         np.random.seed(seed)
@@ -136,7 +136,7 @@ class TestKernels:
     @pytest.mark.parametrize("kernel_name", list(KERNEL_PARAMS.keys()))
     def test_boundedness(self, kernel, kernel_name):
         """Test boundedness within each kernel's valid domain"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         test_points = self.get_test_range(kernel_name)
@@ -171,42 +171,32 @@ class TestKernels:
             pytest.fail(f"{kernel_name} failed boundedness test: {str(e)}")
 
     def test_known_kernels_only(self, kernel):
-        """Test that all kernel methods are in the known parameters list"""
-        # Get all callable methods from the kernel object
-        kernel_methods = [
-            method
-            for method in dir(kernel)
-            if not method.startswith("_") and callable(getattr(kernel, method))
-        ]
-
-        # Check that all found methods are in our known kernel parameters
-        unknown_kernels = [
-            method for method in kernel_methods if method not in KERNEL_PARAMS
-        ]
-
+        """Test that all available kernel classes are in the known parameters list"""
+        available = kernels_module.list_available()
+        unknown_kernels = [name for name in available if name not in KERNEL_PARAMS]
         assert (
             len(unknown_kernels) == 0
-        ), f"Found unknown kernel methods not in KERNEL_PARAMS: {unknown_kernels}"
+        ), f"Found unknown kernel classes not in KERNEL_PARAMS: {unknown_kernels}"
 
     @pytest.mark.parametrize(
         "kernel_name",
         [
-            "gaussian",
-            "exponential",
-            "matern_32",
-            "matern_52",
-            "matern_general",
-            "rational_quadratic",
-            "inverse_multiquadric",
-            "inverse_quadratic",
-            "power",
-            "generalized_cauchy",
-            "sigmoid_kernel",
+            "Gaussian",
+            "Exponential",
+            "Matern32",
+            "Matern52",
+            "MaternGeneral",
+            "RationalQuadratic",
+            "InverseMultiquadric",
+            "InverseQuadratic",
+            "Power",
+            "GeneralizedCauchy",
+            "Sigmoid",
         ],
     )
     def test_monotonic_decrease(self, kernel, kernel_name):
         """Test monotonic decrease for kernels that have this property"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         # Use dense sampling to catch any violations
@@ -230,21 +220,21 @@ class TestKernels:
     @pytest.mark.parametrize(
         "kernel_name,params",
         [
-            ("matern_general", {"nu": 0.01}),
-            ("matern_general", {"nu": 10.0}),
-            ("matern_general", {"nu": 0.5001}),
-            ("rational_quadratic", {"alpha": 0.001}),
-            ("rational_quadratic", {"alpha": 100.0}),
-            ("power", {"alpha": 0.1}),
-            ("power", {"alpha": 10.0}),
-            ("generalized_cauchy", {"alpha": 0.1, "beta": 0.1}),
-            ("generalized_cauchy", {"alpha": 10.0, "beta": 3.0}),
-            ("generalized_cauchy", {"alpha": 1.0, "beta": 0.01}),
+            ("MaternGeneral", {"nu": 0.01}),
+            ("MaternGeneral", {"nu": 10.0}),
+            ("MaternGeneral", {"nu": 0.5001}),
+            ("RationalQuadratic", {"alpha": 0.001}),
+            ("RationalQuadratic", {"alpha": 100.0}),
+            ("Power", {"alpha": 0.1}),
+            ("Power", {"alpha": 10.0}),
+            ("GeneralizedCauchy", {"alpha": 0.1, "beta": 0.1}),
+            ("GeneralizedCauchy", {"alpha": 10.0, "beta": 3.0}),
+            ("GeneralizedCauchy", {"alpha": 1.0, "beta": 0.01}),
         ],
     )
     def test_extreme_parameter_stability(self, kernel, kernel_name, params):
         """Test kernels with extreme parameter values for numerical stability"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         test_points = np.array([0.0, 0.001, 0.1, 1.0, 5.0, 10.0])
 
         try:
@@ -267,24 +257,24 @@ class TestKernels:
     @pytest.mark.parametrize(
         "kernel_name,decay_type",
         [
-            ("gaussian", "fast"),
-            ("exponential", "fast"),
-            ("matern_32", "fast"),
-            ("matern_52", "fast"),
-            ("matern_general", "fast"),
-            ("sigmoid_kernel", "fast"),
-            ("polynomial_kernel", "fast"),
-            ("rational_quadratic", "slow"),
-            ("inverse_multiquadric", "slow"),
-            ("inverse_quadratic", "slow"),
-            ("power", "slow"),
-            ("generalized_cauchy", "slow"),
+            ("Gaussian", "fast"),
+            ("Exponential", "fast"),
+            ("Matern32", "fast"),
+            ("Matern52", "fast"),
+            ("MaternGeneral", "fast"),
+            ("Sigmoid", "fast"),
+            ("Polynomial", "fast"),
+            ("RationalQuadratic", "slow"),
+            ("InverseMultiquadric", "slow"),
+            ("InverseQuadratic", "slow"),
+            ("Power", "slow"),
+            ("GeneralizedCauchy", "slow"),
         ],
     )
     def test_large_distance_behavior(self, kernel, kernel_name, decay_type):
         """Test kernel behavior at large distances"""
         large_distances = np.array([50, 100, 500, 1000])
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         try:
@@ -323,21 +313,21 @@ class TestKernels:
     @pytest.mark.parametrize(
         "kernel_name",
         [
-            "wendland_k0",
-            "wendland_k1",
-            "wendland_k2",
-            "wendland_k3",
-            "wendland_k4",
-            "wu_c2",
-            "wu_c4",
-            "wu_c6",
+            "WendlandK0",
+            "WendlandK1",
+            "WendlandK2",
+            "WendlandK3",
+            "WendlandK4",
+            "WuC2",
+            "WuC4",
+            "WuC6",
         ],
     )
     def test_compact_support_zeros(self, kernel, kernel_name):
         """Test that compact support kernels are zero outside their support"""
         test_points_outside = np.array([1.1, 1.5, 2.0, 5.0, 10.0])
 
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         k_vals = method(test_points_outside, **params)
@@ -351,7 +341,7 @@ class TestKernels:
     @pytest.mark.parametrize("scalar_val", [0.0, 0.5, 1.0, 2.5, 5.0])
     def test_array_vs_scalar_consistency(self, kernel, kernel_name, scalar_val):
         """Test that scalar and array inputs give identical results"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         try:
@@ -379,7 +369,7 @@ class TestKernels:
             )
 
     @pytest.mark.parametrize(
-        "kernel_name", [k for k in KERNEL_PARAMS.keys() if k != "bump"]
+        "kernel_name", [k for k in KERNEL_PARAMS.keys() if k != "Bump"]
     )
     def test_multidimensional_array_element_wise_consistency(self, kernel, kernel_name):
         """Test that 2D and 3D arrays are handled element-wise consistently"""
@@ -391,7 +381,7 @@ class TestKernels:
         array_2d = np.array([[0.0, 0.1, 0.5], [1.0, 2.0, 0.0]])
         array_3d = np.array([[[0.0, 0.1], [0.5, 1.0]], [[2.0, 0.0], [0.1, 0.5]]])
 
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         try:
@@ -456,9 +446,9 @@ class TestKernels:
     @pytest.mark.parametrize(
         "kernel_name,params",
         [
-            ("matern_general", {"nu": 0.01}),
-            ("rational_quadratic", {"alpha": 0.001}),
-            ("generalized_cauchy", {"alpha": 1.0, "beta": 0.01}),
+            ("MaternGeneral", {"nu": 0.01}),
+            ("RationalQuadratic", {"alpha": 0.001}),
+            ("GeneralizedCauchy", {"alpha": 1.0, "beta": 0.01}),
         ],
     )
     @pytest.mark.parametrize(
@@ -474,7 +464,7 @@ class TestKernels:
         self, kernel, kernel_name, params, array_name, test_array
     ):
         """Test multidimensional consistency with extreme parameters"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
 
         try:
             # Get scalar reference value
@@ -504,11 +494,11 @@ class TestKernels:
             )
 
     @pytest.mark.parametrize(
-        "kernel_name", [k for k in KERNEL_PARAMS.keys() if k != "bump"]
+        "kernel_name", [k for k in KERNEL_PARAMS.keys() if k != "Bump"]
     )
     def test_broadcasting_behavior(self, kernel, kernel_name):
         """Test that kernels handle broadcasting correctly"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         try:
@@ -547,7 +537,7 @@ class TestKernels:
     @pytest.mark.parametrize("kernel_name", list(KERNEL_PARAMS.keys()))
     def test_numerical_regression_grid(self, kernel, kernel_name):
         """Test that kernel values on grid [0.1, 0.2, ..., 1.0] remain unchanged"""
-        method = getattr(kernel, kernel_name)
+        method = kernel[kernel_name].exact
         params = KERNEL_PARAMS[kernel_name]
 
         # Test grid from 0.1 to 1.0 with 0.1 step
@@ -556,80 +546,258 @@ class TestKernels:
         # Expected values computed once and stored for regression testing
         # These values should never change unless there's an intentional kernel modification
         expected_values = {
-            "gaussian": [0.9900498337491681, 0.9607894391523232, 0.9139311852712282,
-                        0.8521437889662113, 0.7788007830714049, 0.697676326071031,
-                        0.612626394184416, 0.5272924240430485, 0.4448580662229411,
-                        0.36787944117144233],
-            "exponential": [0.9048374180359595, 0.8187307530779818, 0.7408182206817179,
-                           0.6703200460356393, 0.6065306597126334, 0.5488116360940264,
-                           0.49658530379140947, 0.44932896411722156, 0.4065696597405991,
-                           0.36787944117144233],
-            "matern_32": [0.9866245648897064, 0.9522113614772348, 0.9037901598990385,
-                         0.846686862268961, 0.7848876539574506, 0.7213304237515004,
-                         0.6581373763165839, 0.5968001712848926, 0.538326805558179,
-                         0.4833577245965077],
-            "matern_52": [0.9917592361711776, 0.9679861199640714, 0.930965342775005,
-                         0.8835453294128766, 0.8286491424181255, 0.7689931092516178,
-                         0.7069426819040977, 0.64445632646425, 0.5830835509043292,
-                         0.5239941088318203],
-            "matern_general": [0.9866245648897064, 0.9522113614772348, 0.9037901598990385,
-                              0.846686862268961, 0.7848876539574506, 0.7213304237515004,
-                              0.6581373763165839, 0.5968001712848926, 0.538326805558179,
-                              0.4833577245965077],
-            "rational_quadratic": [0.9950186876947283, 0.9802960494069208, 0.9564744352317359,
-                                  0.9245562130177514, 0.8858131487889274, 0.84167999326656,
-                                  0.7936468569104319, 0.7431629013079665, 0.6915599431191946,
-                                  0.64],
-            "inverse_multiquadric": [0.9950371902099893, 0.9805806756909201, 0.9578262852211513,
-                                    0.9284766908852592, 0.8944271909999159, 0.8574929257125441,
-                                    0.8192319205190405, 0.7808688094430303, 0.7432941462471663,
-                                    0.7071067811865475],
-            "inverse_quadratic": [0.9900990099009901, 0.9615384615384615, 0.9174311926605504,
-                                 0.8620689655172413, 0.8, 0.7352941176470588,
-                                 0.6711409395973154, 0.6097560975609756, 0.5524861878453039,
-                                 0.5],
-            "power": [0.9900990099009901, 0.9615384615384615, 0.9174311926605504,
-                     0.8620689655172413, 0.8, 0.7352941176470588,
-                     0.6711409395973154, 0.6097560975609756, 0.5524861878453039,
-                     0.5],
-            "generalized_cauchy": [0.9950371902099892, 0.9805806756909201, 0.9578262852211513,
-                                  0.9284766908852593, 0.8944271909999159, 0.8574929257125442,
-                                  0.8192319205190404, 0.7808688094430303, 0.7432941462471663,
-                                  0.7071067811865476],
-            "wendland_k0": [0.9, 0.8, 0.7, 0.6, 0.5, 0.3999999999999999,
-                           0.29999999999999993, 0.19999999999999996, 0.09999999999999998, 0.0],
-            "wendland_k1": [0.9477000000000001, 0.8192000000000003, 0.6516999999999998,
-                           0.47519999999999996, 0.3125, 0.17919999999999991,
-                           0.08369999999999994, 0.027199999999999985, 0.003699999999999998, 0.0],
-            "wendland_k2": [0.9329742000000002, 0.7602176000000003, 0.5411853999999999,
-                           0.33281279999999996, 0.171875, 0.07045119999999994,
-                           0.02046059999999998, 0.0032383999999999967, 0.00011979999999999988, 0.0],
-            "wendland_k3": [0.9140253759000002, 0.6979321856000003, 0.44281907109999985,
-                           0.22909962239999998, 0.0927734375, 0.027158118399999973,
-                           0.004901723099999993, 0.00037775359999999954, 3.7998999999999947e-06, 0.0],
-            "wendland_k4": [0.8944653558463717, 0.6388457069421718, 0.3607116692913999,
-                           0.15684119838719995, 0.049769810267857144, 0.010400915221942841,
-                           0.0011663791505999977, 4.376154697142849e-05, 1.196927714285712e-07, 0.0],
-            "wu_c2": [0.9185399999999999, 0.7372800000000002, 0.5282199999999999,
-                     0.33696, 0.1875, 0.08703999999999994,
-                     0.030779999999999974, 0.006719999999999994, 0.0004599999999999995, 0.0],
-            "wu_c4": [0.9123070500000002, 0.6990506666666669, 0.4529486499999999,
-                     0.24572159999999996, 0.10807291666666667, 0.03604479999999996,
-                     0.00795824999999999, 0.0008490666666666657, 1.584999999999998e-05, 0.0],
-            "wu_c6": [0.9754386978600003, 0.6925634764800004, 0.3852040028199999,
-                     0.16836470783999996, 0.0556640625, 0.012750684159999979,
-                     0.001688670179999997, 8.497151999999987e-05, 4.1913999999999924e-07, 0.0],
-            "bump": [0.9899498337660452, 0.9591894571091382, 0.9058322914025678,
-                    0.8265654376242381, 0.7165313105737893, 0.5697828247309229,
-                    0.38259269556636644, 0.16901331540606596, 0.014077776007559552, 0.0],
-            "sigmoid_kernel": [0.987618541644215, 0.9742867642904025, 0.9599654177527794,
-                              0.9446198289440934, 0.9282211494963358, 0.9107476723245048,
-                              0.8921861830498622, 0.8725333027482136, 0.851796769486964,
-                              0.8299965984314522],
-            "polynomial_kernel": [0.9802473601476912, 0.9238359991849261, 0.8384689773130534,
-                                 0.7346067146260442, 0.623040626457124, 0.5129972985816404,
-                                 0.41115865381504424, 0.3215197707579564, 0.2457779371397465,
-                                 0.18393972058572117]
+            "Gaussian": [
+                0.9900498337491681,
+                0.9607894391523232,
+                0.9139311852712282,
+                0.8521437889662113,
+                0.7788007830714049,
+                0.697676326071031,
+                0.612626394184416,
+                0.5272924240430485,
+                0.4448580662229411,
+                0.36787944117144233,
+            ],
+            "Exponential": [
+                0.9048374180359595,
+                0.8187307530779818,
+                0.7408182206817179,
+                0.6703200460356393,
+                0.6065306597126334,
+                0.5488116360940264,
+                0.49658530379140947,
+                0.44932896411722156,
+                0.4065696597405991,
+                0.36787944117144233,
+            ],
+            "Matern32": [
+                0.9866245648897064,
+                0.9522113614772348,
+                0.9037901598990385,
+                0.846686862268961,
+                0.7848876539574506,
+                0.7213304237515004,
+                0.6581373763165839,
+                0.5968001712848926,
+                0.538326805558179,
+                0.4833577245965077,
+            ],
+            "Matern52": [
+                0.9917592361711776,
+                0.9679861199640714,
+                0.930965342775005,
+                0.8835453294128766,
+                0.8286491424181255,
+                0.7689931092516178,
+                0.7069426819040977,
+                0.64445632646425,
+                0.5830835509043292,
+                0.5239941088318203,
+            ],
+            "MaternGeneral": [
+                0.9866245648897064,
+                0.9522113614772348,
+                0.9037901598990385,
+                0.846686862268961,
+                0.7848876539574506,
+                0.7213304237515004,
+                0.6581373763165839,
+                0.5968001712848926,
+                0.538326805558179,
+                0.4833577245965077,
+            ],
+            "RationalQuadratic": [
+                0.9950186876947283,
+                0.9802960494069208,
+                0.9564744352317359,
+                0.9245562130177514,
+                0.8858131487889274,
+                0.84167999326656,
+                0.7936468569104319,
+                0.7431629013079665,
+                0.6915599431191946,
+                0.64,
+            ],
+            "InverseMultiquadric": [
+                0.9950371902099893,
+                0.9805806756909201,
+                0.9578262852211513,
+                0.9284766908852592,
+                0.8944271909999159,
+                0.8574929257125441,
+                0.8192319205190405,
+                0.7808688094430303,
+                0.7432941462471663,
+                0.7071067811865475,
+            ],
+            "InverseQuadratic": [
+                0.9900990099009901,
+                0.9615384615384615,
+                0.9174311926605504,
+                0.8620689655172413,
+                0.8,
+                0.7352941176470588,
+                0.6711409395973154,
+                0.6097560975609756,
+                0.5524861878453039,
+                0.5,
+            ],
+            "Power": [
+                0.9900990099009901,
+                0.9615384615384615,
+                0.9174311926605504,
+                0.8620689655172413,
+                0.8,
+                0.7352941176470588,
+                0.6711409395973154,
+                0.6097560975609756,
+                0.5524861878453039,
+                0.5,
+            ],
+            "GeneralizedCauchy": [
+                0.9950371902099892,
+                0.9805806756909201,
+                0.9578262852211513,
+                0.9284766908852593,
+                0.8944271909999159,
+                0.8574929257125442,
+                0.8192319205190404,
+                0.7808688094430303,
+                0.7432941462471663,
+                0.7071067811865476,
+            ],
+            "WendlandK0": [
+                0.9,
+                0.8,
+                0.7,
+                0.6,
+                0.5,
+                0.3999999999999999,
+                0.29999999999999993,
+                0.19999999999999996,
+                0.09999999999999998,
+                0.0,
+            ],
+            "WendlandK1": [
+                0.9477000000000001,
+                0.8192000000000003,
+                0.6516999999999998,
+                0.47519999999999996,
+                0.3125,
+                0.17919999999999991,
+                0.08369999999999994,
+                0.027199999999999985,
+                0.003699999999999998,
+                0.0,
+            ],
+            "WendlandK2": [
+                0.9329742000000002,
+                0.7602176000000003,
+                0.5411853999999999,
+                0.33281279999999996,
+                0.171875,
+                0.07045119999999994,
+                0.02046059999999998,
+                0.0032383999999999967,
+                0.00011979999999999988,
+                0.0,
+            ],
+            "WendlandK3": [
+                0.9140253759000002,
+                0.6979321856000003,
+                0.44281907109999985,
+                0.22909962239999998,
+                0.0927734375,
+                0.027158118399999973,
+                0.004901723099999993,
+                0.00037775359999999954,
+                3.7998999999999947e-06,
+                0.0,
+            ],
+            "WendlandK4": [
+                0.8944653558463717,
+                0.6388457069421718,
+                0.3607116692913999,
+                0.15684119838719995,
+                0.049769810267857144,
+                0.010400915221942841,
+                0.0011663791505999977,
+                4.376154697142849e-05,
+                1.196927714285712e-07,
+                0.0,
+            ],
+            "WuC2": [
+                0.9185399999999999,
+                0.7372800000000002,
+                0.5282199999999999,
+                0.33696,
+                0.1875,
+                0.08703999999999994,
+                0.030779999999999974,
+                0.006719999999999994,
+                0.0004599999999999995,
+                0.0,
+            ],
+            "WuC4": [
+                0.9123070500000002,
+                0.6990506666666669,
+                0.4529486499999999,
+                0.24572159999999996,
+                0.10807291666666667,
+                0.03604479999999996,
+                0.00795824999999999,
+                0.0008490666666666657,
+                1.584999999999998e-05,
+                0.0,
+            ],
+            "WuC6": [
+                0.9754386978600003,
+                0.6925634764800004,
+                0.3852040028199999,
+                0.16836470783999996,
+                0.0556640625,
+                0.012750684159999979,
+                0.001688670179999997,
+                8.497151999999987e-05,
+                4.1913999999999924e-07,
+                0.0,
+            ],
+            "Bump": [
+                0.9899498337660452,
+                0.9591894571091382,
+                0.9058322914025678,
+                0.8265654376242381,
+                0.7165313105737893,
+                0.5697828247309229,
+                0.38259269556636644,
+                0.16901331540606596,
+                0.014077776007559552,
+                0.0,
+            ],
+            "Sigmoid": [
+                0.987618541644215,
+                0.9742867642904025,
+                0.9599654177527794,
+                0.9446198289440934,
+                0.9282211494963358,
+                0.9107476723245048,
+                0.8921861830498622,
+                0.8725333027482136,
+                0.851796769486964,
+                0.8299965984314522,
+            ],
+            "Polynomial": [
+                0.9802473601476912,
+                0.9238359991849261,
+                0.8384689773130534,
+                0.7346067146260442,
+                0.623040626457124,
+                0.5129972985816404,
+                0.41115865381504424,
+                0.3215197707579564,
+                0.2457779371397465,
+                0.18393972058572117,
+            ],
         }
 
         try:
@@ -639,7 +807,9 @@ class TestKernels:
             # Use appropriate tolerance for numerical precision
             tolerance = 1e-14
 
-            for i, (computed, expected_val) in enumerate(zip(computed_values, expected)):
+            for i, (computed, expected_val) in enumerate(
+                zip(computed_values, expected)
+            ):
                 assert abs(computed - expected_val) < tolerance, (
                     f"{kernel_name}: Value mismatch at grid point {test_grid[i]:.1f}. "
                     f"Expected {expected_val:.16f}, got {computed:.16f}, "
