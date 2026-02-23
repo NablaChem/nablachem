@@ -5,6 +5,7 @@ from scipy import linalg
 from . import utils
 from . import matrix
 from .dataset import DataSet
+from . import kernels
 
 
 class AutoKRR:
@@ -14,7 +15,7 @@ class AutoKRR:
         dataset: DataSet,
         mincount: int,
         maxcount: int,
-        kernel_func: callable,
+        kernel_func: kernels.Kernel,
         detrend_atomic: bool = True,
     ) -> None:
         self._archive = {}
@@ -31,7 +32,11 @@ class AutoKRR:
 
         if self._local:
             self._kernel_matrix = matrix.LocalKernelMatrix(
-                self._X_train, self._train_counts, self._X_holdout, self._holdout_counts
+                self._X_train,
+                self._train_counts,
+                kernel_func,
+                self._X_holdout,
+                self._holdout_counts,
             )
         else:
             self._kernel_matrix = matrix.GlobalKernelMatrix(

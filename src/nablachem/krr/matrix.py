@@ -1,12 +1,12 @@
 import numpy as np
-from numpy.polynomial.chebyshev import Chebyshev
+from .kernels import Kernel
 
 
 class KernelMatrix:
     """Base class for kernel matrix computation and management"""
 
     def __init__(
-        self, X: np.ndarray, X_holdout: np.ndarray = None, kernel_func: callable = None
+        self, X: np.ndarray, kernel_func: Kernel, X_holdout: np.ndarray = None
     ):
         """Initialize kernel matrix with training and optional holdout data
 
@@ -59,6 +59,7 @@ class LocalKernelMatrix(KernelMatrix):
         self,
         X: np.ndarray,
         train_counts: np.ndarray,
+        kernel_func: Kernel,
         X_holdout: np.ndarray = None,
         holdout_counts: np.ndarray = None,
     ):
@@ -70,12 +71,13 @@ class LocalKernelMatrix(KernelMatrix):
             X_holdout: Concatenated holdout atom representations (optional)
             holdout_counts: Number of atoms per holdout molecule (optional)
         """
-        super().__init__(X, X_holdout)
+        super().__init__(
+            X,
+            kernel_func,
+            X_holdout,
+        )
         self._train_counts = train_counts
         self._holdout_counts = holdout_counts
-
-        # Local approximation cache will be built on demand
-        self._cache_built = False
 
         # Compute holdout self-distances if needed
         if X_holdout is not None and holdout_counts is not None:
@@ -87,75 +89,8 @@ class LocalKernelMatrix(KernelMatrix):
                     self._dist_squared(X_holdout[start:end], X_holdout[start:end])
                 )
                 start = end
-        self.build_cache(max_molecules=len(train_counts))
         self._approx_fail_sigma = dict()
-
-    def build_cache(self, max_molecules: int):
-        """Build local approximation cache for efficient kernel computation"""
-        self._local_grid = 1.5 ** np.linspace(-15, 15, 100)
-        self._local_ymax = 20.0
-
-        # Chebyshev polynomial coefficients for exp approximation
-        cheby_p = [
-            1.2783333716342860e-01,
-            -2.4252536276891104e-01,
-            2.0716160177307505e-01,
-            -1.5966072205968104e-01,
-            1.1136516853726638e-01,
-            -7.0568587229867946e-02,
-            4.0796581307398473e-02,
-            -2.1612689660989802e-02,
-            1.0538815782012821e-02,
-            -4.7505844097694584e-03,
-            1.9877638444287539e-03,
-            -7.7505672091777230e-04,
-            2.8263905844468264e-04,
-            -9.6722980858327177e-05,
-            3.1159309411000033e-05,
-            -9.4769211836987947e-06,
-            2.7285817731910956e-06,
-            -7.4564575189212374e-07,
-            1.9431609391984766e-07,
-            -5.0571492223751847e-08,
-            1.1357243950084354e-08,
-        ]
-
-        P = Chebyshev(cheby_p, domain=[0, self._local_ymax])
-        Q = P.convert(kind=np.polynomial.Polynomial)
-        self._exp_coef = Q.coef
-
-        # Build power moments cache
-        nmols = max_molecules
-        atoms_per_mol = self._train_counts[:nmols]
-        grid = self._local_grid
-        D2 = self._D2
-        npowers = len(cheby_p)
-        npairs = nmols * (nmols + 1) // 2
-
-        power_moments = np.zeros((npairs, npowers, len(grid)), dtype=np.float64)
-        pair_idx = 0
-        for i in range(nmols):
-            for j in range(i, nmols):
-                x = D2[
-                    sum(atoms_per_mol[:i]) : sum(atoms_per_mol[: i + 1]),
-                    sum(atoms_per_mol[:j]) : sum(atoms_per_mol[: j + 1]),
-                ].flatten()
-                x = np.sort(x)
-
-                cum_moments = np.zeros((len(cheby_p), len(x) + 1))
-                cum_moments[0, 1:] = np.cumsum(np.ones_like(x))
-                for k in range(1, len(cheby_p)):
-                    cum_moments[k, 1:] = np.cumsum(x**k)
-
-                select_indices = np.minimum(
-                    np.searchsorted(x, grid, side="right"), len(x) - 1
-                )
-
-                power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
-                pair_idx += 1
-
-        self._local_power_moments = power_moments
-        self._cache_built = True
+        self._kernel_func.approx_prepare(train_counts, self._D2)
 
     def length_scale(self, ntrain: int) -> float:
         # get median nearest neighbor distance for first ntrain points
@@ -210,38 +145,7 @@ class LocalKernelMatrix(KernelMatrix):
         self, sigma: float, ntrain: int
     ) -> np.ndarray:
         """Compute training local kernel matrix using approximation"""
-        if not self._cache_built:
-            raise RuntimeError("Cache must be built before computing kernel matrix")
-
-        q = sigma**2
-        cutoff = np.searchsorted(self._local_grid, self._local_ymax * q) - 1
-        cutoff = max(0, min(cutoff, len(self._local_grid) - 1))
-
-        moments = self._local_power_moments[:, :, cutoff]
-        triu = moments * self._exp_coef
-        triu /= q ** np.arange(len(self._exp_coef))
-        triu = np.sum(triu, axis=1)
-
-        # build full K matrix
-        nmols = len(self._train_counts)
-        K = np.zeros((nmols, nmols))
-        pair_idx = 0
-        for i in range(nmols):
-            for j in range(i, nmols):
-                K[i, j] = triu[pair_idx]
-                K[j, i] = K[i, j]
-                pair_idx += 1
-
-        K_sub = K[:ntrain, :ntrain]
-
-        # normalize
-        d = np.diag(K_sub)
-        d_sqrt = np.sqrt(d)
-        K_sub /= np.outer(d_sqrt, d_sqrt)
-
-        if np.max(K_sub) > 1.0 + 1e-8 or np.min(K_sub) > 0.1:
-            return None
-        return K_sub
+        return self._kernel_func.approx(sigma, ntrain)
 
     def compute_train_kernel_matrix_exact(
         self, sigma: float, ntrain: int
@@ -253,14 +157,12 @@ class LocalKernelMatrix(KernelMatrix):
         natoms = sum(atom_counts_A)
 
         # Compute atomic kernel between test and train
-        K_atom = np.exp(-self._D2[:natoms, :natoms] / sigma**2)
+        K_atom = self._kernel_func.exact(np.sqrt(self._D2[:natoms, :natoms]) / sigma)
         K_atom_train = self.aggregate_atomic_kernel(
             K_atom, atom_counts_A, atom_counts_A
         )
 
         d_train_sqrt = np.sqrt(np.diag(K_atom_train))
-
-        # Apply normalization
         K_train = K_atom_train / np.outer(d_train_sqrt, d_train_sqrt)
 
         return K_train
@@ -275,14 +177,16 @@ class LocalKernelMatrix(KernelMatrix):
         natoms = sum(atom_counts_A)
 
         # Compute atomic kernel between test and train
-        K_atom = np.exp(-self._D2_test[:, :natoms] / sigma**2)
+        K_atom = self._kernel_func.exact(np.sqrt(self._D2_test[:, :natoms]) / sigma)
         K_test = self.aggregate_atomic_kernel(K_atom, atom_counts_B, atom_counts_A)
 
         # Compute normalization factors
         # For training: get unnormalized diagonal first
         atom_counts_A = self._train_counts[:ntrain]
         natoms = sum(atom_counts_A)
-        K_atom_train = np.exp(-self._D2[:natoms, :natoms] / sigma**2)
+        K_atom_train = self._kernel_func.exact(
+            np.sqrt(self._D2[:natoms, :natoms]) / sigma
+        )
         K_train_unnorm = self.aggregate_atomic_kernel(
             K_atom_train, atom_counts_A, atom_counts_A
         )
@@ -291,7 +195,7 @@ class LocalKernelMatrix(KernelMatrix):
         # For test: self-kernel diagonal
         d_test = np.sqrt(
             [
-                np.exp(-test_self_dist / sigma**2).sum()
+                self._kernel_func.exact(np.sqrt(test_self_dist) / sigma).sum()
                 for test_self_dist in self._test_self
             ]
         )

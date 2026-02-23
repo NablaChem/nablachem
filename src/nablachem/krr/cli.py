@@ -114,7 +114,7 @@ def main(
     # Instantiate kernel and get callable method
     k = kernels.Kernel()
     kernel_func = getattr(k, kernel_name)
-
+    kernel_func = kernels.ExponentialKernel()
     autokrr = AutoKRR(
         ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
     )

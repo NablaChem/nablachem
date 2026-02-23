@@ -2,6 +2,8 @@ import numpy as np
 from scipy.special import gamma, kv
 import inspect
 
+from numpy.polynomial.chebyshev import Chebyshev
+
 
 class Kernel:
     def __init__(self):
@@ -151,6 +153,125 @@ class Kernel:
         k_vals = (1 + dr**2) ** alpha * np.exp(-beta * dr**2)
         norm_const = (1 + 0) ** alpha * np.exp(-beta * 0)  # k(0) = 1 * 1 = 1
         return k_vals / norm_const
+
+
+class ExponentialToChebychev:
+    def __init__(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
+        self._local_grid = 1.5 ** np.linspace(-15, 15, 100)
+        self._local_ymax = 20.0
+
+        # Chebyshev polynomial coefficients for exp approximation
+        cheby_p = [
+            1.2783333716342860e-01,
+            -2.4252536276891104e-01,
+            2.0716160177307505e-01,
+            -1.5966072205968104e-01,
+            1.1136516853726638e-01,
+            -7.0568587229867946e-02,
+            4.0796581307398473e-02,
+            -2.1612689660989802e-02,
+            1.0538815782012821e-02,
+            -4.7505844097694584e-03,
+            1.9877638444287539e-03,
+            -7.7505672091777230e-04,
+            2.8263905844468264e-04,
+            -9.6722980858327177e-05,
+            3.1159309411000033e-05,
+            -9.4769211836987947e-06,
+            2.7285817731910956e-06,
+            -7.4564575189212374e-07,
+            1.9431609391984766e-07,
+            -5.0571492223751847e-08,
+            1.1357243950084354e-08,
+        ]
+
+        P = Chebyshev(cheby_p, domain=[0, self._local_ymax])
+        Q = P.convert(kind=np.polynomial.Polynomial)
+        self._exp_coef = Q.coef
+
+        # Build power moments cache
+        nmols = len(atoms_per_mol)
+        self._nmols = nmols
+        grid = self._local_grid
+        npowers = len(cheby_p)
+        npairs = nmols * (nmols + 1) // 2
+
+        power_moments = np.zeros((npairs, npowers, len(grid)), dtype=np.float64)
+        pair_idx = 0
+        for i in range(nmols):
+            for j in range(i, nmols):
+                x = Ds[
+                    sum(atoms_per_mol[:i]) : sum(atoms_per_mol[: i + 1]),
+                    sum(atoms_per_mol[:j]) : sum(atoms_per_mol[: j + 1]),
+                ].flatten()
+                x = np.sort(x)
+
+                cum_moments = np.zeros((len(cheby_p), len(x) + 1))
+                cum_moments[0, 1:] = np.cumsum(np.ones_like(x))
+                for k in range(1, len(cheby_p)):
+                    cum_moments[k, 1:] = np.cumsum(x**k)
+
+                select_indices = np.minimum(
+                    np.searchsorted(x, grid, side="right"), len(x) - 1
+                )
+
+                power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
+                pair_idx += 1
+
+        self._local_power_moments = power_moments
+        self._cache_built = True
+
+    def __call__(self, q, ntrain):
+        cutoff = np.searchsorted(self._local_grid, self._local_ymax * q) - 1
+        cutoff = max(0, min(cutoff, len(self._local_grid) - 1))
+
+        moments = self._local_power_moments[:, :, cutoff]
+        triu = moments * self._exp_coef
+        triu /= q ** np.arange(len(self._exp_coef))
+        triu = np.sum(triu, axis=1)
+
+        # build full K matrix
+        nmols = self._nmols
+        K = np.zeros((nmols, nmols))
+        pair_idx = 0
+        for i in range(nmols):
+            for j in range(i, nmols):
+                K[i, j] = triu[pair_idx]
+                K[j, i] = K[i, j]
+                pair_idx += 1
+
+        K_sub = K[:ntrain, :ntrain]
+
+        # normalize
+        d = np.diag(K_sub)
+        d_sqrt = np.sqrt(d)
+        K_sub /= np.outer(d_sqrt, d_sqrt)
+
+        if np.max(K_sub) > 1.0 + 1e-8 or np.min(K_sub) > 0.1:
+            return None
+        return K_sub
+
+
+class GaussianKernel(Kernel):
+    def exact(self, dr):
+        return np.exp(-(dr**2))
+
+    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
+        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=Ds)
+
+    def approx(self, sigma: float, ntrain: int) -> np.ndarray:
+        return self._chebytrick(sigma**2, ntrain)
+
+
+class ExponentialKernel(Kernel):
+    def exact(self, dr):
+        return np.exp(-dr)
+
+    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
+        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=np.sqrt(Ds))
+
+    def approx(self, sigma: float, ntrain: int) -> np.ndarray:
+        return self._chebytrick(sigma, ntrain)
 
 
 def list_available():
