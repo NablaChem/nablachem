@@ -326,6 +326,7 @@ class AutoKRR:
         best_cases: dict[int, dict[str, float]],
     ) -> tuple[float, float]:
         models = {}
+        y_tests = {}
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
@@ -355,23 +356,25 @@ class AutoKRR:
                 K_train + params["lambda"] * np.eye(len(y_train)), y_train
             )
             models[ntrain] = alpha
+            y_tests[ntrain] = y_test
 
         model_preds = {_: list() for _ in models.keys()}
         # batched prediction to save memory
-        batch = 0
-        max_ntrain = max(best_cases.keys())
-        while True:
-            K_test = self._kernel_matrix.compute_test_kernel_matrix(
-                params["sigma"], max_ntrain, batch
-            )
-            if K_test is None:
-                break
-            for ntrain, alpha in models.items():
-                model_preds[ntrain].append(K_test[:, :ntrain] @ alpha)
-            batch += 1
+        for ntrain, alpha in models.items():
+            params_ntrain = best_cases[ntrain]
+            batch = 0
+            while True:
+                K_test = self._kernel_matrix.compute_test_kernel_matrix(
+                    params_ntrain["sigma"], ntrain, batch
+                )
+                if K_test is None:
+                    break
+                model_preds[ntrain].append(K_test @ alpha)
+                batch += 1
 
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)
+            y_test = y_tests[ntrain]
 
             # Store holdout predictions for residual calculation
             residuals = y_test - pred

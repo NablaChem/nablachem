@@ -217,3 +217,50 @@ def test_global_kernel_holdout_count(slatm_global_dataset):
 
     kmat = GlobalKernelMatrix(X_train, kernels.Gaussian(), X_train)
     assert kmat._holdout_molecule_count == len(reps)
+
+
+def test_evaluate_models_uses_per_model_sigma():
+    from nablachem.krr.krr import AutoKRR
+
+    n_train_max = 8
+    n_holdout = 4
+    n_all = n_train_max + n_holdout
+    X = np.arange(n_all, dtype=float).reshape(-1, 1)
+    y = X[:, 0].copy()
+
+    class _MockDataset:
+        def __init__(self):
+            self.representations = [X[i] for i in range(n_all)]
+            self.labels = y.copy()
+
+        def __len__(self):
+            return n_all
+
+    sigma_map = {4: 0.1, 8: 10.0}
+    lam = 1e-6
+
+    class _ForcedSigmaKRR(AutoKRR):
+        def _optimize_hyperparameters(self, ntrain, _length_heuristic):
+            return {"sigma": sigma_map[ntrain], "lambda": lam}, 1.0, 1.0
+
+    krr = _ForcedSigmaKRR(
+        _MockDataset(),
+        mincount=4,
+        maxcount=8,
+        kernel_func=kernels.Gaussian(),
+        detrend_atomic=False,
+    )
+
+    X_train = X[:n_train_max]
+    X_holdout = X[n_train_max:]
+    kmat = GlobalKernelMatrix(X_train, kernels.Gaussian(), X_holdout)
+
+    shift = np.mean(y[:4])
+    y_train_4 = y[:4] - shift
+    K_train_4 = kmat.compute_train_kernel_matrix(sigma_map[4], 4)
+    alpha_4 = np.linalg.solve(K_train_4 + lam * np.eye(4), y_train_4)
+    y_test_4 = y[n_train_max:] - shift
+    K_test_4 = kmat.compute_test_kernel_matrix(sigma_map[4], 4, batch=0)
+    expected_residuals = y_test_4 - K_test_4 @ alpha_4
+
+    assert np.allclose(krr.holdout_residuals[4], expected_residuals, atol=1e-6)
