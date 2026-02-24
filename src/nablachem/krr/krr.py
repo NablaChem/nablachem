@@ -89,7 +89,7 @@ class AutoKRR:
         utils.info("Evaluate models on test set")
         self._evaluate_models(best_cases)
 
-    def store_archive(self, filename: str) -> None:
+    def store_archive(self, filename: str, metadata: dict) -> None:
         """Store hyperparameter optimization archive and learning curve data to JSON file"""
         # Add learning curve data to archive
         learning_curve_data = []
@@ -122,6 +122,7 @@ class AutoKRR:
             )
 
         self._archive["learning_curve"] = learning_curve_data
+        self._archive["metadata"] = metadata
 
         with open(filename, "w") as f:
             json.dump(self._archive, f, indent=2)
