@@ -7,9 +7,13 @@ from . import matrix
 from .dataset import DataSet
 from . import kernels
 
+from utils.perftracker import PerformanceTracker
+
 
 class AutoKRR:
+    tracker: PerformanceTracker = PerformanceTracker()
 
+    @tracker.track("AutoKRR")
     def __init__(
         self,
         dataset: DataSet,
@@ -18,78 +22,74 @@ class AutoKRR:
         kernel_func: kernels.Kernel,
         detrend_atomic: bool = True,
     ) -> None:
-        self._archive = {}
-        self._archive["hyperopt"] = []
-        self.dataset = dataset
-        self._training_sizes = utils.get_training_sizes(mincount, maxcount)
-        self._detrend_atomic = detrend_atomic
+        with self.tracker.track("Initialization"):
+            self._archive = {}
+            self._archive["hyperopt"] = []
+            self.dataset = dataset
+            self._training_sizes = utils.get_training_sizes(mincount, maxcount)
+            self._detrend_atomic = detrend_atomic
 
-        self._create_holdout_split()
+            self._create_holdout_split()
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
-        if self._local:
-            self._kernel_matrix = matrix.LocalKernelMatrix(
-                self._X_train,
-                self._train_counts,
-                kernel_func,
-                self._X_holdout,
-                self._holdout_counts,
-            )
-        else:
-            self._kernel_matrix = matrix.GlobalKernelMatrix(
-                self._X_train, kernel_func, self._X_holdout
-            )
-
-        learning_curve_start = time.time()
-        last_rmse = None
-        last_size = None
-
-        best_cases = {}
-        for i, ntrain in enumerate(self._training_sizes):
-            length_heuristic = self._kernel_matrix.length_scale(ntrain)
-            best_parameters, best_val_rmse, best_val_mae = (
-                self._optimize_hyperparameters(ntrain, length_heuristic)
-            )
-            best_cases[ntrain] = best_parameters
-
-            improvement = {}
-            if last_rmse is not None:
-                improvement["validation_slope"] = float(
-                    np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
+        with self.tracker.track("Kernel matrix setup"):
+            if self._local:
+                self._kernel_matrix = matrix.LocalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                    self._X_holdout,
+                    self._holdout_counts,
                 )
             else:
-                improvement["validation_slope"] = None
+                self._kernel_matrix = matrix.GlobalKernelMatrix(
+                    self._X_train, kernel_func, self._X_holdout
+                )
 
-            last_rmse = best_val_rmse
-            last_size = ntrain
+        last_rmse = None
+        last_size = None
+        best_cases = {}
 
-            utils.info(
-                "Training size completed",
-                ntrain=ntrain,
-                validation_rmse=float(best_val_rmse),
-                **improvement,
-            )
+        with self.tracker.track("Learning curve"):
+            for i, ntrain in enumerate(self._training_sizes):
+                length_heuristic = self._kernel_matrix.length_scale(ntrain)
+                best_parameters, best_val_rmse, best_val_mae = (
+                    self._optimize_hyperparameters(ntrain, length_heuristic)
+                )
+                best_cases[ntrain] = best_parameters
 
-            self.results[ntrain] = {
-                "parameters": best_parameters,
-                "val_rmse": float(best_val_rmse),
-                "val_mae": float(best_val_mae),
-                **improvement,
-            }
+                improvement = {}
+                if last_rmse is not None:
+                    improvement["validation_slope"] = float(
+                        np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
+                    )
+                else:
+                    improvement["validation_slope"] = None
+
+                last_rmse = best_val_rmse
+                last_size = ntrain
+
+                utils.info(
+                    "Training size completed",
+                    ntrain=ntrain,
+                    validation_rmse=float(best_val_rmse),
+                    **improvement,
+                )
+
+                self.results[ntrain] = {
+                    "parameters": best_parameters,
+                    "val_rmse": float(best_val_rmse),
+                    "val_mae": float(best_val_mae),
+                    **improvement,
+                }
 
         utils.info("Evaluate models on test set")
         self._evaluate_models(best_cases)
 
-        learning_curve_end = time.time()
-        utils.info(
-            "Learning curve calculation",
-            duration=f"{learning_curve_end - learning_curve_start:.1f}s",
-        )
-
-    def store_archive(self, filename: str) -> None:
+    def store_archive(self, filename: str, metadata: dict) -> None:
         """Store hyperparameter optimization archive and learning curve data to JSON file"""
         # Add learning curve data to archive
         learning_curve_data = []
@@ -122,6 +122,7 @@ class AutoKRR:
             )
 
         self._archive["learning_curve"] = learning_curve_data
+        self._archive["metadata"] = metadata
 
         with open(filename, "w") as f:
             json.dump(self._archive, f, indent=2)
@@ -130,6 +131,7 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
+    @tracker.track
     def _create_holdout_split(self):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
@@ -178,6 +180,7 @@ class AutoKRR:
         # if too large, far from ntrain, if too small, noisy
         return min(valcount, 200)
 
+    @tracker.track
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
     ) -> tuple[float, float, float]:
@@ -317,6 +320,7 @@ class AutoKRR:
         )
         return best_params, best_val_rmse, best_val_mae
 
+    @tracker.track
     def _evaluate_models(
         self,
         best_cases: dict[int, dict[str, float]],

@@ -1,7 +1,8 @@
 import click
+import os
 import hashlib
 
-from .utils import info, error
+from .utils import info, error, warning
 from .dataset import DataSet
 from .krr import AutoKRR
 from . import features
@@ -58,6 +59,12 @@ and the remaining molecules used as holdout/test data.
     default=None,
     help="Output JSONL file path for holdout residuals",
 )
+@click.option(
+    "--track", is_flag=True, default=False, help="Enable performance tracking"
+)
+@click.option(
+    "--archive", default="archive.json", help="Output file for KRR archive data"
+)
 def main(
     jsonl_path,
     column_name,
@@ -69,7 +76,12 @@ def main(
     select,
     detrend_atomic,
     holdout_residuals,
+    track,
+    archive,
 ):
+    if os.path.exists(archive):
+        warning(f"Archive file {archive} will be overwritten.")
+
     # Set default limit if not specified
     if limit is None:
         limit = maxcount + 2000
@@ -117,7 +129,17 @@ def main(
     autokrr = AutoKRR(
         ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
     )
-    autokrr.store_archive("archive.json")
+    metadata = {
+        "representation": representation_name,
+        "kernel": kernel_name,
+        "detrend_atomic": detrend_atomic,
+        "file_hash": hash,
+        "file_path": jsonl_path,
+        "column_name": column_name,
+        "limit": limit,
+        "select": select,
+    }
+    autokrr.store_archive(archive, metadata)
 
     # Print learning curve table
     print("\nLearning Curve Results:")
@@ -145,6 +167,10 @@ def main(
         ds.write_holdout_residuals_jsonl(
             autokrr.holdout_residuals, maxcount, holdout_residuals
         )
+
+    if track:
+        print("\nPerformance Summary:")
+        autokrr.tracker.summary()
 
 
 if __name__ == "__main__":

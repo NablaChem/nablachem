@@ -1,24 +1,65 @@
-import streamlit as st
+import os
+import sys
+from collections import defaultdict
+
 import json
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from collections import defaultdict
-import sys
+import streamlit as st
 
 st.set_page_config(page_title="Training details", layout="wide")
 
 
-def load_data():
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
-    else:
-        filename = "archive.json"
-
-    with open(filename, "r") as f:
+def load_data(filepath: str) -> dict:
+    with open(filepath, "r") as f:
         data = json.load(f)
-    return data["hyperopt"], data.get("spectrum", {}), data["learning_curve"]
+    return data
+
+
+def validate_metadata(datasets: dict):
+    comparable_fields = [
+        "representation",
+        "kernel",
+        "detrend_atomic",
+        "file_hash",
+        "column_name",
+        "limit",
+        "select",
+    ]
+
+    meta_by_file = {}
+    for path, data in datasets.items():
+        if "metadata" not in data:
+            st.warning(f"File {path} has no metadata key — skipping compatibility check.")
+            continue
+        meta_by_file[path] = data["metadata"]
+
+    if len(meta_by_file) < 2:
+        return
+
+    mismatches = []
+    reference_path = next(iter(meta_by_file))
+    reference_meta = meta_by_file[reference_path]
+
+    for field in comparable_fields:
+        ref_val = reference_meta.get(field)
+        differing = []
+        for path, meta in meta_by_file.items():
+            if path == reference_path:
+                continue
+            if meta.get(field) != ref_val:
+                differing.append(path)
+        if differing:
+            mismatches.append((field, [reference_path] + differing))
+
+    if mismatches:
+        msg = "Archives are not comparable — the following fields differ:\n"
+        for field, paths in mismatches:
+            msg += f"- **{field}**: differs across {paths}\n"
+        st.error(msg)
+        st.stop()
 
 
 def process_hyperopt_data(hyperopt_data):
@@ -383,11 +424,210 @@ def create_learning_curve_plot(learning_curve_data):
     return fig
 
 
+def create_combined_learning_curve_plot(stats: dict) -> go.Figure:
+    """Plot median test/val RMSE with 33rd-67th percentile bands."""
+    ntrains = sorted(stats.keys())
+
+    test_rmse_med = [stats[n]["test_rmse"]["median"] for n in ntrains]
+    test_rmse_p33 = [stats[n]["test_rmse"]["p33"] for n in ntrains]
+    test_rmse_p67 = [stats[n]["test_rmse"]["p67"] for n in ntrains]
+    val_rmse_med = [stats[n]["val_rmse"]["median"] for n in ntrains]
+    val_rmse_p33 = [stats[n]["val_rmse"]["p33"] for n in ntrains]
+    val_rmse_p67 = [stats[n]["val_rmse"]["p67"] for n in ntrains]
+
+    fig = go.Figure()
+
+    # test RMSE band (p33 bottom, p67 top with fill)
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=test_rmse_p33,
+            mode="lines",
+            line=dict(width=0),
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=test_rmse_p67,
+            mode="lines",
+            line=dict(width=0),
+            fill="tonexty",
+            fillcolor="rgba(255,127,14,0.2)",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+
+    # val RMSE band
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=val_rmse_p33,
+            mode="lines",
+            line=dict(width=0),
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=val_rmse_p67,
+            mode="lines",
+            line=dict(width=0),
+            fill="tonexty",
+            fillcolor="rgba(31,119,180,0.2)",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+
+    # Median lines
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=test_rmse_med,
+            mode="lines+markers",
+            name="test RMSE (median)",
+            line=dict(color="#ff7f0e", width=2),
+            marker=dict(symbol="square", size=10),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=ntrains,
+            y=val_rmse_med,
+            mode="lines+markers",
+            name="val RMSE (median)",
+            line=dict(color="#1f77b4", width=2, dash="dash"),
+            marker=dict(symbol="circle", size=10),
+        )
+    )
+
+    all_vals = test_rmse_p33 + test_rmse_p67 + val_rmse_p33 + val_rmse_p67
+    y_lower = min(v for v in all_vals if v > 0) * 0.9
+    y_upper = max(all_vals) * 1.1
+
+    fig.update_layout(
+        xaxis=dict(
+            title=dict(text="Training points", font=dict(size=24)),
+            type="log",
+            range=[np.log10(min(ntrains) * 0.9), np.log10(max(ntrains) * 1.2)],
+            tickfont=dict(size=20),
+            tickmode="array",
+            tickvals=ntrains,
+            ticktext=[str(int(n)) for n in ntrains],
+            showline=True,
+            linewidth=1,
+            linecolor="black",
+        ),
+        yaxis=dict(
+            title=dict(text="RMSE", font=dict(size=24)),
+            type="log",
+            showgrid=True,
+            dtick=1,
+            gridcolor="#555",
+            range=[np.log10(y_lower), np.log10(y_upper)],
+            tickfont=dict(size=20),
+            showline=True,
+            linewidth=1,
+            linecolor="black",
+        ),
+        legend=dict(x=0.02, y=0.02, bgcolor="rgba(255,255,255,0.8)"),
+        width=800,
+        height=500,
+        showlegend=True,
+    )
+
+    return fig
+
+
+def show_combined_view(datasets: dict):
+    """Render combined learning curve across all datasets."""
+    st.markdown("### Combined Learning Curve")
+
+    # Gather per-ntrain values across all files
+    by_ntrain: dict = defaultdict(lambda: defaultdict(list))
+    for data in datasets.values():
+        for entry in data.get("learning_curve", []):
+            n = entry["ntrain"]
+            if n == 1:
+                continue
+            for metric in ("test_rmse", "val_rmse", "test_mae", "val_mae"):
+                by_ntrain[n][metric].append(entry[metric])
+
+    stats = {}
+    for n, metrics in by_ntrain.items():
+        stats[n] = {}
+        for metric, values in metrics.items():
+            arr = np.array(values)
+            stats[n][metric] = {
+                "median": float(np.median(arr)),
+                "p33": float(np.percentile(arr, 33)),
+                "p67": float(np.percentile(arr, 67)),
+            }
+
+    fig = create_combined_learning_curve_plot(stats)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Table
+    ntrains = sorted(stats.keys())
+    rows = []
+    for n in ntrains:
+        row = {"ntrain": n}
+        for metric in ("test_rmse", "val_rmse", "test_mae", "val_mae"):
+            row[f"{metric} (median)"] = stats[n][metric]["median"]
+            row[f"{metric} (p33)"] = stats[n][metric]["p33"]
+            row[f"{metric} (p67)"] = stats[n][metric]["p67"]
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True)
+
+
 def main():
     st.markdown("Interactive visualization of hyperopt results from archive.json")
 
-    # Load and process data
-    hyperopt_data, spectrum_data, learning_curve_data = load_data()
+    # Multi-file argument parsing
+    file_paths = sys.argv[1:] if len(sys.argv) > 1 else ["archive.json"]
+
+    # Load all datasets
+    datasets = {}
+    for path in file_paths:
+        datasets[path] = load_data(path)
+
+    # Validate metadata compatibility across files
+    validate_metadata(datasets)
+
+    # Determine which dataset to display
+    if len(file_paths) == 1:
+        selected_path = file_paths[0]
+        show_combined = False
+    else:
+        options = [os.path.basename(p) for p in file_paths] + ["combined"]
+        selected_label = st.selectbox("Dataset", options)
+        if selected_label == "combined":
+            show_combined = True
+            selected_path = None
+        else:
+            show_combined = False
+            # Map basename back to full path
+            selected_path = next(
+                p for p in file_paths if os.path.basename(p) == selected_label
+            )
+
+    if show_combined:
+        show_combined_view(datasets)
+        return
+
+    # Single-file view (unchanged)
+    data = datasets[selected_path]
+    hyperopt_data = data["hyperopt"]
+    spectrum_data = data.get("spectrum", {})
+    learning_curve_data = data["learning_curve"]
     processed_data = process_hyperopt_data(hyperopt_data)
 
     # Get unique ntrain values and sort them
