@@ -58,6 +58,9 @@ and the remaining molecules used as holdout/test data.
     default=None,
     help="Output JSONL file path for holdout residuals",
 )
+@click.option(
+    "--track", is_flag=True, default=False, help="Enable performance tracking"
+)
 def main(
     jsonl_path,
     column_name,
@@ -69,6 +72,7 @@ def main(
     select,
     detrend_atomic,
     holdout_residuals,
+    track,
 ):
     # Set default limit if not specified
     if limit is None:
@@ -145,6 +149,10 @@ def main(
         ds.write_holdout_residuals_jsonl(
             autokrr.holdout_residuals, maxcount, holdout_residuals
         )
+
+    if track:
+        print("\nPerformance Summary:")
+        autokrr.tracker.summary()
 
 
 if __name__ == "__main__":
