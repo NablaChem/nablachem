@@ -137,3 +137,83 @@ def test_global_kernel_matrix_manual(slatm_global_dataset):
 
     assert np.allclose(K_gaussian, k_gaussian)
     assert np.allclose(K_exponential, k_exponential)
+
+
+def test_global_test_batched(slatm_global_dataset):
+    reps = slatm_global_dataset.representations
+    X_train = np.stack(reps, axis=0)
+
+    # patterned holdout data
+    X_holdout = np.stack(reps[:1] * 1024, axis=0)
+    powers = 2 ** np.arange(1, 11) - 1
+    for power in powers:
+        X_holdout[power] = reps[1]
+
+    kernel = kernels.Gaussian()
+    kmat = GlobalKernelMatrix(X_train, kernel, X_holdout)
+    batch_0 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=0)
+    batch_1 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=1)
+    batch_2 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=2)
+    assert batch_2 is None
+
+    K_train = np.concatenate([batch_0, batch_1], axis=0)
+    actual = np.where(K_train[:, 1] > 0.9)[0]
+    assert np.array_equal(actual, powers)
+    actual = np.where(K_train[:, 0] < 0.9)[0]
+    assert np.array_equal(actual, powers)
+
+
+def test_local_test_batched(slatm_local_dataset):
+    reps = slatm_local_dataset.representations
+    train_counts = np.array([rep.shape[0] for rep in reps])
+    X_train = np.concatenate(reps, axis=0)
+
+    # patterned holdout data
+    holdout = reps[:1] * 1024
+    powers = 2 ** np.arange(1, 11) - 1
+    for power in powers:
+        holdout[power] = reps[1]
+    X_holdout = np.concatenate(holdout, axis=0)
+
+    kmat = LocalKernelMatrix(
+        X_train,
+        train_counts,
+        kernels.Gaussian(),
+        X_holdout,
+        np.array([rep.shape[0] for rep in holdout]),
+    )
+    batch_0 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=0)
+    batch_1 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=1)
+    batch_2 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=2)
+    assert batch_2 is None
+
+    K_train = np.concatenate([batch_0, batch_1], axis=0)
+    actual = np.where(K_train[:, 1] > 0.9)[0]
+    assert np.array_equal(actual, powers)
+    actual = np.where(K_train[:, 0] < 0.9)[0]
+    assert np.array_equal(actual, powers)
+
+
+def test_local_kernel_holdout_count(slatm_local_dataset):
+    """Test that LocalKernelMatrix correctly counts holdout molecules."""
+    reps = slatm_local_dataset.representations
+    train_counts = np.array([rep.shape[0] for rep in reps])
+    X_train = np.concatenate(reps, axis=0)
+
+    kmat = LocalKernelMatrix(
+        X_train,
+        train_counts,
+        kernels.Gaussian(),
+        X_train,
+        np.array([rep.shape[0] for rep in reps]),
+    )
+    assert kmat._holdout_molecule_count == len(reps)
+
+
+def test_global_kernel_holdout_count(slatm_global_dataset):
+    """Test that GlobalKernelMatrix correctly counts holdout molecules."""
+    reps = slatm_global_dataset.representations
+    X_train = np.stack(reps, axis=0)
+
+    kmat = GlobalKernelMatrix(X_train, kernels.Gaussian(), X_train)
+    assert kmat._holdout_molecule_count == len(reps)

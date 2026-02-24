@@ -40,34 +40,36 @@ class AutoKRR:
             )
         else:
             self._kernel_matrix = matrix.GlobalKernelMatrix(
-                self._X_train, self._X_holdout, kernel_func
+                self._X_train, kernel_func, self._X_holdout
             )
 
         learning_curve_start = time.time()
         last_rmse = None
         last_size = None
+
+        best_cases = {}
         for i, ntrain in enumerate(self._training_sizes):
             length_heuristic = self._kernel_matrix.length_scale(ntrain)
             best_parameters, best_val_rmse, best_val_mae = (
                 self._optimize_hyperparameters(ntrain, length_heuristic)
             )
-            test_rmse, test_mae = self._evaluate_model(ntrain, best_parameters)
+            best_cases[ntrain] = best_parameters
 
             improvement = {}
             if last_rmse is not None:
-                improvement["test_slope"] = float(
-                    np.log(test_rmse / last_rmse) / np.log(ntrain / last_size)
+                improvement["validation_slope"] = float(
+                    np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
                 )
             else:
-                improvement["test_slope"] = None
+                improvement["validation_slope"] = None
 
-            last_rmse = test_rmse
+            last_rmse = best_val_rmse
             last_size = ntrain
 
             utils.info(
                 "Training size completed",
                 ntrain=ntrain,
-                test_rmse=float(test_rmse),
+                validation_rmse=float(best_val_rmse),
                 **improvement,
             )
 
@@ -75,10 +77,11 @@ class AutoKRR:
                 "parameters": best_parameters,
                 "val_rmse": float(best_val_rmse),
                 "val_mae": float(best_val_mae),
-                "test_rmse": float(test_rmse),
-                "test_mae": float(test_mae),
                 **improvement,
             }
+
+        utils.info("Evaluate models on test set")
+        self._evaluate_models(best_cases)
 
         learning_curve_end = time.time()
         utils.info(
@@ -314,49 +317,66 @@ class AutoKRR:
         )
         return best_params, best_val_rmse, best_val_mae
 
-    def _evaluate_model(
+    def _evaluate_models(
         self,
-        ntrain: int,
-        params: dict[str, float],
+        best_cases: dict[int, dict[str, float]],
     ) -> tuple[float, float]:
-        y_train = self._y_train[:ntrain].copy()
-        y_test = self._y_holdout.copy()
-        if self._detrend_atomic:
-            A = self._elements_train[:ntrain]
-            coefs = linalg.lstsq(A, y_train)[0]
-            trend_train = A @ coefs
-            y_train -= trend_train
+        models = {}
+        for ntrain, params in best_cases.items():
+            y_train = self._y_train[:ntrain].copy()
+            y_test = self._y_holdout.copy()
+            if self._detrend_atomic:
+                A = self._elements_train[:ntrain]
+                coefs = linalg.lstsq(A, y_train)[0]
+                trend_train = A @ coefs
+                y_train -= trend_train
 
-            A_test = self._elements_holdout
-            trend_test = A_test @ coefs
-            y_test -= trend_test
+                A_test = self._elements_holdout
+                trend_test = A_test @ coefs
+                y_test -= trend_test
 
-        shift = np.mean(y_train)
-        y_train -= shift
-        y_test -= shift
+            shift = np.mean(y_train)
+            y_train -= shift
+            y_test -= shift
 
-        K_train = self._kernel_matrix.compute_train_kernel_matrix(
-            params["sigma"], ntrain
-        )
-        K_test = self._kernel_matrix.compute_test_kernel_matrix(params["sigma"], ntrain)
+            K_train = self._kernel_matrix.compute_train_kernel_matrix(
+                params["sigma"], ntrain
+            )
+            # store eigenvalues for analysis
+            w = np.linalg.eigvalsh(K_train)
+            self._archive["spectrum"] = self._archive.get("spectrum", {})
+            self._archive["spectrum"][ntrain] = w.tolist()
 
-        # store eigenvalues for analysis
-        w = np.linalg.eigvalsh(K_train)
-        self._archive["spectrum"] = self._archive.get("spectrum", {})
-        self._archive["spectrum"][ntrain] = w.tolist()
+            alpha = np.linalg.solve(
+                K_train + params["lambda"] * np.eye(len(y_train)), y_train
+            )
+            models[ntrain] = alpha
 
-        alpha = np.linalg.solve(
-            K_train + params["lambda"] * np.eye(len(y_train)), y_train
-        )
-        pred = K_test @ alpha
+        model_preds = {_: list() for _ in models.keys()}
+        # batched prediction to save memory
+        batch = 0
+        max_ntrain = max(best_cases.keys())
+        while True:
+            K_test = self._kernel_matrix.compute_test_kernel_matrix(
+                params["sigma"], max_ntrain, batch
+            )
+            if K_test is None:
+                break
+            for ntrain, alpha in models.items():
+                model_preds[ntrain].append(K_test[:, :ntrain] @ alpha)
+            batch += 1
 
-        # Store holdout predictions for residual calculation
-        residuals = y_test - pred
-        self.holdout_residuals[ntrain] = residuals
+        for ntrain, preds in model_preds.items():
+            pred = np.concatenate(preds, axis=0)
 
-        test_rmse = np.sqrt(((pred - y_test) ** 2).mean())
-        test_mae = np.abs(pred - y_test).mean()
-        return test_rmse, test_mae
+            # Store holdout predictions for residual calculation
+            residuals = y_test - pred
+            self.holdout_residuals[ntrain] = residuals
+
+            test_rmse = np.sqrt(((pred - y_test) ** 2).mean())
+            test_mae = np.abs(pred - y_test).mean()
+            self.results[ntrain]["test_rmse"] = float(test_rmse)
+            self.results[ntrain]["test_mae"] = float(test_mae)
 
     def _add_nullmodel(self) -> None:
         """Add nullmodel results where prediction is always the mean of the labels

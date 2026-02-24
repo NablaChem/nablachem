@@ -18,11 +18,21 @@ class KernelMatrix:
         self._X = X
         self._X_holdout = X_holdout
         self._kernel_func = kernel_func
+        self._batch_size = 1000
 
-        # Compute distance matrices
         self._D2 = self._dist_squared(X)
-        if X_holdout is not None:
-            self._D2_test = self._dist_squared(X, X_holdout)
+
+    def _calculate_D2_test(self, start: int, end: int, ntrain: int) -> np.ndarray:
+        return self._dist_squared(self._X[:ntrain], self._X_holdout[start:end])
+
+    def _get_batch_indices(self, batch: int) -> tuple[int, int] | tuple[None, None]:
+        """Get start and end indices for a given batch number"""
+        n_holdout = self._holdout_molecule_count
+        start = batch * self._batch_size
+        if start >= n_holdout:
+            return None, None
+        end = min(start + self._batch_size, n_holdout)
+        return start, end
 
     @staticmethod
     def _dist_squared(X_one: np.ndarray, X_other: np.ndarray = None) -> np.ndarray:
@@ -164,17 +174,30 @@ class LocalKernelMatrix(KernelMatrix):
 
         return K_train
 
-    def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
+    @property
+    def _holdout_molecule_count(self) -> int:
+        return len(self._holdout_counts)
+
+    def compute_test_kernel_matrix(
+        self, sigma: float, ntrain: int, batch: int
+    ) -> np.ndarray:
         """Compute test kernel matrix for local representations"""
         if self._X_holdout is None:
             raise ValueError("Holdout data not provided")
 
+        start, end = self._get_batch_indices(batch)
+        if start is None:
+            return None
+
         atom_counts_A = self._train_counts[:ntrain]
-        atom_counts_B = self._holdout_counts
+        atom_counts_B_start = sum(self._holdout_counts[:start])
+        atom_counts_B_end = atom_counts_B_start + sum(self._holdout_counts[start:end])
+        atom_counts_B = self._holdout_counts[start:end]
         natoms = sum(atom_counts_A)
 
         # Compute atomic kernel between test and train
-        K_atom = self._kernel_func.exact(np.sqrt(self._D2_test[:, :natoms]) / sigma)
+        D2 = self._calculate_D2_test(atom_counts_B_start, atom_counts_B_end, natoms)
+        K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma)
         K_test = self.aggregate_atomic_kernel(K_atom, atom_counts_B, atom_counts_A)
 
         # Compute normalization factors
@@ -193,7 +216,7 @@ class LocalKernelMatrix(KernelMatrix):
         d_test = np.sqrt(
             [
                 self._kernel_func.exact(np.sqrt(test_self_dist) / sigma).sum()
-                for test_self_dist in self._test_self
+                for test_self_dist in self._test_self[start:end]
             ]
         )
 
@@ -213,12 +236,22 @@ class GlobalKernelMatrix(KernelMatrix):
         K_train = self._kernel_func(np.sqrt(D2_train) / sigma)
         return K_train
 
-    def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
+    @property
+    def _holdout_molecule_count(self) -> int:
+        return len(self._X_holdout)
+
+    def compute_test_kernel_matrix(
+        self, sigma: float, ntrain: int, batch: int
+    ) -> np.ndarray:
         """Compute test kernel matrix for global representations"""
         if self._X_holdout is None:
             raise ValueError("Holdout data not provided")
 
-        D2_test = self._D2_test[:, :ntrain]
+        start, end = self._get_batch_indices(batch)
+        if start is None:
+            return None
+
+        D2_test = self._calculate_D2_test(start, end, ntrain)
         K_test = self._kernel_func(np.sqrt(D2_test) / sigma)
         return K_test
 

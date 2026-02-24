@@ -101,7 +101,7 @@ def main(
 
     rep = rep_class_map[representation_name]()
     rep.build([ds])
-    info("Built representation", shape=ds.representations[0].shape)
+    info("Built representation", first_entry_shape=ds.representations[0].shape)
 
     # Validate kernel name
     if kernel_name not in available_kernels:

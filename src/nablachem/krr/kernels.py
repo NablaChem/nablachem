@@ -229,11 +229,12 @@ class ExponentialToChebychev:
 
         power_moments = np.zeros((npairs, npowers, len(grid)), dtype=np.float64)
         pair_idx = 0
+        atoms_per_mol_cumsum = np.concatenate([[0], np.cumsum(atoms_per_mol)])
         for i in range(nmols):
             for j in range(i, nmols):
                 x = Ds[
-                    sum(atoms_per_mol[:i]) : sum(atoms_per_mol[: i + 1]),
-                    sum(atoms_per_mol[:j]) : sum(atoms_per_mol[: j + 1]),
+                    atoms_per_mol_cumsum[i] : atoms_per_mol_cumsum[i + 1],
+                    atoms_per_mol_cumsum[j] : atoms_per_mol_cumsum[j + 1],
                 ].flatten()
                 x = np.sort(x)
 
