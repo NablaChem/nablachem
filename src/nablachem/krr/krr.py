@@ -1,7 +1,9 @@
+import warnings
 import numpy as np
 import time
 import json
 from scipy import linalg
+from scipy.linalg import LinAlgWarning
 from . import utils
 from . import matrix
 from .dataset import DataSet
@@ -258,12 +260,14 @@ class AutoKRR:
                     else:
                         K_full_shuf = K_full[idx][:, idx]
                         try:
-                            alpha = linalg.solve(
-                                K_full_shuf[:-validation, :-validation]
-                                + lam * np.eye(ntrain - validation),
-                                y_shuf[:-validation],
-                                assume_a="pos",
-                            )
+                            with warnings.catch_warnings():
+                                warnings.simplefilter("ignore", LinAlgWarning)
+                                alpha = linalg.solve(
+                                    K_full_shuf[:-validation, :-validation]
+                                    + lam * np.eye(ntrain - validation),
+                                    y_shuf[:-validation],
+                                    assume_a="pos",
+                                )
                         except linalg.LinAlgError:
                             continue
 
