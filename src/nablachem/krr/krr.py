@@ -9,7 +9,7 @@ from . import matrix
 from .dataset import DataSet
 from . import kernels
 
-from utils.perftracker import PerformanceTracker
+from ..utils.perftracker import PerformanceTracker
 
 
 class AutoKRR:
@@ -189,6 +189,7 @@ class AutoKRR:
         # other tricks which are not used yet:
         # when shuffling, in-group shuffles (validation vs training) could be ignored
         # cholesky updates
+        # condition numbers could be estimated without full eigenvalue decomposition
         opt_start = time.time()
         best_params, best_val_rmse, best_val_mae = None, np.inf, None
 
