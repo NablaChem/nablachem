@@ -780,5 +780,10 @@ def main():
             st.dataframe(display_df, use_container_width=True)
 
 
+def _launch():
+    import subprocess
+    sys.exit(subprocess.call(["streamlit", "run", __file__] + sys.argv[1:]))
+
+
 if __name__ == "__main__":
     main()

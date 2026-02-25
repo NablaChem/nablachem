@@ -38,6 +38,10 @@ tzdata = "^2025.3"
 pytest = "^9.0.2"
 pytest-testmon = "^2.2.0"
 
+[tool.poetry.scripts]
+nc-krr = "nablachem.krr.cli:main"
+nc-krr-vis = "nablachem.krr.vis:_launch"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

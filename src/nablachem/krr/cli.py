@@ -173,5 +173,3 @@ def main(
         autokrr.tracker.summary()
 
 
-if __name__ == "__main__":
-    main()
