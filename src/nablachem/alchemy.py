@@ -1010,6 +1010,7 @@ class Anygrad:
 
             # update nuclear charges
             mf = baseclass(mol)
+            mf.chkfile = None
             h1 = mf.get_hcore()
             mf.max_cycle = 500
 
@@ -1042,7 +1043,7 @@ class Anygrad:
                 raise ValueError("SCF did not converge.")
             return callable(mf)
 
-        ndims = 4 * pyscf.gto.M(atom=atomspec, basis=basis, symmetry=False).natm
+        ndims = 4 * self._natm
         gradient = np.zeros(ndims)
         hessian = np.zeros((ndims, ndims))
 

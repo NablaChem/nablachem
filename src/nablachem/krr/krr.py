@@ -1,13 +1,15 @@
+import warnings
 import numpy as np
 import time
 import json
 from scipy import linalg
+from scipy.linalg import LinAlgWarning
 from . import utils
 from . import matrix
 from .dataset import DataSet
 from . import kernels
 
-from utils.perftracker import PerformanceTracker
+from ..utils.perftracker import PerformanceTracker
 
 
 class AutoKRR:
@@ -187,6 +189,7 @@ class AutoKRR:
         # other tricks which are not used yet:
         # when shuffling, in-group shuffles (validation vs training) could be ignored
         # cholesky updates
+        # condition numbers could be estimated without full eigenvalue decomposition
         opt_start = time.time()
         best_params, best_val_rmse, best_val_mae = None, np.inf, None
 
@@ -258,12 +261,14 @@ class AutoKRR:
                     else:
                         K_full_shuf = K_full[idx][:, idx]
                         try:
-                            alpha = linalg.solve(
-                                K_full_shuf[:-validation, :-validation]
-                                + lam * np.eye(ntrain - validation),
-                                y_shuf[:-validation],
-                                assume_a="pos",
-                            )
+                            with warnings.catch_warnings():
+                                warnings.simplefilter("ignore", LinAlgWarning)
+                                alpha = linalg.solve(
+                                    K_full_shuf[:-validation, :-validation]
+                                    + lam * np.eye(ntrain - validation),
+                                    y_shuf[:-validation],
+                                    assume_a="pos",
+                                )
                         except linalg.LinAlgError:
                             continue
 
@@ -326,6 +331,7 @@ class AutoKRR:
         best_cases: dict[int, dict[str, float]],
     ) -> tuple[float, float]:
         models = {}
+        y_tests = {}
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
@@ -355,23 +361,25 @@ class AutoKRR:
                 K_train + params["lambda"] * np.eye(len(y_train)), y_train
             )
             models[ntrain] = alpha
+            y_tests[ntrain] = y_test
 
         model_preds = {_: list() for _ in models.keys()}
         # batched prediction to save memory
-        batch = 0
-        max_ntrain = max(best_cases.keys())
-        while True:
-            K_test = self._kernel_matrix.compute_test_kernel_matrix(
-                params["sigma"], max_ntrain, batch
-            )
-            if K_test is None:
-                break
-            for ntrain, alpha in models.items():
-                model_preds[ntrain].append(K_test[:, :ntrain] @ alpha)
-            batch += 1
+        for ntrain, alpha in models.items():
+            params_ntrain = best_cases[ntrain]
+            batch = 0
+            while True:
+                K_test = self._kernel_matrix.compute_test_kernel_matrix(
+                    params_ntrain["sigma"], ntrain, batch
+                )
+                if K_test is None:
+                    break
+                model_preds[ntrain].append(K_test @ alpha)
+                batch += 1
 
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)
+            y_test = y_tests[ntrain]
 
             # Store holdout predictions for residual calculation
             residuals = y_test - pred

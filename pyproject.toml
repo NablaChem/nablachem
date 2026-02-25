@@ -33,10 +33,15 @@ structlog = ">=24.0.0"
 pbr = "^7.0.3"
 setuptools = "^82.0.0"
 tzdata = "^2025.3"
+psutil = "^7.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
 pytest-testmon = "^2.2.0"
+
+[tool.poetry.scripts]
+nc-krr = "nablachem.krr.cli:main"
+nc-krr-vis = "nablachem.krr.vis:_launch"
 
 [build-system]
 requires = ["poetry-core"]
