@@ -96,6 +96,16 @@ def form_basissets(mol, obs_basis, cabs_basis):
     mol_ri.build()
     nri_ao = mol_ri.nao
 
+    # Reorder mol_ri shells so OBS shells come first (0..n_obs_sh-1), then CABS.
+    # This enables a tight shls_slice restriction in form_fock: the J/K density-
+    # matrix contraction runs over only OBS shells, not all RI shells.
+    _S_tmp = gto.intor_cross("int1e_ovlp", mol, mol_ri)
+    _obs_idx = np.argmax(np.abs(_S_tmp), axis=1)
+    _ao_loc_tmp = mol_ri.ao_loc_nr()
+    _obs_sh = sorted(set((np.searchsorted(_ao_loc_tmp, _obs_idx, side="right") - 1).tolist()))
+    _cabs_sh = [s for s in range(mol_ri.nbas) if s not in set(_obs_sh)]
+    mol_ri._bas = mol_ri._bas[_obs_sh + _cabs_sh]
+
     # Mixed overlap S[mu_obs, mu_ri] and RI overlap
     S_mix = gto.intor_cross("int1e_ovlp", mol, mol_ri)  # (nobs_ao, nri_ao)
     S_ri = mol_ri.intor("int1e_ovlp")  # (nri_ao, nri_ao)
@@ -271,34 +281,25 @@ def form_fock(mf, mol_ri, C_cabs_ao):
         nobs_ao,
     ), f"D_ao shape {D_ao.shape} != ({nobs_ao}, {nobs_ao})"
 
-    # Embed D into the combined (OBS + RI) AO space and compute J, K on the full space.
-    # CABS rows/cols are zero: no occupied CABS functions.
-    mol_full = gto.conc_mol(mol, mol_ri)
-    n_ao_full = nobs_ao + nri_ao
-    D_full = np.zeros((n_ao_full, n_ao_full))
-    D_full[:nobs_ao, :nobs_ao] = D_ao
-    assert D_full.shape == (
-        n_ao_full,
-        n_ao_full,
-    ), f"D_full shape {D_full.shape} != ({n_ao_full}, {n_ao_full})"
+    # Compute J, K on mol_ri with OBS-only density matrix.
+    # form_basissets reorders mol_ri shells so OBS shells are first (0..n_obs_sh-1),
+    # making D_ri's nonzero block contiguous at the top-left.  This helps PySCF's
+    # Cauchy-Schwarz screener skip CABS-CABS shell pairs efficiently in one pass.
+    # Cross-overlap locates each OBS AO in the reordered mol_ri index space.
+    S_mix_ovlp = gto.intor_cross("int1e_ovlp", mol, mol_ri)  # (nobs_ao, nri_ao)
+    obs_idx = np.argmax(np.abs(S_mix_ovlp), axis=1)  # (nobs_ao,)
 
-    mf_full = scf.RHF(mol_full)
-    J_full, K_full = mf_full.get_jk(mol_full, D_full)
-    assert J_full.shape == (
-        n_ao_full,
-        n_ao_full,
-    ), f"J_full shape {J_full.shape} != ({n_ao_full}, {n_ao_full})"
-    assert K_full.shape == (
-        n_ao_full,
-        n_ao_full,
-    ), f"K_full shape {K_full.shape} != ({n_ao_full}, {n_ao_full})"
+    D_ri = np.zeros((nri_ao, nri_ao))
+    D_ri[np.ix_(obs_idx, obs_idx)] = D_ao
 
-    # F = H + J - 0.5*K  (factor of 2 already absorbed in D_full)
-    JK_full = J_full - 0.5 * K_full  # (n_ao_full, n_ao_full)
+    J_ri, K_ri = scf.RHF(mol_ri).get_jk(mol_ri, D_ri, hermi=1)
 
-    # Extract the OBS–CABS and CABS–CABS AO blocks of the 2e contribution
-    JK_ao_oc = JK_full[:nobs_ao, nobs_ao:]  # (nobs_ao, nri_ao)
-    JK_ao_cc = JK_full[nobs_ao:, nobs_ao:]  # (nri_ao, nri_ao)
+    # F = H + J - 0.5*K  (factor of 2 already absorbed in D_ri)
+    JK_ri = J_ri - 0.5 * K_ri  # (nri_ao, nri_ao)
+
+    # obs_idx rows give the OBS AOs in mol's ordering; all nri_ao cols = full RI
+    JK_ao_oc = JK_ri[obs_idx, :]  # (nobs_ao, nri_ao)
+    JK_ao_cc = JK_ri  # (nri_ao, nri_ao)
     assert JK_ao_oc.shape == (
         nobs_ao,
         nri_ao,
@@ -408,7 +409,7 @@ def form_cabs_singles(f, nocc, nobs, ncabs, nri):
     return E_singles
 
 
-def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str = None):
+def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str):
     """
     Compute the CABS singles correction for a closed-shell (RHF) system.
 
@@ -417,17 +418,13 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str = None):
     atomspec  : atom specification accepted by pyscf Mole.atom (string, list of
                 tuples, etc.).  Coordinates are assumed to be in Angstrom.
     obs_basis : OBS basis set name as accepted by pyscf (e.g. ``"pcseg-0"``).
-    cabs_basis: path to a Gaussian .gbs file for the CABS basis.  Pass None to
-                skip the correction (not yet implemented).
+    cabs_basis: path to a Gaussian .gbs file for the CABS basis.
 
     Returns
     -------
     E_hf      : RHF total energy (Hartree)
     E_singles : CABS singles correction (Hartree, typically negative)
     """
-    if cabs_basis is None:
-        raise NotImplementedError("cabs_basis=None not yet implemented")
-
     mol = gto.Mole()
     mol.atom = atomspec
     mol.basis = obs_basis
