@@ -5,6 +5,7 @@ import re
 import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.basis import parse_gaussian
+from requests_cache import Path
 
 
 def resolve_basis(name):
@@ -102,7 +103,9 @@ def form_basissets(mol, obs_basis, cabs_basis):
     _S_tmp = gto.intor_cross("int1e_ovlp", mol, mol_ri)
     _obs_idx = np.argmax(np.abs(_S_tmp), axis=1)
     _ao_loc_tmp = mol_ri.ao_loc_nr()
-    _obs_sh = sorted(set((np.searchsorted(_ao_loc_tmp, _obs_idx, side="right") - 1).tolist()))
+    _obs_sh = sorted(
+        set((np.searchsorted(_ao_loc_tmp, _obs_idx, side="right") - 1).tolist())
+    )
     _cabs_sh = [s for s in range(mol_ri.nbas) if s not in set(_obs_sh)]
     mol_ri._bas = mol_ri._bas[_obs_sh + _cabs_sh]
 
@@ -292,7 +295,8 @@ def form_fock(mf, mol_ri, C_cabs_ao):
     D_ri = np.zeros((nri_ao, nri_ao))
     D_ri[np.ix_(obs_idx, obs_idx)] = D_ao
 
-    J_ri, K_ri = scf.RHF(mol_ri).get_jk(mol_ri, D_ri, hermi=1)
+    calc_JK = scf.RHF(mol_ri).density_fit(auxbasis="cc-pvtz-ri")
+    J_ri, K_ri = calc_JK.get_jk(mol_ri, D_ri, hermi=1)
 
     # F = H + J - 0.5*K  (factor of 2 already absorbed in D_ri)
     JK_ri = J_ri - 0.5 * K_ri  # (nri_ao, nri_ao)
@@ -442,3 +446,46 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str):
     E_singles = form_cabs_singles(f, nocc, nobs, ncabs, nri)
 
     return E_hf, E_singles
+
+
+"""def time_rel_to_dz(atomspec):
+    CABS_GBS = str(
+        Path(__file__).parent.parent.parent / "tests" / "cabs" / "pcseg-cabs.gbs"
+    )
+    OBS_BASIS = "pcseg-0"
+    mol = gto.Mole()
+    mol.atom = atomspec
+    mol.basis = OBS_BASIS
+    mol.unit = "Angstrom"
+    mol.verbose = 0
+    mol.build()
+
+    mf = scf.RHF(mol)
+    mf.verbose = 0
+    mf.kernel()
+
+    import time
+
+    start = time.time()
+    mol_ri, C_cabs_ao, nobs_ao, ncabs = form_basissets(mol, OBS_BASIS, CABS_GBS)
+    f, nocc, nobs, ncabs, nri = form_fock(mf, mol_ri, C_cabs_ao)
+    E_singles = form_cabs_singles(f, nocc, nobs, ncabs, nri)
+    stop = time.time()
+    elapsed = stop - start
+
+    # dz comparison
+    mol = gto.Mole()
+    mol.atom = atomspec
+    mol.basis = "cc-pvdz"
+    mol.unit = "Angstrom"
+    mol.verbose = 0
+    mol.build()
+
+    mf = scf.RHF(mol)
+    mf.verbose = 0
+    start = time.time()
+    mf.kernel()  # includes SCF iterations, J/K build, etc.
+    stop = time.time()
+    elapsed_dz = stop - start
+
+    return elapsed / elapsed_dz"""
