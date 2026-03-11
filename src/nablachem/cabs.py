@@ -10,6 +10,8 @@ from requests_cache import Path
 
 def resolve_basis(name):
     """Return a PySCF-compatible basis: string name or {elem: shells} dict from a .gbs file."""
+    if isinstance(name, dict):
+        return name
     if name.endswith(".gbs"):
         return _parse_gbs_per_element(name)
     return name
@@ -89,6 +91,9 @@ def form_basissets(mol, obs_basis, cabs_basis):
     # a smaller RI space and wrong CABS.
     cabs_dict = resolve_basis(cabs_basis)
     elements = set(a[0] for a in mol._atom)
+    missing = elements - set(cabs_dict)
+    if missing:
+        raise ValueError(f"CABS basis missing entries for elements: {sorted(missing)}")
     combined_basis = {
         elem: gto.basis.load(obs_basis, elem) + cabs_dict[elem] for elem in elements
     }
@@ -448,11 +453,240 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str):
     return E_hf, E_singles
 
 
-"""def time_rel_to_dz(atomspec):
-    CABS_GBS = str(
-        Path(__file__).parent.parent.parent / "tests" / "cabs" / "pcseg-cabs.gbs"
-    )
+def CABS_opt(
+    atomspecs: list[str],
+    cbs_estimates: list[float],
+    obs_basis: str,
+    cabs_basis: str,
+    output_path: str,
+    run_phase1: bool = False,
+):
+    """
+    Optimize a fully-decontracted CABS basis against a set of reference CBS energies.
+
+    Phase 1 — Sensitivity analysis (optional, off by default):
+        Drop each primitive one at a time, measure RMedSE change.
+        Auto-drop primitives whose removal increases RMedSE by < 0.25%.
+
+    Phase 2 — Exponent optimization (5 cycles):
+        Each cycle iterates over all elements; for each element exponents are
+        scanned individually using a geometric line search (base 1.05).
+
+    Parameters
+    ----------
+    atomspecs     : list of atom specifications (passed to pyscf Mole.atom)
+    cbs_estimates : list of reference total energies  E_HF_CBS + E_corr_CBS
+    obs_basis     : OBS basis name (e.g. "pcseg-0")
+    cabs_basis    : path to fully-decontracted .gbs CABS file
+    output_path   : path where the optimized .gbs file is written
+    run_phase1    : whether to run sensitivity analysis + pruning (default: False)
+    """
+    L_NAMES = {0: "S", 1: "P", 2: "D", 3: "F", 4: "G", 5: "H"}
+
+    # ------------------------------------------------------------------
+    # Internal basis representation: {elem: [(l, exp), ...]}
+    # One entry per primitive; fully decontracted so coefficient = 1.0.
+    # ------------------------------------------------------------------
+
+    def pyscf_to_primitives(basis_dict):
+        result = {}
+        for elem, shells in basis_dict.items():
+            result[elem] = []
+            for shell in shells:
+                l = shell[0]
+                exp = float(shell[1][0])  # first element of first primitive tuple
+                result[elem].append((l, exp))
+        return result
+
+    def primitives_to_pyscf(prims):
+        return {
+            elem: [[l, [exp, 1.0]] for l, exp in shells]
+            for elem, shells in prims.items()
+        }
+
+    def write_gbs(prims, path):
+        lines = []
+        for elem in sorted(prims):
+            lines.append("****")
+            lines.append(f"{elem} 0")
+            for l, exp in prims[elem]:
+                lines.append(f"{L_NAMES[l]}   1   1.00")
+                lines.append(f"      {exp:>20.10f}   1.0000000000")
+        lines.append("****")
+        with open(path, "w") as fh:
+            fh.write("\n".join(lines) + "\n")
+
+    # ------------------------------------------------------------------
+    # Parse input basis
+    # ------------------------------------------------------------------
+    basis_dict = resolve_basis(cabs_basis)
+    primitives = pyscf_to_primitives(basis_dict)
+
+    # ------------------------------------------------------------------
+    # Pre-compute HF for all molecules (independent of CABS basis)
+    # ------------------------------------------------------------------
+    print("Pre-computing HF for all molecules...")
+    hf_cache = []  # list of (mol, mf, E_hf) per molecule
+    for i, atomspec in enumerate(atomspecs):
+        mol = gto.Mole()
+        mol.atom = atomspec
+        mol.basis = obs_basis
+        mol.unit = "Angstrom"
+        mol.verbose = 0
+        mol.build()
+        mf = scf.RHF(mol)
+        mf.verbose = 0
+        mf.kernel()
+        hf_cache.append((mol, mf, mf.e_tot))
+        print(f"  [{i+1}/{len(atomspecs)}] E_HF = {mf.e_tot:.10f} Ha")
+    print()
+
+    def compute_rmedse(prims):
+        basis = primitives_to_pyscf(prims)
+        errors = []
+        for (mol, mf, E_hf), cbs in zip(hf_cache, cbs_estimates):
+            mol_ri, C_cabs_ao, nobs_ao, ncabs = form_basissets(mol, obs_basis, basis)
+            f, nocc, nobs, ncabs, nri = form_fock(mf, mol_ri, C_cabs_ao)
+            E_singles = form_cabs_singles(f, nocc, nobs, ncabs, nri)
+            errors.append(E_hf + E_singles - cbs)
+        return float(np.sqrt(np.median(np.array(errors) ** 2)))
+
+    # ------------------------------------------------------------------
+    # Phase 1: sensitivity analysis + pruning
+    # ------------------------------------------------------------------
+    if run_phase1:
+        print("=" * 72)
+        print("PHASE 1: Sensitivity Analysis")
+        print("=" * 72)
+        baseline_rmedse = compute_rmedse(primitives)
+        print(f"Baseline RMedSE (full basis): {baseline_rmedse * 1000:.6f} mHa\n")
+
+        header = f"{'Elem':4s} {'Shell':5s} {'Exponent':>16s} {'RMedSE_wo/mHa':>12s} {'ΔRMedSE/mHa':>11s} {'%change':>8s}  {'Action':6s}"
+        print(header)
+        print("-" * len(header))
+
+        DROP_THRESHOLD_PCT = 0.25
+
+        rows = []
+        to_drop_by_elem: dict[str, list[int]] = {}
+        for elem in sorted(primitives):
+            for i, (l, exp) in enumerate(primitives[elem]):
+                print(f"  Testing {elem} {L_NAMES[l]} exp={exp:.8f} ...")
+                reduced = {
+                    e: [(ll, ex) for j, (ll, ex) in enumerate(primitives[e])
+                        if not (e == elem and j == i)]
+                    for e in primitives
+                }
+                # Skip if this would empty the element entirely — keep at least one
+                if not reduced.get(elem):
+                    print(f"{elem:4s} {L_NAMES[l]:5s} {exp:>16.8f} {'N/A':>12s} {'N/A':>11s} {'N/A':>8s}  KEEP (last)")
+                    rows.append((elem, i, l, exp, None, None, None, "KEEP (last)"))
+                    continue
+                rmedse_wo = compute_rmedse(reduced)
+                delta = rmedse_wo - baseline_rmedse
+                pct = 100.0 * delta / baseline_rmedse if baseline_rmedse > 0 else 0.0
+                action = "DROP" if pct < DROP_THRESHOLD_PCT else "KEEP"
+                print(
+                    f"{elem:4s} {L_NAMES[l]:5s} {exp:>16.8f} "
+                    f"{rmedse_wo*1000:>12.6f} {delta*1000:>11.6f} {pct:>8.2f}%  {action}"
+                )
+                rows.append((elem, i, l, exp, rmedse_wo, delta, pct, action))
+                if action == "DROP":
+                    to_drop_by_elem.setdefault(elem, []).append(i)
+
+        n_drop = sum(len(v) for v in to_drop_by_elem.values())
+        print(f"\nDropping {n_drop} primitives with < {DROP_THRESHOLD_PCT}% RMedSE impact.\n")
+
+        for elem, idxs in to_drop_by_elem.items():
+            for i in sorted(idxs, reverse=True):
+                primitives[elem].pop(i)
+            if not primitives[elem]:
+                del primitives[elem]
+
+        print("Surviving primitives:")
+        for elem in sorted(primitives):
+            for l, exp in primitives[elem]:
+                print(f"  {elem:2s}  {L_NAMES[l]}  {exp:.8f}")
+        print()
+
+    # ------------------------------------------------------------------
+    # Phase 2: exponent optimization — 5 cycles over all elements
+    # ------------------------------------------------------------------
+    print()
+    print("=" * 72)
+    print("PHASE 2: Exponent Optimization (5 cycles)")
+    print("=" * 72)
+
+    current_rmedse = compute_rmedse(primitives)
+    print(f"Starting RMedSE: {current_rmedse * 1000:.6f} mHa")
+
+    for cycle in range(5):
+        print(f"\n--- Cycle {cycle + 1} ---")
+        for elem in sorted(primitives):
+            for k in range(len(primitives[elem])):
+                l, exp = primitives[elem][k]
+                print(
+                    f"  Scanning {elem} {L_NAMES[l]} exp={exp:.8f}  (RMedSE={current_rmedse*1000:.6f} mHa)"
+                )
+                best_rmedse = current_rmedse
+                best_exp = exp
+
+                def try_direction(sign, start=1):
+                    nonlocal best_rmedse, best_exp
+                    for p in (sign * i for i in range(start, 10_000)):
+                        trial_exp = exp * (1.05**p)
+                        trial_prims = {e: list(primitives[e]) for e in primitives}
+                        trial_prims[elem][k] = (l, trial_exp)
+                        rmedse = compute_rmedse(trial_prims)
+                        marker = " <--" if rmedse < best_rmedse else ""
+                        print(
+                            f"    1.05^{p:+d} exp={trial_exp:.8f}: RMedSE={rmedse*1000:.6f} mHa{marker}"
+                        )
+                        if rmedse < best_rmedse:
+                            best_rmedse = rmedse
+                            best_exp = trial_exp
+                        else:
+                            break  # no improvement — stop this direction
+
+                # Try increasing first; if the very first step fails, try decreasing
+                trial_exp = exp * 1.05
+                trial_prims = {e: list(primitives[e]) for e in primitives}
+                trial_prims[elem][k] = (l, trial_exp)
+                rmedse = compute_rmedse(trial_prims)
+                marker = " <--" if rmedse < best_rmedse else ""
+                print(
+                    f"    1.05^+1 exp={trial_exp:.8f}: RMedSE={rmedse*1000:.6f} mHa{marker}"
+                )
+                if rmedse < best_rmedse:
+                    best_rmedse = rmedse
+                    best_exp = trial_exp
+                    try_direction(+1, start=2)
+                else:
+                    try_direction(-1)
+
+                if best_exp != exp:
+                    primitives[elem][k] = (l, best_exp)
+                    current_rmedse = best_rmedse
+                    print(f"    -> updated: {exp:.8f} -> {best_exp:.8f}")
+        print(f"  End of cycle {cycle + 1}: RMedSE = {current_rmedse * 1000:.6f} mHa")
+
+    # ------------------------------------------------------------------
+    # Write output
+    # ------------------------------------------------------------------
+    write_gbs(primitives, output_path)
+    print(f"\nOptimized basis written to: {output_path}")
+
+
+def time_rel_to_dz(atomspec):
+    # CABS_GBS = str(
+    #    Path(__file__).parent.parent.parent / "tests" / "cabs" / "pcseg-cabs.gbs"
+    # )
+    CABS_GBS = "/Users/guido/Downloads/cabsmodmanual.gbs"
     OBS_BASIS = "pcseg-0"
+
+    import time
+
+    start = time.time()
     mol = gto.Mole()
     mol.atom = atomspec
     mol.basis = OBS_BASIS
@@ -464,9 +698,6 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str):
     mf.verbose = 0
     mf.kernel()
 
-    import time
-
-    start = time.time()
     mol_ri, C_cabs_ao, nobs_ao, ncabs = form_basissets(mol, OBS_BASIS, CABS_GBS)
     f, nocc, nobs, ncabs, nri = form_fock(mf, mol_ri, C_cabs_ao)
     E_singles = form_cabs_singles(f, nocc, nobs, ncabs, nri)
@@ -488,4 +719,4 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str):
     stop = time.time()
     elapsed_dz = stop - start
 
-    return elapsed / elapsed_dz"""
+    return elapsed / elapsed_dz
