@@ -122,6 +122,25 @@ class SLATMGlobal(_SLATM):
         super().__init__(local=False)
 
 
+class MACELocal(BaseRepresenter):
+    def __init__(self):
+        self._model = None
+
+    def build(self, datasets: list[dataset.DataSet]):
+        from mace.calculators import mace_mp
+
+        if self._model is None:
+            self._model = mace_mp(model="medium", device="")
+
+        all_mols = [mol for ds in datasets for mol in ds.molecules]
+        reps = [self._model.get_descriptors(mol) for mol in all_mols]
+
+        offset = 0
+        for ds in datasets:
+            ds.representations = reps[offset : offset + len(ds.molecules)]
+            offset += len(ds.molecules)
+
+
 def list_available():
     """Return string names of all BaseRepresenter subclasses that don't start with underscore."""
     current_module = inspect.getmembers(
