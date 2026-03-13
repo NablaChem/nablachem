@@ -62,7 +62,7 @@ class KernelMatrix:
         )
 
 
-class LocalKernelMatrix(KernelMatrix):
+class _LocalKernelMatrix(KernelMatrix):
     """Kernel matrix for local (atom-based) representations with approximation cache"""
 
     def __init__(
@@ -72,6 +72,9 @@ class LocalKernelMatrix(KernelMatrix):
         kernel_func: Kernel,
         X_holdout: np.ndarray = None,
         holdout_counts: np.ndarray = None,
+        elemental: bool = False,
+        nuclear_charges: np.ndarray = None,
+        holdout_nuclear_charges: np.ndarray = None,
     ):
         """Initialize local kernel matrix
 
@@ -80,7 +83,18 @@ class LocalKernelMatrix(KernelMatrix):
             train_counts: Number of atoms per training molecule
             X_holdout: Concatenated holdout atom representations (optional)
             holdout_counts: Number of atoms per holdout molecule (optional)
+            elemental: If True, zero contributions from cross-element atom pairs
+            nuclear_charges: Nuclear charges per train atom (required when elemental=True)
+            holdout_nuclear_charges: Nuclear charges per holdout atom (required when
+                elemental=True and X_holdout is provided)
         """
+        if elemental and nuclear_charges is None:
+            raise ValueError("nuclear_charges is required when elemental=True")
+        if elemental and X_holdout is not None and holdout_nuclear_charges is None:
+            raise ValueError(
+                "holdout_nuclear_charges is required when elemental=True and X_holdout is provided"
+            )
+
         super().__init__(
             X,
             kernel_func,
@@ -88,16 +102,28 @@ class LocalKernelMatrix(KernelMatrix):
         )
         self._train_counts = train_counts
         self._holdout_counts = holdout_counts
+        self._elemental = elemental
+
+        if elemental:
+            self._nuclear_charges = np.asarray(nuclear_charges, dtype=float)
+            cross = self._nuclear_charges[:, None] != self._nuclear_charges[None, :]
+            self._D2[cross] = np.inf
 
         # Compute holdout self-distances if needed
         if X_holdout is not None and holdout_counts is not None:
+            self._holdout_nuclear_charges = (
+                np.asarray(holdout_nuclear_charges, dtype=float) if elemental else None
+            )
             self._test_self = []
             start = 0
             for count in holdout_counts:
                 end = start + count
-                self._test_self.append(
-                    self._dist_squared(X_holdout[start:end], X_holdout[start:end])
-                )
+                d2 = self._dist_squared(X_holdout[start:end], X_holdout[start:end])
+                if elemental:
+                    z = self._holdout_nuclear_charges[start:end]
+                    cross = z[:, None] != z[None, :]
+                    d2[cross] = np.inf
+                self._test_self.append(d2)
                 start = end
         self._approx_fail_sigma = dict()
         self._kernel_func.approx_prepare(train_counts, self._D2)
@@ -197,6 +223,14 @@ class LocalKernelMatrix(KernelMatrix):
 
         # Compute atomic kernel between test and train
         D2 = self._calculate_D2_test(atom_counts_B_start, atom_counts_B_end, natoms)
+        if self._elemental:
+            z_holdout = self._holdout_nuclear_charges[
+                atom_counts_B_start:atom_counts_B_end
+            ]
+            z_train = self._nuclear_charges[:natoms]
+            cross = z_holdout[:, None] != z_train[None, :]
+            D2 = D2.copy()
+            D2[cross] = np.inf
         K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma)
         K_test = self.aggregate_atomic_kernel(K_atom, atom_counts_B, atom_counts_A)
 
@@ -224,6 +258,19 @@ class LocalKernelMatrix(KernelMatrix):
         K_test /= np.outer(d_test, d_train_sqrt)
 
         return K_test
+
+
+class ElementalKernelMatrix(_LocalKernelMatrix):
+
+    def __init__(self, *args, **kwargs):
+        kwargs["elemental"] = True
+        super().__init__(*args, **kwargs)
+
+
+class LocalKernelMatrix(_LocalKernelMatrix):
+    def __init__(self, *args, **kwargs):
+        kwargs["elemental"] = False
+        super().__init__(*args, **kwargs)
 
 
 class GlobalKernelMatrix(KernelMatrix):

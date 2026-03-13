@@ -109,6 +109,10 @@ class DataSet:
     def __len__(self):
         return len(self.molecules)
 
+    @property
+    def nuclear_charges(self) -> list[np.ndarray]:
+        return [mol.get_atomic_numbers() for mol in self.molecules]
+
     def get_element_counts(self):
         """Return element count matrix for all molecules in the dataset.
 

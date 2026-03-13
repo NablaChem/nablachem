@@ -60,6 +60,11 @@ and the remaining molecules used as holdout/test data.
     help="Output JSONL file path for holdout residuals",
 )
 @click.option(
+    "--elemental/--no-elemental",
+    default=False,
+    help="Mask cross-element atom pairs in local kernel (requires local representation)",
+)
+@click.option(
     "--track", is_flag=True, default=False, help="Enable performance tracking"
 )
 @click.option(
@@ -75,6 +80,7 @@ def main(
     maxcount,
     select,
     detrend_atomic,
+    elemental,
     holdout_residuals,
     track,
     archive,
@@ -127,7 +133,12 @@ def main(
     kernel_cls_map = {name: getattr(kernels, name) for name in available_kernels}
     kernel_func = kernel_cls_map[kernel_name]()
     autokrr = AutoKRR(
-        ds, mincount, maxcount, detrend_atomic=detrend_atomic, kernel_func=kernel_func
+        ds,
+        mincount,
+        maxcount,
+        detrend_atomic=detrend_atomic,
+        kernel_func=kernel_func,
+        elemental=elemental,
     )
     metadata = {
         "representation": representation_name,
@@ -171,5 +182,3 @@ def main(
     if track:
         print("\nPerformance Summary:")
         autokrr.tracker.summary()
-
-

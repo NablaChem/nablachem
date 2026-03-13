@@ -6,7 +6,7 @@ import pytest
 from nablachem.krr.dataset import DataSet
 from nablachem.krr.features import SLATMGlobal, SLATMLocal
 from nablachem.krr import kernels
-from nablachem.krr.matrix import GlobalKernelMatrix, LocalKernelMatrix
+from nablachem.krr.matrix import GlobalKernelMatrix, LocalKernelMatrix, ElementalKernelMatrix
 
 DATA_FILE = pathlib.Path(__file__).parent / "data" / "molecules.jsonl"
 
@@ -264,3 +264,114 @@ def test_evaluate_models_uses_per_model_sigma():
     expected_residuals = y_test_4 - K_test_4 @ alpha_4
 
     assert np.allclose(krr.holdout_residuals[4], expected_residuals, atol=1e-6)
+
+
+def test_elemental_kernel_masks_cross_element_pairs():
+    """ElementalKernelMatrix should zero atom-atom contributions between different elements.
+
+    Setup: 2 molecules, each with one H (Z=1) and one C (Z=6) atom.
+    Features are chosen so H atoms are close and C atoms are close.
+
+      mol0: H @ [1,0], C @ [0,1]
+      mol1: H @ [0.9,0.1], C @ [0.1,0.9]
+
+    With sigma=1, the elemental kernel K[0,1] must equal
+      ( k(H0,H1) + k(C0,C1) ) / sqrt( k(H0,H0)+k(C0,C0) ) / sqrt( k(H1,H1)+k(C1,C1) )
+    i.e. only same-element pairs contribute.
+    """
+    # atom features: rows are [H_mol0, C_mol0, H_mol1, C_mol1]
+    X = np.array([
+        [1.0, 0.0],   # H in mol 0
+        [0.0, 1.0],   # C in mol 0
+        [0.9, 0.1],   # H in mol 1
+        [0.1, 0.9],   # C in mol 1
+    ], dtype=float)
+    nuclear_charges = np.array([1, 6, 1, 6])
+    counts = np.array([2, 2])
+    sigma = 1.0
+    kernel = kernels.Gaussian()
+
+    # manually compute expected elemental kernel
+    def k(a, b):
+        return np.exp(-np.sum((a - b) ** 2))
+
+    # same-element pairs only
+    k_HH = k(X[0], X[2])
+    k_CC = k(X[1], X[3])
+    k_self0 = k(X[0], X[0]) + k(X[1], X[1])  # = 2.0
+    k_self1 = k(X[2], X[2]) + k(X[3], X[3])  # = 2.0
+    expected_K01 = (k_HH + k_CC) / (np.sqrt(k_self0) * np.sqrt(k_self1))
+
+    kmat = ElementalKernelMatrix(X, counts, kernel, nuclear_charges=nuclear_charges)
+    K = kmat.compute_train_kernel_matrix_exact(sigma, ntrain=2)
+
+    assert np.isclose(K[0, 1], expected_K01), (
+        f"K[0,1]={K[0,1]:.6f} but expected {expected_K01:.6f}; "
+        "cross-element pairs are likely not being masked"
+    )
+    assert np.isclose(K[0, 0], 1.0)
+    assert np.isclose(K[1, 1], 1.0)
+
+
+def test_elemental_kernel_masks_cross_element_pairs_holdout():
+    """ElementalKernelMatrix should mask cross-element pairs in the test/holdout path.
+
+    Setup: 2 train molecules and 1 holdout molecule, each with one H (Z=1) and one C (Z=6).
+
+      mol0 (train): H @ [1.0, 0.0], C @ [0.0, 1.0]
+      mol1 (train): H @ [0.9, 0.1], C @ [0.1, 0.9]
+      mol_h (holdout): H @ [0.8, 0.2], C @ [0.2, 0.8]
+
+    K_test[0, i] must equal ( k(H_h, H_i) + k(C_h, C_i) ) / sqrt(self_h) / sqrt(self_i),
+    i.e. only same-element pairs contribute.
+    """
+    X_train = np.array([
+        [1.0, 0.0],  # H in mol0
+        [0.0, 1.0],  # C in mol0
+        [0.9, 0.1],  # H in mol1
+        [0.1, 0.9],  # C in mol1
+    ], dtype=float)
+    X_holdout = np.array([
+        [0.8, 0.2],  # H in holdout mol
+        [0.2, 0.8],  # C in holdout mol
+    ], dtype=float)
+    train_charges = np.array([1, 6, 1, 6])
+    holdout_charges = np.array([1, 6])
+    train_counts = np.array([2, 2])
+    holdout_counts = np.array([2])
+    sigma = 1.0
+    kernel = kernels.Gaussian()
+
+    def k(a, b):
+        return np.exp(-np.sum((a - b) ** 2))
+
+    # self-kernels: each molecule has one H and one C, k(x,x)=1 for both → sum=2
+    self_0 = k(X_train[0], X_train[0]) + k(X_train[1], X_train[1])  # 2.0
+    self_1 = k(X_train[2], X_train[2]) + k(X_train[3], X_train[3])  # 2.0
+    self_h = k(X_holdout[0], X_holdout[0]) + k(X_holdout[1], X_holdout[1])  # 2.0
+
+    expected_K_test_0 = (k(X_holdout[0], X_train[0]) + k(X_holdout[1], X_train[1])) / (
+        np.sqrt(self_h) * np.sqrt(self_0)
+    )
+    expected_K_test_1 = (k(X_holdout[0], X_train[2]) + k(X_holdout[1], X_train[3])) / (
+        np.sqrt(self_h) * np.sqrt(self_1)
+    )
+
+    kmat = ElementalKernelMatrix(
+        X_train,
+        train_counts,
+        kernel,
+        X_holdout,
+        holdout_counts,
+        nuclear_charges=train_charges,
+        holdout_nuclear_charges=holdout_charges,
+    )
+    K_test = kmat.compute_test_kernel_matrix(sigma, ntrain=2, batch=0)
+
+    assert K_test.shape == (1, 2)
+    assert np.isclose(K_test[0, 0], expected_K_test_0), (
+        f"K_test[0,0]={K_test[0,0]:.6f} but expected {expected_K_test_0:.6f}"
+    )
+    assert np.isclose(K_test[0, 1], expected_K_test_1), (
+        f"K_test[0,1]={K_test[0,1]:.6f} but expected {expected_K_test_1:.6f}"
+    )
