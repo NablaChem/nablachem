@@ -32,7 +32,9 @@ def validate_metadata(datasets: dict):
     meta_by_file = {}
     for path, data in datasets.items():
         if "metadata" not in data:
-            st.warning(f"File {path} has no metadata key — skipping compatibility check.")
+            st.warning(
+                f"File {path} has no metadata key — skipping compatibility check."
+            )
             continue
         meta_by_file[path] = data["metadata"]
 
@@ -782,6 +784,7 @@ def main():
 
 def _launch():
     import subprocess
+
     sys.exit(subprocess.call(["streamlit", "run", __file__] + sys.argv[1:]))
 
 

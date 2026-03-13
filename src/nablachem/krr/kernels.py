@@ -29,7 +29,7 @@ class Matern52(Kernel):
 class MaternGeneral(Kernel):
     def exact(self, dr, nu):
         if nu == 0.5:
-            return ExponentialKernel().exact(dr)
+            return Exponential().exact(dr)
         elif nu == 1.5:
             return Matern32().exact(dr)
         elif nu == 2.5:
@@ -237,6 +237,11 @@ class ExponentialToChebychev:
                     atoms_per_mol_cumsum[j] : atoms_per_mol_cumsum[j + 1],
                 ].flatten()
                 x = np.sort(x)
+                x = x[np.isfinite(x)]
+
+                if len(x) == 0:
+                    pair_idx += 1
+                    continue
 
                 cum_moments = np.zeros((len(cheby_p), len(x) + 1))
                 cum_moments[0, 1:] = np.cumsum(np.ones_like(x))

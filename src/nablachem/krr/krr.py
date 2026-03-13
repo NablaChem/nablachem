@@ -23,6 +23,7 @@ class AutoKRR:
         maxcount: int,
         kernel_func: kernels.Kernel,
         detrend_atomic: bool = True,
+        elemental: bool = False,
     ) -> None:
         with self.tracker.track("Initialization"):
             self._archive = {}
@@ -30,8 +31,9 @@ class AutoKRR:
             self.dataset = dataset
             self._training_sizes = utils.get_training_sizes(mincount, maxcount)
             self._detrend_atomic = detrend_atomic
+            self._elemental = elemental
 
-            self._create_holdout_split()
+            self._create_holdout_split(elemental)
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
@@ -39,14 +41,29 @@ class AutoKRR:
 
         with self.tracker.track("Kernel matrix setup"):
             if self._local:
-                self._kernel_matrix = matrix.LocalKernelMatrix(
-                    self._X_train,
-                    self._train_counts,
-                    kernel_func,
-                    self._X_holdout,
-                    self._holdout_counts,
-                )
+                if self._elemental:
+                    self._kernel_matrix = matrix.ElementalKernelMatrix(
+                        self._X_train,
+                        self._train_counts,
+                        kernel_func,
+                        self._X_holdout,
+                        self._holdout_counts,
+                        nuclear_charges=self._train_nuclear_charges,
+                        holdout_nuclear_charges=self._holdout_nuclear_charges,
+                    )
+                else:
+                    self._kernel_matrix = matrix.LocalKernelMatrix(
+                        self._X_train,
+                        self._train_counts,
+                        kernel_func,
+                        self._X_holdout,
+                        self._holdout_counts,
+                    )
             else:
+                if self._elemental:
+                    utils.error(
+                        "--elemental is not supported for global representations"
+                    )
                 self._kernel_matrix = matrix.GlobalKernelMatrix(
                     self._X_train, kernel_func, self._X_holdout
                 )
@@ -134,7 +151,7 @@ class AutoKRR:
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
     @tracker.track
-    def _create_holdout_split(self):
+    def _create_holdout_split(self, elemental: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
         max_training_size = max(self._training_sizes)
@@ -161,6 +178,14 @@ class AutoKRR:
             self._X_train = np.concatenate(X_train, axis=0)
             self._holdout_counts = np.array([rep.shape[0] for rep in self._X_holdout])
             self._X_holdout = np.concatenate(self._X_holdout, axis=0)
+            if elemental:
+                charges_all = self.dataset.nuclear_charges
+                self._train_nuclear_charges = np.concatenate(
+                    charges_all[:max_training_size]
+                )
+                self._holdout_nuclear_charges = np.concatenate(
+                    charges_all[max_training_size:]
+                )
         else:
             self._X_train = np.stack(X_train, axis=0)
             self._X_holdout = np.stack(self._X_holdout, axis=0)
@@ -195,7 +220,7 @@ class AutoKRR:
 
         # Loop: sigma outer, splits inner
         factors, lam_grid = self.get_hyperparameter_grid(ntrain)
-        shufs = 20
+        shufs = 50
         validation = self.validation_size(ntrain)
 
         idx = np.arange(ntrain)
