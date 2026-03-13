@@ -236,7 +236,7 @@ class ExponentialToChebychev:
                     atoms_per_mol_cumsum[i] : atoms_per_mol_cumsum[i + 1],
                     atoms_per_mol_cumsum[j] : atoms_per_mol_cumsum[j + 1],
                 ].flatten()
-                x = np.sort(x)
+                x = np.sort(x).astype(np.float64)
                 x = x[np.isfinite(x)]
 
                 if len(x) == 0:
