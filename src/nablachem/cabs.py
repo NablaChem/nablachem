@@ -5,7 +5,7 @@ import re
 import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.basis import parse_gaussian
-from requests_cache import Path
+from pathlib import Path
 
 
 def resolve_basis(name):
@@ -87,7 +87,6 @@ def form_basissets(mol, obs_basis, cabs_basis):
 
     e_ri, v_ri = np.linalg.eigh(S_ri)
     keep_ri = e_ri > LINDEP_TOL
-    n_orth_ri = int(keep_ri.sum())
     X_ri = v_ri[:, keep_ri] / np.sqrt(e_ri[keep_ri])
 
     S_cross = X_ri.T @ S_mix.T @ X_obs
@@ -100,7 +99,7 @@ def form_basissets(mol, obs_basis, cabs_basis):
     return mol_ri, C_cabs_ao
 
 
-def form_fock(mf, mol_ri, C_cabs_ao, density_fit):
+def form_fock(mf, mol_ri, C_cabs_ao, density_fit=False):
     mol = mf.mol
     C_obs = mf.mo_coeff
     nobs = C_obs.shape[1]
@@ -325,7 +324,7 @@ def time_rel_to_dz(atomspec):
 
     mol_ri, C_cabs_ao = form_basissets(mol, OBS_BASIS, CABS_GBS)
     f, nocc = form_fock(mf, mol_ri, C_cabs_ao)
-    E_singles = form_cabs_singles(f, nocc)
+    form_cabs_singles(f, nocc)
     stop = time.time()
     elapsed = stop - start
 
