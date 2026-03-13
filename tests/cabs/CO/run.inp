@@ -1,0 +1,17 @@
+molecule mol {
+0 1
+O 0 0 0
+C 0 0 1.1
+symmetry c1
+}
+
+set {
+  basis         pcseg-0
+  cabs_basis    ../pcseg-cabs
+  freeze_core   True
+  mp2_type      conv
+  f12_beta      1.0
+  cabs_singles  True
+}
+
+energy('mp2-f12')
