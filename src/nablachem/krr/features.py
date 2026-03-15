@@ -3,6 +3,8 @@ from .deps import cmbdf, mbdf
 from . import dataset
 import qmllib.representations
 import inspect
+import warnings
+import contextlib
 
 
 class BaseRepresenter:
@@ -127,10 +129,16 @@ class MACELocal(BaseRepresenter):
         self._model = None
 
     def build(self, datasets: list[dataset.DataSet]):
-        from mace.calculators import mace_mp
 
         if self._model is None:
-            self._model = mace_mp(model="medium", device="")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from mace.calculators import mace_mp
+
+                with contextlib.redirect_stdout(None):
+                    self._model = mace_mp(
+                        model="medium", device="", default_dtype="float64"
+                    )
 
         all_mols = [mol for ds in datasets for mol in ds.molecules]
         reps = [self._model.get_descriptors(mol) for mol in all_mols]
