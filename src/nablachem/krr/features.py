@@ -124,12 +124,12 @@ class SLATMGlobal(_SLATM):
         super().__init__(local=False)
 
 
-class MACELocal(BaseRepresenter):
-    def __init__(self):
+class _MACE(BaseRepresenter):
+    def __init__(self, local: bool):
+        self._local = local
         self._model = None
 
     def build(self, datasets: list[dataset.DataSet]):
-
         if self._model is None:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -141,12 +141,64 @@ class MACELocal(BaseRepresenter):
                     )
 
         all_mols = [mol for ds in datasets for mol in ds.molecules]
-        reps = [self._model.get_descriptors(mol) for mol in all_mols]
+        if self._local:
+            reps = [self._model.get_descriptors(mol) for mol in all_mols]
+        else:
+            reps = [
+                np.sum(self._model.get_descriptors(mol), axis=0) for mol in all_mols
+            ]
 
         offset = 0
         for ds in datasets:
             ds.representations = reps[offset : offset + len(ds.molecules)]
             offset += len(ds.molecules)
+
+
+class MACEGlobal(_MACE):
+    def __init__(self):
+        super().__init__(local=False)
+
+
+class MACELocal(_MACE):
+    def __init__(self):
+        super().__init__(local=True)
+
+
+class _FCHL19(BaseRepresenter):
+    def __init__(self, local: bool):
+        self._local = local
+
+    def build(self, datasets: list[dataset.DataSet]):
+        all_mols = [mol for ds in datasets for mol in ds.molecules]
+        all_element_numbers = set()
+        for mol in all_mols:
+            all_element_numbers.update(mol.get_atomic_numbers())
+        all_element_numbers = sorted(all_element_numbers)
+        reps = []
+        for mol in all_mols:
+            rep = qmllib.representations.generate_fchl19(
+                mol.get_atomic_numbers(),
+                mol.get_positions(),
+                elements=all_element_numbers,
+            )
+            if not self._local:
+                rep = np.sum(rep, axis=0)
+            reps.append(rep)
+
+        offset = 0
+        for ds in datasets:
+            ds.representations = reps[offset : offset + len(ds.molecules)]
+            offset += len(ds.molecules)
+
+
+class FCHL19Global(_FCHL19):
+    def __init__(self):
+        super().__init__(local=False)
+
+
+class FCHL19Local(_FCHL19):
+    def __init__(self):
+        super().__init__(local=True)
 
 
 def list_available():
