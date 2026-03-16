@@ -6,6 +6,8 @@ import pytest
 from nablachem.krr.dataset import DataSet
 import nablachem.krr.features as features
 
+pytestmark = pytest.mark.isolated_process
+
 DATA_FILE = pathlib.Path(__file__).parent / "data" / "molecules.jsonl"
 
 _available = features.list_available()

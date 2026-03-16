@@ -1,10 +1,6 @@
 import numpy as np
-from .deps import cmbdf, mbdf
 from . import dataset
-import qmllib.representations
 import inspect
-import warnings
-import contextlib
 
 
 class BaseRepresenter:
@@ -12,11 +8,18 @@ class BaseRepresenter:
 
 
 class _DF(BaseRepresenter):
-    def __init__(self, local: bool, call):
+    def __init__(self, local: bool, dep: str):
         self._local = local
-        self._call = call
+        self._dep = dep
 
     def build(self, datasets: list[dataset.DataSet]):
+        if self._dep == "mbdf":
+            from .deps import mbdf
+            call = mbdf.generate_mbdf
+        else:
+            from .deps import cmbdf
+            call = cmbdf.generate_mbdf
+
         mols_charges = []
         mols_coords = []
         natoms = []
@@ -25,7 +28,7 @@ class _DF(BaseRepresenter):
                 mols_charges.append(mol.get_atomic_numbers())
                 mols_coords.append(mol.get_positions())
                 natoms.append(len(mol.get_atomic_numbers()))
-        reps = self._call(
+        reps = call(
             mols_charges, mols_coords, progress_bar=False, local=self._local
         )
 
@@ -44,22 +47,22 @@ class _DF(BaseRepresenter):
 
 class MBDFLocal(_DF):
     def __init__(self):
-        super().__init__(local=True, call=mbdf.generate_mbdf)
+        super().__init__(local=True, dep="mbdf")
 
 
 class MBDFGlobal(_DF):
     def __init__(self):
-        super().__init__(local=False, call=mbdf.generate_mbdf)
+        super().__init__(local=False, dep="mbdf")
 
 
 class cMBDFLocal(_DF):
     def __init__(self):
-        super().__init__(local=True, call=cmbdf.generate_mbdf)
+        super().__init__(local=True, dep="cmbdf")
 
 
 class cMBDFGlobal(_DF):
     def __init__(self):
-        super().__init__(local=False, call=cmbdf.generate_mbdf)
+        super().__init__(local=False, dep="cmbdf")
 
 
 class _SLATM(BaseRepresenter):
@@ -82,6 +85,7 @@ class _SLATM(BaseRepresenter):
                 mols_coords.append(coords)
                 natoms.append(len(charges))
 
+        import qmllib.representations
         # Get mbtypes for the entire dataset
         mbtypes = qmllib.representations.get_slatm_mbtypes(all_nuclear_charges)
 
@@ -131,6 +135,8 @@ class _MACE(BaseRepresenter):
 
     def build(self, datasets: list[dataset.DataSet]):
         if self._model is None:
+            import warnings
+            import contextlib
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 from mace.calculators import mace_mp
@@ -173,6 +179,7 @@ class _FCHL19(BaseRepresenter):
         all_element_numbers = set()
         for mol in all_mols:
             all_element_numbers.update(mol.get_atomic_numbers())
+        import qmllib.representations
         all_element_numbers = sorted(all_element_numbers)
         reps = []
         for mol in all_mols:
