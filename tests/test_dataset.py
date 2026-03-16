@@ -24,7 +24,7 @@ def test_molecules_are_ase_atoms(dataset):
 
 def test_molecule_sizes(dataset):
     for mol in dataset.molecules:
-        assert len(mol) == 2
+        assert len(mol) == 3
 
 
 def test_labels_single_column(dataset):
