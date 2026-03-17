@@ -75,7 +75,7 @@ class AutoKRR:
         with self.tracker.track("Learning curve"):
             for i, ntrain in enumerate(self._training_sizes):
                 length_heuristic = self._kernel_matrix.length_scale(ntrain)
-                best_parameters, best_val_rmse, best_val_mae = (
+                best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
                     self._optimize_hyperparameters(ntrain, length_heuristic)
                 )
                 best_cases[ntrain] = best_parameters
@@ -95,6 +95,8 @@ class AutoKRR:
                     "Training size completed",
                     ntrain=ntrain,
                     validation_rmse=float(best_val_rmse),
+                    eig_count=eig_count,
+                    direct_count=direct_count,
                     **improvement,
                 )
 
@@ -102,6 +104,8 @@ class AutoKRR:
                     "parameters": best_parameters,
                     "val_rmse": float(best_val_rmse),
                     "val_mae": float(best_val_mae),
+                    "eig_count": eig_count,
+                    "direct_count": direct_count,
                     **improvement,
                 }
 
@@ -137,6 +141,8 @@ class AutoKRR:
                     "val_mae": result["val_mae"],
                     "test_mae": result["test_mae"],
                     "hyperparameters": result["parameters"],
+                    "eig_count": result["eig_count"],
+                    "direct_count": result["direct_count"],
                 }
             )
 
@@ -196,13 +202,13 @@ class AutoKRR:
             self._elements_holdout = element_counts[max_training_size:]
 
     def get_hyperparameter_grid(self, ntrain: int):
-        factors = 1.5 ** np.arange(-10, 20)
-        lam_grid = 10.0 ** np.arange(-14, -1)
+        factors = 1.5 ** np.arange(0, 15)
+        lam_grid = 10.0 ** np.arange(-10, -1)
         return factors, lam_grid
 
     def validation_size(self, ntrain: int) -> int:
         # default: 20%
-        valcount = int(ntrain * 0.8)
+        valcount = int(ntrain * 0.2)
 
         # if too large, far from ntrain, if too small, noisy
         return min(valcount, 200)
@@ -210,7 +216,7 @@ class AutoKRR:
     @tracker.track
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
-    ) -> tuple[float, float, float]:
+    ) -> tuple[float, float, float, int, int]:
         # other tricks which are not used yet:
         # when shuffling, in-group shuffles (validation vs training) could be ignored
         # cholesky updates
@@ -237,23 +243,32 @@ class AutoKRR:
             trend = A @ coefs
             y -= trend
         y -= np.mean(y)
-
+        #counter
+        eig_count = 0
+        direct_count = 0
         for factor in factors:
             # get kernel matrix
             sigma = length_heuristic * factor
             K_full = self._kernel_matrix.compute_train_kernel_matrix(sigma, ntrain)
+            # kernel centering
+            K_row_mean = K_full.mean(axis=1, keepdims=True)
+            K_col_mean = K_full.mean(axis=0, keepdims=True)
+            K_mean = K_full.mean()
+            K_full = K_full - K_row_mean - K_col_mean + K_mean
 
             # choose algorithm based on condition number
             eigvals, Q = np.linalg.eigh(K_full)
-            condition_number = eigvals[-1] / eigvals[0]
+            condition_number = eigvals[-1] / eigvals[1]
             if condition_number > 1e15:
                 continue
-            if condition_number < 5e6 and ntrain > 64:
+            if condition_number < 5e8 and ntrain > 64:
                 mode = "eig"
+                eig_count += 1
             else:
                 mode = "direct"
+                direct_count += 1
             useschur = False
-            if condition_number < 1e7 and ntrain > 128:
+            if condition_number < 5e8 and ntrain > 128:
                 useschur = True
 
             for lam_idx in range(len(lam_grid)):
@@ -331,6 +346,8 @@ class AutoKRR:
                         "val_mae": split_mae,
                         "train_rmse": split_train_rmse,
                         "train_mae": split_train_mae,
+                        "eig_count": eig_count,
+                        "direct_count": direct_count,
                     }
                 )
 
@@ -348,7 +365,7 @@ class AutoKRR:
             ntrain=ntrain,
             duration=f"{opt_end - opt_start:.1f}s",
         )
-        return best_params, best_val_rmse, best_val_mae
+        return best_params, best_val_rmse, best_val_mae, eig_count, direct_count
 
     @tracker.track
     def _evaluate_models(
@@ -357,6 +374,8 @@ class AutoKRR:
     ) -> tuple[float, float]:
         models = {}
         y_tests = {}
+        train_col_means = {}
+        train_means = {}
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
@@ -377,13 +396,22 @@ class AutoKRR:
             K_train = self._kernel_matrix.compute_train_kernel_matrix(
                 params["sigma"], ntrain
             )
-            # store eigenvalues for analysis
-            w = np.linalg.eigvalsh(K_train)
+
+            # Center the training kernel
+            K_train_row_mean = K_train.mean(axis=1, keepdims=True)
+            K_train_col_mean = K_train.mean(axis=0, keepdims=True)
+            K_train_mean = K_train.mean()
+            K_train_centered = K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            # #Save means for the test kernel centering
+            train_col_means[ntrain] = K_train_col_mean
+            train_means[ntrain] = K_train_mean
+            # #store eigenvalues for analysis
+            w = np.linalg.eigvalsh(K_train_centered)
             self._archive["spectrum"] = self._archive.get("spectrum", {})
             self._archive["spectrum"][ntrain] = w.tolist()
 
             alpha = np.linalg.solve(
-                K_train + params["lambda"] * np.eye(len(y_train)), y_train
+                K_train_centered + params["lambda"] * np.eye(len(y_train)), y_train
             )
             models[ntrain] = alpha
             y_tests[ntrain] = y_test
@@ -392,6 +420,8 @@ class AutoKRR:
         # batched prediction to save memory
         for ntrain, alpha in models.items():
             params_ntrain = best_cases[ntrain]
+            K_train_col_mean = train_col_means[ntrain]
+            K_train_mean = train_means[ntrain]
             batch = 0
             while True:
                 K_test = self._kernel_matrix.compute_test_kernel_matrix(
@@ -399,7 +429,9 @@ class AutoKRR:
                 )
                 if K_test is None:
                     break
-                model_preds[ntrain].append(K_test @ alpha)
+                K_test_row_mean = K_test.mean(axis=1, keepdims=True)
+                K_test_centered = K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                model_preds[ntrain].append(K_test_centered @ alpha)
                 batch += 1
 
         for ntrain, preds in model_preds.items():
