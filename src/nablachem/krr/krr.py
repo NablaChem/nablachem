@@ -216,7 +216,7 @@ class AutoKRR:
     @tracker.track
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
-    ) -> tuple[float, float, float]:
+    ) -> tuple[float, float, float, int, int]:
         # other tricks which are not used yet:
         # when shuffling, in-group shuffles (validation vs training) could be ignored
         # cholesky updates
