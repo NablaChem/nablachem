@@ -473,13 +473,13 @@ class Q:
         number = pyparsing.Word(pyparsing.nums)
         operand = identifier | number
 
-        comparison_op = pyparsing.oneOf("< > = <= >= !=")
-        and_op = pyparsing.oneOf("and &", caseless=True)
-        or_op = pyparsing.oneOf("or |", caseless=True)
-        not_op = pyparsing.oneOf("not !", caseless=True)
-        add_op = pyparsing.oneOf("+ -")
+        comparison_op = pyparsing.one_of("< > = <= >= !=")
+        and_op = pyparsing.one_of("and &", caseless=True)
+        or_op = pyparsing.one_of("or |", caseless=True)
+        not_op = pyparsing.one_of("not !", caseless=True)
+        add_op = pyparsing.one_of("+ -")
 
-        arithmetic_expr = pyparsing.infixNotation(
+        arithmetic_expr = pyparsing.infix_notation(
             operand,
             [
                 (add_op, 2, pyparsing.opAssoc.LEFT),
@@ -490,7 +490,7 @@ class Q:
             arithmetic_expr + comparison_op + arithmetic_expr
         )
         not_expr = pyparsing.Group(not_op + comparison_expr)
-        parser = pyparsing.infixNotation(
+        parser = pyparsing.infix_notation(
             comparison_expr | not_expr,
             [
                 (not_op, 1, pyparsing.opAssoc.RIGHT),
@@ -499,7 +499,7 @@ class Q:
             ],
         )
         try:
-            return parser.parseString(query_string, parseAll=True).as_list()
+            return parser.parse_string(query_string, parse_all=True).as_list()
         except:
             raise ValueError(
                 "Cannot parse query string. Mismatched parentheses or invalid syntax?"
