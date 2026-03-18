@@ -75,6 +75,7 @@ class _LocalKernelMatrix(KernelMatrix):
         elemental: bool = False,
         nuclear_charges: np.ndarray = None,
         holdout_nuclear_charges: np.ndarray = None,
+        approx: bool = True,
     ):
         """Initialize local kernel matrix
 
@@ -126,7 +127,9 @@ class _LocalKernelMatrix(KernelMatrix):
                 self._test_self.append(d2)
                 start = end
         self._approx_fail_sigma = dict()
-        self._kernel_func.approx_prepare(train_counts, self._D2)
+        self._approx = approx
+        if approx:
+            self._kernel_func.approx_prepare(train_counts, self._D2)
 
     def length_scale(self, ntrain: int) -> float:
         # get median nearest neighbor distance for first ntrain points
@@ -163,6 +166,8 @@ class _LocalKernelMatrix(KernelMatrix):
         return Kp
 
     def compute_train_kernel_matrix(self, sigma, ntrain):
+        if not self._approx:
+            return self.compute_train_kernel_matrix_exact(sigma, ntrain)
         # approx only pays off for larger ntrain
         if ntrain <= 128:
             return self.compute_train_kernel_matrix_exact(sigma, ntrain)
@@ -189,7 +194,6 @@ class _LocalKernelMatrix(KernelMatrix):
         atom_counts_A = self._train_counts[:ntrain]
         natoms = sum(atom_counts_A)
 
-        # Compute atomic kernel between test and train
         K_atom = self._kernel_func.exact(np.sqrt(self._D2[:natoms, :natoms]) / sigma)
         K_atom_train = self.aggregate_atomic_kernel(
             K_atom, atom_counts_A, atom_counts_A
