@@ -1,9 +1,11 @@
 # %% library imports
+import time
 import jax
 import optax
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor
 
 jax.config.update("jax_enable_x64", True)
 
@@ -288,7 +290,37 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 # %%
 
 
-def _value_and_grad(ctrl, weights):
+def _pick_best_workers_for(ctrl, weights, candidates=(4, 6, 8)):
+    delta = 2
+    y_train, y_test = ctrl["get_labels"]()
+    mlo = ctrl["get_mlo"](weights, False, approx=False)
+    value = estimate_local_model_error(y_train, y_test, mlo, xTB=True)["val_rmse"]
+
+    def _probe(i):
+        weights_delta = weights.at[i].multiply(delta)
+        mlo_delta = ctrl["get_mlo"](weights_delta, False, approx=False)
+        E = estimate_local_model_error(y_train, y_test, mlo_delta, xTB=True)
+        return i, (E["val_rmse"] - value) / delta
+
+    nonzero = [i for i in range(len(weights)) if weights[i] != 0]
+    probe = nonzero[: max(4, len(nonzero) // 5)]
+    return _pick_best_workers(_probe, probe, candidates)
+
+
+def _pick_best_workers(fn, probe_indices, candidates=(4, 6, 8)):
+    best, best_t = candidates[0], float("inf")
+    for n in candidates:
+        t0 = time.perf_counter()
+        with ThreadPoolExecutor(max_workers=n) as ex:
+            list(ex.map(fn, probe_indices))
+        t = time.perf_counter() - t0
+        print(f"workers={n}: {t:.2f}s")
+        if t < best_t:
+            best, best_t = n, t
+    return best
+
+
+def _value_and_grad(ctrl, weights, n_workers=4):
     delta = 2
 
     y_train, y_test = ctrl["get_labels"]()
@@ -299,19 +331,19 @@ def _value_and_grad(ctrl, weights):
 
     grad = np.zeros_like(weights)
 
-    for i in range(len(weights)):
-        print(i, end=" -- ")
+    def _compute_grad_i(i):
         if weights[i] == 0:
-            continue
-
-        weights_delta = weights.copy()
-        weights_delta = weights_delta.at[i].multiply(delta)
-
+            return i, 0.0
+        weights_delta = weights.at[i].multiply(delta)
         mlo_delta = ctrl["get_mlo"](weights_delta, False, approx=False)
-        E_high = estimate_local_model_error(y_train, y_test, mlo_delta, xTB=True)
+        E = estimate_local_model_error(y_train, y_test, mlo_delta, xTB=True)
+        return i, (E["val_rmse"] - value) / delta
 
-        grad[i] = (E_high["val_rmse"] - value) / delta
-        print(grad[i])
+    with ThreadPoolExecutor(max_workers=n_workers) as ex:
+        for i, g in ex.map(_compute_grad_i, range(len(weights))):
+            print(i, g)
+            grad[i] = g
+
     return value, grad
 
 
@@ -362,6 +394,10 @@ class Selector:
         )
         # ---------------------------------------#
 
+        ctrl_xTB["next_chunk"]()
+        n_workers = _pick_best_workers_for(ctrl_xTB, jnp.array(params))
+        ctrl_xTB["next_chunk"]()
+
         for step in range(self.steps):
             print(f"Step {step}")
 
@@ -380,7 +416,7 @@ class Selector:
                 print("-----")
 
             ctrl_xTB["next_chunk"]()
-            v, g = _value_and_grad(ctrl_xTB, jnp.array(params))
+            v, g = _value_and_grad(ctrl_xTB, jnp.array(params), n_workers=n_workers)
 
             print(g.shape, params.shape)
             updates, opt_state = optimizer.update(jnp.array(g), opt_state, params)
@@ -409,7 +445,7 @@ class Selector:
 
 s = Selector(
     batch_size=512,
-    learning_rate=0.1,
+    learning_rate=0.05,
     steps=21,
 )
 
