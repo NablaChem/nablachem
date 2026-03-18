@@ -286,28 +286,6 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 
 
 # %%
-vqm24 = "/Users/ali/xTB_data/VQM24.jsonl.gz"
-ctrl = make_local_data_controller(vqm24, "Etot", holdout_size=512, chunk_size=512)
-
-ctrl["next_chunk"]()  # advance when YOU want
-y_train, y_test, mlo = ctrl["get_current_data"](np.ones(40), True)
-
-r1 = estimate_local_model_error(y_train, y_test, mlo, sigma=2.0)  # fixed sigma (no CV)
-
-r2 = estimate_local_model_error(y_train, y_test, mlo)  # CV (sigma=None)
-
-# keep same chunk -> call estimate again
-r3 = estimate_local_model_error(y_train, y_test, mlo, sigma=3.0)
-
-# now move to next chunk
-ctrl["next_chunk"]()
-y_train, y_test, mlo = ctrl["get_current_data"]()
-r4 = estimate_local_model_error(y_train, y_test, mlo, sigma=2.0)
-
-print(r1, r2, r3, r4)
-
-
-# %%
 
 
 def _value_and_grad(ctrl, weights):
