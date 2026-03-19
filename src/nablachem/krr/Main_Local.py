@@ -290,7 +290,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 # %%
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(4, 6, 8)):
+def _pick_best_workers_for(ctrl, weights, candidates=(3, 4, 5, 6)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
@@ -401,7 +401,7 @@ class Selector:
         for step in range(self.steps):
             print(f"Step {step}")
 
-            if step % 1 == 0:
+            if step % 5 == 0:
 
                 y_train, y_test, mlo = ctrl["get_current_data"](params, True)
                 E_high = estimate_local_model_error(
@@ -446,7 +446,7 @@ class Selector:
 s = Selector(
     batch_size=512,
     learning_rate=0.05,
-    steps=21,
+    steps=201,
 )
 
 test_errors, val_error, weight_log = s.compress()
