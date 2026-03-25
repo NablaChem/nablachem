@@ -23,6 +23,7 @@ class AutoKRR:
         maxcount: int,
         kernel_func: kernels.Kernel,
         detrend_atomic: bool = True,
+        detrend_pairs: str | None = None,
         elemental: bool = False,
     ) -> None:
         with self.tracker.track("Initialization"):
@@ -31,6 +32,7 @@ class AutoKRR:
             self.dataset = dataset
             self._training_sizes = utils.get_training_sizes(mincount, maxcount)
             self._detrend_atomic = detrend_atomic
+            self._detrend_pairs = detrend_pairs
             self._elemental = elemental
 
             self._create_holdout_split(elemental)
@@ -201,6 +203,35 @@ class AutoKRR:
             self._elements_train = element_counts[:max_training_size]
             self._elements_holdout = element_counts[max_training_size:]
 
+        if self._detrend_pairs:
+            pair_features, self._pairs_labels = self.dataset.get_pairwise_features(
+                self._detrend_pairs
+            )
+            self._pairs_train = pair_features[:max_training_size]
+            self._pairs_holdout = pair_features[max_training_size:]
+
+    def _detrend_matrix(self, is_train: bool, n: int | None = None) -> np.ndarray | None:
+        """Build joint detrending design matrix from active detrending modes.
+
+        Args:
+            is_train: True for training split, False for holdout.
+            n: Number of training samples to use (only used when is_train=True).
+
+        Returns:
+            Design matrix of shape (n_molecules, n_features), or None if no
+            detrending is active.
+        """
+        parts = []
+        if self._detrend_atomic:
+            A = self._elements_train[:n] if is_train else self._elements_holdout
+            parts.append(A)
+        if self._detrend_pairs:
+            P = self._pairs_train[:n] if is_train else self._pairs_holdout
+            parts.append(P)
+        if not parts:
+            return None
+        return np.hstack(parts)
+
     def get_hyperparameter_grid(self, ntrain: int):
         factors = 1.5 ** np.arange(0, 15)
         lam_grid = 10.0 ** np.arange(-10, -1)
@@ -232,16 +263,21 @@ class AutoKRR:
         idx = np.arange(ntrain)
 
         y = self._y_train[:ntrain].copy()
-        if self._detrend_atomic:
-            A = self._elements_train[:ntrain]
+        A = self._detrend_matrix(is_train=True, n=ntrain)
+        if A is not None:
             coefs = linalg.lstsq(A, y)[0]
-            mapping = {
-                utils.Z_to_element_symbol(Z): float(c)
-                for Z, c in zip(self._elements_Z, coefs)
-            }
-            utils.info("Atomic detrending coefficients", **mapping)
-            trend = A @ coefs
-            y -= trend
+            if self._detrend_atomic:
+                n_atomic = len(self._elements_Z)
+                mapping = {
+                    utils.Z_to_element_symbol(Z): float(c)
+                    for Z, c in zip(self._elements_Z, coefs[:n_atomic])
+                }
+                utils.info("Atomic detrending coefficients", **mapping)
+            if self._detrend_pairs:
+                n_atomic = len(self._elements_Z) if self._detrend_atomic else 0
+                for label, coef in zip(self._pairs_labels, coefs[n_atomic:]):
+                    utils.info("Pairwise detrending coefficient", label=label, coef=float(coef))
+            y -= A @ coefs
         y -= np.mean(y)
         #counter
         eig_count = 0
@@ -379,15 +415,11 @@ class AutoKRR:
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
-            if self._detrend_atomic:
-                A = self._elements_train[:ntrain]
-                coefs = linalg.lstsq(A, y_train)[0]
-                trend_train = A @ coefs
-                y_train -= trend_train
-
-                A_test = self._elements_holdout
-                trend_test = A_test @ coefs
-                y_test -= trend_test
+            A_train = self._detrend_matrix(is_train=True, n=ntrain)
+            if A_train is not None:
+                coefs = linalg.lstsq(A_train, y_train)[0]
+                y_train -= A_train @ coefs
+                y_test -= self._detrend_matrix(is_train=False) @ coefs
 
             shift = np.mean(y_train)
             y_train -= shift
@@ -454,14 +486,11 @@ class AutoKRR:
         """
         y_train = self._y_train.copy()
         y_holdout = self._y_holdout.copy()
-        if self._detrend_atomic:
-            A = self._elements_train
-            coefs = linalg.lstsq(A, y_train)[0]
-            trend = A @ coefs
-            y_train -= trend
-            A_holdout = self._elements_holdout
-            trend_holdout = A_holdout @ coefs
-            y_holdout -= trend_holdout
+        A_train = self._detrend_matrix(is_train=True)
+        if A_train is not None:
+            coefs = linalg.lstsq(A_train, y_train)[0]
+            y_train -= A_train @ coefs
+            y_holdout -= self._detrend_matrix(is_train=False) @ coefs
 
         mean_prediction = np.mean(y_train)
 

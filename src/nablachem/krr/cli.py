@@ -55,6 +55,12 @@ and the remaining molecules used as holdout/test data.
     help="Enable/disable atomic count detrending (default: enabled)",
 )
 @click.option(
+    "--detrend-pairs",
+    default=None,
+    type=str,
+    help="Pairwise detrending functional form label (e.g. 'gCP'). Disabled by default.",
+)
+@click.option(
     "--holdout-residuals",
     default=None,
     help="Output JSONL file path for holdout residuals",
@@ -80,6 +86,7 @@ def main(
     maxcount,
     select,
     detrend_atomic,
+    detrend_pairs,
     elemental,
     holdout_residuals,
     track,
@@ -137,6 +144,7 @@ def main(
         mincount,
         maxcount,
         detrend_atomic=detrend_atomic,
+        detrend_pairs=detrend_pairs,
         kernel_func=kernel_func,
         elemental=elemental,
     )
@@ -144,6 +152,7 @@ def main(
         "representation": representation_name,
         "kernel": kernel_name,
         "detrend_atomic": detrend_atomic,
+        "detrend_pairs": detrend_pairs,
         "file_hash": hash,
         "file_path": jsonl_path,
         "column_name": column_name,

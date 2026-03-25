@@ -146,6 +146,42 @@ class DataSet:
 
         return element_counts, unique_atomic_numbers
 
+    def get_pairwise_features(self, label: str):
+        """Return pairwise feature matrix for all molecules.
+
+        Each entry is the sum over all unique atom pairs (i<j) of a
+        pairwise function f(Z_i, Z_j, d_ij).
+
+        Args:
+            label: Name of pairwise feature. Currently supported: "gCP"
+                   (Z_i^2.5 * Z_j^2.5 * exp(-3 * d_ij), inspired by geometric
+                   counterpoise correction).
+
+        Returns:
+            np.ndarray: Matrix of shape (N, 1) with per-molecule sums.
+            list[str]: Feature names.
+        """
+        _SUPPORTED = ["gCP"]
+        if label not in _SUPPORTED:
+            error(
+                "Unknown pairwise detrending label",
+                label=label,
+                available=_SUPPORTED,
+            )
+
+        features = np.zeros((len(self.molecules), 1))
+        for mol_idx, mol in enumerate(self.molecules):
+            Z = mol.get_atomic_numbers()
+            pos = mol.get_positions()
+            n = len(Z)
+            i_idx, j_idx = np.triu_indices(n, k=1)
+            diffs = pos[i_idx] - pos[j_idx]
+            dists = np.linalg.norm(diffs, axis=1)
+            features[mol_idx, 0] = np.sum(
+                Z[i_idx] ** 2.5 * Z[j_idx] ** 2.5 * np.exp(-3 * dists)
+            )
+        return features, [label]
+
     @staticmethod
     def _parse_xyz_counts(xyz: str) -> dict:
         import ase.data
