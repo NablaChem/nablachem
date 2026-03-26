@@ -6,6 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 
 jax.config.update("jax_enable_x64", True)
 
@@ -13,15 +14,30 @@ jax.config.update("jax_enable_x64", True)
 
 
 def make_local_data_controller(
-    path, prop, holdout_size, chunk_size, limit=12000, rep="cMBDFLocal", label_scale=1.0
+    path,
+    prop,
+    holdout_size,
+    chunk_size,
+    limit=12000,
+    rep="cMBDFLocal",
+    label_scale=1.0,
+    kernel="elemental",
 ):
     import numpy as np
     from nablachem.krr import krr
     from nablachem.krr import dataset
     from nablachem.krr import features
-    from nablachem.krr.matrix import ElementalKernelMatrix
+    from nablachem.krr.matrix import ElementalKernelMatrix, LocalKernelMatrix
     from nablachem.krr.kernels import Gaussian
     from scipy import linalg
+
+    _kernel_classes = {
+        "elemental": ElementalKernelMatrix,
+        "local": LocalKernelMatrix,
+    }
+    if kernel not in _kernel_classes:
+        raise ValueError(f"kernel must be one of {list(_kernel_classes.keys())}")
+    KernelMatrixClass = _kernel_classes[kernel]
 
     class LocalMatrixOnly(krr.AutoKRR):
         def __init__(
@@ -54,15 +70,18 @@ def make_local_data_controller(
                 self._X_holdout = None
                 holdout_nuclear_charges = None
 
-            self._kernel_matrix = ElementalKernelMatrix(
+            kwargs = dict(approx=approx)
+            if kernel == "elemental":
+                kwargs["nuclear_charges"] = train_nuclear_charges
+                kwargs["holdout_nuclear_charges"] = holdout_nuclear_charges
+
+            self._kernel_matrix = KernelMatrixClass(
                 self._X_train,
                 self._train_counts,
                 Gaussian(),
                 self._X_holdout,
                 self._holdout_counts,
-                nuclear_charges=train_nuclear_charges,
-                holdout_nuclear_charges=holdout_nuclear_charges,
-                approx=approx,
+                **kwargs,
             )
 
         def ktrain(self, sigma):
@@ -235,7 +254,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
         test_rmse = np.nan
         test_mae = np.nan
 
-    lam = 1e-12
+    lam = 1e-7
     rng = np.random.default_rng(seed)
 
     if sigma is not None:
@@ -290,7 +309,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 # %%
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(3, 4, 5, 6)):
+def _pick_best_workers_for(ctrl, weights, candidates=(2, 3, 4, 5)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
@@ -340,9 +359,14 @@ def _value_and_grad(ctrl, weights, n_workers=4):
         return i, (E["val_rmse"] - value) / delta
 
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
-        for i, g in ex.map(_compute_grad_i, range(len(weights))):
-            print(i, g)
+        pbar = tqdm(
+            ex.map(_compute_grad_i, range(len(weights))),
+            total=len(weights),
+            desc="grad",
+        )
+        for i, g in pbar:
             grad[i] = g
+            pbar.set_postfix(i=i, g=f"{g:.4f}")
 
     return value, grad
 
@@ -353,135 +377,293 @@ class Selector:
         batch_size: int,
         learning_rate: float,
         steps: int,
+        n_runs: int = 5,
     ):
-
         self.lr = learning_rate
         self.batch_size = batch_size
         self.steps = steps
+        self.n_runs = n_runs
         self.value_log = []
         self.rmse_steps = []
         self.weight_log = []
         self.better_val_errors = []
         self.better_test_errors = []
 
-    def compress(self):
+    def _run_once(self, n_workers):
+        path = "/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz"
 
         params = jnp.ones(40)
         optimizer = optax.adam(self.lr)
         opt_state = optimizer.init(params)
 
-        # ---------------------------------------#
-        path = "/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz"
         ctrl = make_local_data_controller(
             path,
             "Etot",
-            holdout_size=100,
+            holdout_size=512,
             chunk_size=512,
-            limit=512 + 100,
+            limit=512 + 512,
             rep="cMBDFLocal",
             label_scale=627.509474,
+            kernel="elemental",
         )
         ctrl["next_chunk"]()
-        # ---------------------------------------#
+
         ctrl_xTB = make_local_data_controller(
             path,
             "xtb_E_total",
-            holdout_size=100,
-            chunk_size=512,
-            limit=(512 * self.steps),
+            holdout_size=1,
+            chunk_size=640,
+            limit=(640 * self.steps),
             rep="cMBDFLocal",
             label_scale=627.509474,
+            kernel="elemental",
         )
-        # ---------------------------------------#
-
-        ctrl_xTB["next_chunk"]()
-        n_workers = _pick_best_workers_for(ctrl_xTB, jnp.array(params))
         ctrl_xTB["next_chunk"]()
 
-        for step in range(self.steps):
-            print(f"Step {step}")
+        test_errors, val_errors, weight_log, value_log, rmse_steps = [], [], [], [], []
+
+        zero_threshold = 0.0
+        plateau_window = 300
+        _window_count = 0
+        _prev_active_dims = None
+        active_dims = len(params)
+
+        pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
+        for step in pbar:
 
             if step % 5 == 0:
-
                 y_train, y_test, mlo = ctrl["get_current_data"](params, True)
                 E_high = estimate_local_model_error(
                     y_train, y_test, mlo, sigma=None, xTB=False
                 )
-
-                self.rmse_steps.append(step)
-                self.better_val_errors.append(E_high["val_rmse"])
-                self.better_test_errors.append(E_high["test_rmse"])
-                print(f"test_rmse: {E_high['test_rmse']}")
-                print(f"val error: {E_high['val_rmse']}")
-                print("-----")
+                active_dims = int((np.array(params) > 0.001).sum())
+                rmse_steps.append(step)
+                val_errors.append(E_high["val_rmse"])
+                test_errors.append(E_high["test_rmse"])
+                tqdm.write(
+                    f"  step {step:>4d} │ test RMSE {E_high['test_rmse']:.4f}"
+                    f"  val RMSE {E_high['val_rmse']:.4f}"
+                    f"  test MAE {E_high['test_mae']:.4f}"
+                    f"  dims {active_dims}  zero_thr {zero_threshold:.4f}"
+                )
+                pbar.set_postfix(
+                    test=f"{E_high['test_rmse']:.4f}",
+                    val=f"{E_high['val_rmse']:.4f}",
+                    dims=active_dims,
+                )
 
             ctrl_xTB["next_chunk"]()
             v, g = _value_and_grad(ctrl_xTB, jnp.array(params), n_workers=n_workers)
 
-            print(g.shape, params.shape)
+            _window_count += 1
+            if _window_count == plateau_window:
+                if (
+                    _prev_active_dims is not None
+                    and abs(active_dims - _prev_active_dims) <= 3
+                ):
+                    nonzero = np.array(params)[np.array(params) > 0]
+                    if len(nonzero) > 0:
+                        zero_threshold = float(np.percentile(nonzero, 0.1))
+                        tqdm.write(
+                            f"  [plateau] step {step} — active dims change"
+                            f" {abs(active_dims - _prev_active_dims)} <= 3"
+                            f" → zero_threshold = {zero_threshold:.4f}"
+                        )
+                _prev_active_dims = active_dims
+                _window_count = 0
+
             updates, opt_state = optimizer.update(jnp.array(g), opt_state, params)
             params = optax.apply_updates(params, updates)
 
-            if sum(params < 0.01) > 5:
-                params = params.at[params < 0.01].set(0)
+            if zero_threshold > 0:
+                params = params.at[params < zero_threshold].set(0)
 
-            self.weight_log.append(params)
-            self.value_log.append(v)
+            weight_log.append(params)
+            value_log.append(v)
+
+        return test_errors, val_errors, weight_log, value_log, rmse_steps
+
+    def compress(self):
+        path = "/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz"
+
+        ctrl_xTB_probe = make_local_data_controller(
+            path,
+            "xtb_E_total",
+            holdout_size=1,
+            chunk_size=512,
+            limit=512 * 10,
+            rep="cMBDFLocal",
+            label_scale=627.509474,
+            kernel="elemental",
+        )
+        ctrl_xTB_probe["next_chunk"]()
+        n_workers = _pick_best_workers_for(ctrl_xTB_probe, jnp.ones(40))
+
+        all_test_errors, all_val_errors, all_weight_logs, all_value_logs = (
+            [],
+            [],
+            [],
+            [],
+        )
+        rmse_steps = None
+
+        for run in range(self.n_runs):
+            print(f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}\n{'='*40}")
+            t_err, v_err, w_log, val_log, steps = self._run_once(n_workers)
+            all_test_errors.append(np.array(t_err))
+            all_val_errors.append(np.array(v_err))
+            all_weight_logs.append(w_log)
+            all_value_logs.append(np.array(val_log))
+            if rmse_steps is None:
+                rmse_steps = steps
+
+        self.rmse_steps = rmse_steps
+        self.better_test_errors = np.mean(all_test_errors, axis=0).tolist()
+        self.better_val_errors = np.mean(all_val_errors, axis=0).tolist()
+        self.value_log = np.mean(all_value_logs, axis=0).tolist()
+        self.weight_log = [
+            np.mean(
+                [np.array(all_weight_logs[r][i]) for r in range(self.n_runs)], axis=0
+            )
+            for i in range(len(all_weight_logs[0]))
+        ]
 
         return (self.better_test_errors, self.better_val_errors, self.weight_log)
 
-    def plot_logs(self):
-        f, axs = plt.subplots(3, 1, figsize=(5, 10), sharex=True)
-        axs[0].plot(self.weight_log)
-        axs[0].set_title("Weight Log")
-        axs[1].semilogy(
-            np.cumsum(self.value_log) / (np.arange(len(self.value_log)) + 1)
+    def plot_combined(self, dataset_name="", representer_name=""):
+        steps = np.array(self.rmse_steps)
+        test = np.array(self.better_test_errors)
+        val = np.array(self.better_val_errors)
+        weight_arr = np.array([np.array(w) for w in self.weight_log])
+        instant = np.array(self.value_log)
+        running_avg = np.cumsum(instant) / (np.arange(len(instant)) + 1)
+        n_dims = [(np.array(x) > 0.001).sum() for x in self.weight_log]
+
+        fig = plt.figure(figsize=(18, 10))
+        gs = fig.add_gridspec(3, 2, width_ratios=[2, 1], hspace=0.45, wspace=0.3)
+        ax_main = fig.add_subplot(gs[:, 0])
+        ax_w = fig.add_subplot(gs[0, 1])
+        ax_v = fig.add_subplot(gs[1, 1])
+        ax_d = fig.add_subplot(gs[2, 1])
+
+        header = " | ".join(filter(None, [dataset_name, representer_name]))
+        if header:
+            fig.suptitle(header, fontsize=14, fontweight="bold")
+
+        ref_test = test[0]
+        ref_val = val[0]
+        improvement_test = (ref_test - test) / ref_test * 100
+        improvement_val = (ref_val - val) / ref_val * 100
+
+        ax_main.plot(
+            steps,
+            improvement_test,
+            marker="o",
+            color="C0",
+            label=f"Test RMSE  ({self.n_runs} runs avg)",
         )
-        axs[1].set_title("xTB val error Log")
-        axs[2].set_title("Number of dimensions")
-        axs[2].semilogy([(x > 0.1).sum() for x in self.weight_log])
-        plt.xlabel("Steps")
+        ax_main.plot(
+            steps,
+            improvement_val,
+            marker="o",
+            color="C0",
+            linestyle="--",
+            alpha=0.5,
+            label=f"Val RMSE  ({self.n_runs} runs avg)",
+        )
+        for x, y in zip(steps, improvement_test):
+            ax_main.annotate(
+                f"{y:.1f}%",
+                xy=(x, y),
+                xytext=(0, 8),
+                textcoords="offset points",
+                ha="center",
+                fontsize=9,
+                color="C0",
+            )
+        ax_main.set_xlabel("Compression Step", fontsize=12)
+        ax_main.set_ylabel("RMSE Improvement (%)", fontsize=12)
+        ax_main.set_ylim(25, 0)
+        ax_main.set_title("High Quality RMSE vs Compression Steps", fontsize=12)
+        ax_main.grid(True, alpha=0.4)
+        ax_main.legend(
+            fontsize=9,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.98),
+            ncol=2,
+            framealpha=0.9,
+            borderaxespad=0,
+        )
+
+        ax_w.plot(weight_arr, alpha=0.2, linewidth=0.5, color="steelblue")
+        ax_w.set_title("Feature Weights")
+        ax_w.set_ylabel("Weight")
+        ax_w.set_xlabel("Step")
+        ax_w.grid(True, alpha=0.3)
+
+        ax_v.semilogy(running_avg, color="C1", linewidth=1.5, label="running avg")
+        ax_v.set_title("Low Quality Val Error")
+        ax_v.set_ylabel("RMSE (log scale)")
+        ax_v.set_xlabel("Step")
+        ax_v.legend(fontsize=8)
+        ax_v.grid(True, alpha=0.3)
+
+        ax_d.semilogy(n_dims, color="C2")
+        ax_d.set_title("Active Dimensions")
+        ax_d.set_ylabel("Count (log scale)")
+        ax_d.set_xlabel("Step")
+        ax_d.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.show()
 
 
 s = Selector(
     batch_size=512,
     learning_rate=0.05,
-    steps=201,
+    steps=101,
+    n_runs=1,
 )
 
-test_errors, val_error, weight_log = s.compress()
-s.plot_logs()
+test_errors, val_errors, weight_log = s.compress()
+s.plot_combined(dataset_name="QM9", representer_name="cMBDFLocal")
 
-test = np.array(test_errors)
-val = np.array(val_error)
 
-plt.figure(figsize=(10, 8))
-plt.plot(
-    np.arange(0, len(test)),
-    test,
-    marker="o",
-    label="Test RMSE",
+# %% Plot — re-run this cell freely without re-computing
+
+steps = np.array(s.rmse_steps)
+test = np.array(s.better_test_errors)
+val = np.array(s.better_val_errors)
+
+fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+
+ref = test[0]
+improvement = (ref - test) / ref * 100
+ax.plot(steps, improvement, marker="o", color="C0", label="cMBDFLocal")
+for i, (x, y) in enumerate(zip(steps, improvement)):
+    ax.annotate(
+        f"{y:.1f}%",
+        xy=(x, y),
+        xytext=(0, 8),
+        textcoords="offset points",
+        ha="center",
+        fontsize=7,
+        color="C0",
+    )
+
+ax.set_title("QM9", fontsize=13)
+ax.set_xlabel("Compression Step", fontsize=11)
+ax.set_ylabel("RMSE Improvement (%)", fontsize=11)
+ax.set_ylim(25, -10)
+ax.legend(fontsize=9)
+ax.grid(True, alpha=0.4)
+
+fig.suptitle(
+    "High-Quality RMSE vs Compression Steps — QM9 | cMBDFLocal",
+    fontsize=14,
+    fontweight="bold",
 )
-
-plt.plot(
-    np.arange(0, len(val)),
-    val,
-    marker="s",
-    label="Validation RMSE",
-)
-
-
-plt.axhline(
-    test_errors[0],
-    color="red",
-    linestyle="--",
-    label="Full Feature Set RMSE",
-)
-plt.xlabel("steps")
-plt.ylabel("B3LYP RMSE")
-plt.title("B3LYP RMSE vs steps")
-plt.grid(True)
-plt.legend()
+plt.tight_layout()
 plt.show()
 
 
