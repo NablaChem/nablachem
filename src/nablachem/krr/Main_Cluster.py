@@ -10,6 +10,7 @@ import psutil, os
 
 jax.config.update("jax_enable_x64", True)
 
+
 def _ram(label=""):
     proc = psutil.Process(os.getpid())
     used = proc.memory_info().rss / 1e9
@@ -306,7 +307,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
     }
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(2, 3, 4, 5)):
+def _pick_best_workers_for(ctrl, weights, candidates=(10, 11)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
