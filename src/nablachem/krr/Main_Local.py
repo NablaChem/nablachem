@@ -309,7 +309,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 # %%
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(2, 3, 4, 5)):
+def _pick_best_workers_for(ctrl, weights, candidates=(2, 3, 4)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
@@ -423,7 +423,7 @@ class Selector:
         test_errors, val_errors, weight_log, value_log, rmse_steps = [], [], [], [], []
 
         zero_threshold = 0.0
-        plateau_window = 300
+        plateau_window = 15
         _window_count = 0
         _prev_active_dims = None
         active_dims = len(params)
@@ -431,7 +431,7 @@ class Selector:
         pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
         for step in pbar:
 
-            if step % 5 == 0:
+            if step % 3 == 0:
                 y_train, y_test, mlo = ctrl["get_current_data"](params, True)
                 E_high = estimate_local_model_error(
                     y_train, y_test, mlo, sigma=None, xTB=False
@@ -459,11 +459,11 @@ class Selector:
             if _window_count == plateau_window:
                 if (
                     _prev_active_dims is not None
-                    and abs(active_dims - _prev_active_dims) <= 3
+                    and abs(active_dims - _prev_active_dims) <= 2
                 ):
                     nonzero = np.array(params)[np.array(params) > 0]
                     if len(nonzero) > 0:
-                        zero_threshold = float(np.percentile(nonzero, 0.1))
+                        zero_threshold = float(np.percentile(nonzero, 1))
                         tqdm.write(
                             f"  [plateau] step {step} — active dims change"
                             f" {abs(active_dims - _prev_active_dims)} <= 3"
@@ -518,17 +518,12 @@ class Selector:
                 rmse_steps = steps
 
         self.rmse_steps = rmse_steps
-        self.better_test_errors = np.mean(all_test_errors, axis=0).tolist()
-        self.better_val_errors = np.mean(all_val_errors, axis=0).tolist()
-        self.value_log = np.mean(all_value_logs, axis=0).tolist()
-        self.weight_log = [
-            np.mean(
-                [np.array(all_weight_logs[r][i]) for r in range(self.n_runs)], axis=0
-            )
-            for i in range(len(all_weight_logs[0]))
-        ]
+        self.all_test_errors = all_test_errors
+        self.all_val_errors = all_val_errors
+        self.all_weight_logs = all_weight_logs
+        self.all_value_logs = all_value_logs
 
-        return (self.better_test_errors, self.better_val_errors, self.weight_log)
+        return (all_test_errors, all_val_errors, all_weight_logs)
 
     def plot_combined(self, dataset_name="", representer_name=""):
         steps = np.array(self.rmse_steps)
@@ -621,8 +616,8 @@ class Selector:
 s = Selector(
     batch_size=512,
     learning_rate=0.05,
-    steps=101,
-    n_runs=1,
+    steps=43,
+    n_runs=5,
 )
 
 test_errors, val_errors, weight_log = s.compress()
@@ -632,8 +627,8 @@ s.plot_combined(dataset_name="QM9", representer_name="cMBDFLocal")
 # %% Plot — re-run this cell freely without re-computing
 
 steps = np.array(s.rmse_steps)
-test = np.array(s.better_test_errors)
-val = np.array(s.better_val_errors)
+test = np.median(s.all_test_errors, axis=0)
+val = np.median(s.all_val_errors, axis=0)
 
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
@@ -654,7 +649,7 @@ for i, (x, y) in enumerate(zip(steps, improvement)):
 ax.set_title("QM9", fontsize=13)
 ax.set_xlabel("Compression Step", fontsize=11)
 ax.set_ylabel("RMSE Improvement (%)", fontsize=11)
-ax.set_ylim(25, -10)
+ax.set_ylim(30, -10)
 ax.legend(fontsize=9)
 ax.grid(True, alpha=0.4)
 

@@ -139,9 +139,9 @@ def make_local_data_controller(
 
     if n_pool == 0:
         raise ValueError("No training data left after reserving holdout.")
-    if chunk_size > n_pool:
+    if chunk_size >= n_pool:
         raise ValueError(
-            f"chunk_size={chunk_size} cannot exceed training pool size={n_pool}"
+            f"chunk_size={chunk_size} must be less than training pool size={n_pool}"
         )
 
     X_holdout = X[holdout_idx]
@@ -307,7 +307,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
     }
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(10, 11)):
+def _pick_best_workers_for(ctrl, weights, candidates=(30, 31)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
@@ -372,17 +372,20 @@ def _value_and_grad(ctrl, weights, n_workers=4):
 class Selector:
     def __init__(
         self,
-        batch_size: int,
         learning_rate: float,
         steps: int,
         n_runs: int = 5,
+        hq_chunk_size: int = 1024,
+        lq_chunk_size: int = 1024,
     ):
         self.lr = learning_rate
-        self.batch_size = batch_size
         self.steps = steps
         self.n_runs = n_runs
+        self.hq_chunk_size = hq_chunk_size
+        self.lq_chunk_size = lq_chunk_size
 
-    def _run_once(self, n_workers, path):
+    def _run_once(self, n_workers, path, seed=0):
+        np.random.seed(seed)
         params = jnp.ones(40)
         optimizer = optax.adam(self.lr)
         opt_state = optimizer.init(params)
@@ -390,9 +393,9 @@ class Selector:
         ctrl = make_local_data_controller(
             path,
             "Etot",
-            holdout_size=512,
-            chunk_size=512,
-            limit=512 + 512,
+            holdout_size=self.hq_chunk_size,
+            chunk_size=self.hq_chunk_size,
+            limit=self.hq_chunk_size * 10 + self.hq_chunk_size,
             rep="cMBDFLocal",
             label_scale=627.509474,
             kernel="elemental",
@@ -403,8 +406,8 @@ class Selector:
             path,
             "xtb_E_total",
             holdout_size=1,
-            chunk_size=640,
-            limit=(640 * min(self.steps, 10)),
+            chunk_size=self.lq_chunk_size,
+            limit=self.lq_chunk_size * self.steps,
             rep="cMBDFLocal",
             label_scale=627.509474,
             kernel="elemental",
@@ -481,8 +484,8 @@ class Selector:
             path,
             "xtb_E_total",
             holdout_size=1,
-            chunk_size=512,
-            limit=512 * 10,
+            chunk_size=self.lq_chunk_size,
+            limit=self.lq_chunk_size * 10,
             rep="cMBDFLocal",
             label_scale=627.509474,
             kernel="elemental",
@@ -498,9 +501,14 @@ class Selector:
         )
         rmse_steps = None
 
+        seeds = [1, 2, 3, 4, 5]
         for run in range(self.n_runs):
-            print(f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}\n{'='*40}")
-            t_err, v_err, w_log, val_log, steps = self._run_once(n_workers, path)
+            print(
+                f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}  (seed={seeds[run]})\n{'='*40}"
+            )
+            t_err, v_err, w_log, val_log, steps = self._run_once(
+                n_workers, path, seed=seeds[run]
+            )
             all_test_errors.append(np.array(t_err))
             all_val_errors.append(np.array(v_err))
             all_weight_logs.append(w_log)
@@ -522,12 +530,12 @@ class Selector:
                     for r in range(self.n_runs)
                 ]
             ),
-            "mean_test_errors": np.mean(all_test_errors, axis=0),
-            "mean_val_errors": np.mean(all_val_errors, axis=0),
-            "mean_value_log": np.mean(all_value_logs, axis=0),
+            "mean_test_errors": np.median(all_test_errors, axis=0),
+            "mean_val_errors": np.median(all_val_errors, axis=0),
+            "mean_value_log": np.median(all_value_logs, axis=0),
             "mean_weight_log": np.array(
                 [
-                    np.mean(
+                    np.median(
                         [np.array(all_weight_logs[r][i]) for r in range(self.n_runs)],
                         axis=0,
                     )
@@ -572,12 +580,15 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, default=101)
     parser.add_argument("--n-runs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=0.05)
+    parser.add_argument("--hq-chunk-size", type=int, default=1024)
+    parser.add_argument("--lq-chunk-size", type=int, default=1024)
     args = parser.parse_args()
 
     s = Selector(
-        batch_size=512,
         learning_rate=args.lr,
         steps=args.steps,
         n_runs=args.n_runs,
+        hq_chunk_size=args.hq_chunk_size,
+        lq_chunk_size=args.lq_chunk_size,
     )
     s.compress(path=args.data, output_path=args.output)
