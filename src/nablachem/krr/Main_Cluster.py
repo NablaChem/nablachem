@@ -10,6 +10,10 @@ import psutil, os
 
 jax.config.update("jax_enable_x64", True)
 
+_xtb_default_hyperparams = (
+    None  # (best_sigma, best_lam) cached after first xTB optimisation
+)
+
 
 def _ram(label=""):
     proc = psutil.Process(os.getpid())
@@ -249,21 +253,29 @@ def make_local_data_controller(
 
 
 def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=False):
+    global _xtb_default_hyperparams
 
-    if xTB == False:
-        sigmas_grid = 1.5 ** np.arange(-10, 20)
-    else:
-        sigmas_grid = [2]
-        test_rmse = np.nan
-        test_mae = np.nan
+    sigmas = 1.5 ** np.arange(0, 15)
+    lams = 10.0 ** np.arange(-10, -1)
 
-    lam = 1e-7
     rng = np.random.default_rng(seed)
+    test_rmse = np.nan
+    test_mae = np.nan
 
+    # Determine whether to run grid search or use cached/provided hyperparams
     if sigma is not None:
         best_sigma = float(sigma)
+        best_lam = lams[len(lams) // 2]  # fallback mid-point if only sigma given
         best_rmse = np.nan
+        run_grid = False
+    elif xTB and _xtb_default_hyperparams is not None:
+        best_sigma, best_lam = _xtb_default_hyperparams
+        best_rmse = np.nan
+        run_grid = False
     else:
+        run_grid = True
+
+    if run_grid:
         n = len(y_train)
         perm = rng.permutation(n)
         n_val = max(1, int(round(0.2 * n)))
@@ -274,26 +286,32 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
         y_val = y_train[val_idx]
 
         best_sigma = None
+        best_lam = None
         best_rmse = np.inf
 
-        for s in sigmas_grid:
+        for s in sigmas:
             K_full = mlo.ktrain(sigma=float(s))
             K_tr_tr = K_full[np.ix_(tr_idx, tr_idx)]
             K_val_tr = K_full[np.ix_(val_idx, tr_idx)]
 
-            alpha = np.linalg.solve(K_tr_tr + lam * np.eye(len(tr_idx)), y_tr)
-            pred_val = K_val_tr @ alpha
-            rmse_val = np.sqrt(np.mean((pred_val - y_val) ** 2))
+            for lam in lams:
+                alpha = np.linalg.solve(K_tr_tr + lam * np.eye(len(tr_idx)), y_tr)
+                pred_val = K_val_tr @ alpha
+                rmse_val = np.sqrt(np.mean((pred_val - y_val) ** 2))
 
-            if rmse_val < best_rmse:
-                best_rmse = rmse_val
-                best_sigma = float(s)
+                if rmse_val < best_rmse:
+                    best_rmse = rmse_val
+                    best_sigma = float(s)
+                    best_lam = float(lam)
+
+        if xTB:
+            _xtb_default_hyperparams = (best_sigma, best_lam)
 
     K_train = mlo.ktrain(sigma=best_sigma)
-    if xTB == False:
+    if not xTB:
         K_test = mlo.ktest(sigma=best_sigma)
 
-        alpha = np.linalg.solve(K_train + lam * np.eye(K_train.shape[0]), y_train)
+        alpha = np.linalg.solve(K_train + best_lam * np.eye(K_train.shape[0]), y_train)
         pred = K_test @ alpha
 
         test_rmse = np.sqrt(np.mean((pred - y_test) ** 2))
@@ -301,6 +319,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 
     return {
         "best_sigma": best_sigma,
+        "best_lam": best_lam,
         "val_rmse": best_rmse,
         "test_rmse": test_rmse,
         "test_mae": test_mae,
