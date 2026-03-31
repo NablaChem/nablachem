@@ -377,12 +377,14 @@ class Selector:
         n_runs: int = 5,
         hq_chunk_size: int = 1024,
         lq_chunk_size: int = 1024,
+        rep: str = "cMBDFLocal",
     ):
         self.lr = learning_rate
         self.steps = steps
         self.n_runs = n_runs
         self.hq_chunk_size = hq_chunk_size
         self.lq_chunk_size = lq_chunk_size
+        self.rep = rep
 
     def _run_once(self, n_workers, path, seed=0):
         np.random.seed(seed)
@@ -396,7 +398,7 @@ class Selector:
             holdout_size=self.hq_chunk_size,
             chunk_size=self.hq_chunk_size,
             limit=self.hq_chunk_size * 10 + self.hq_chunk_size,
-            rep="cMBDFLocal",
+            rep=self.rep,
             label_scale=627.509474,
             kernel="elemental",
         )
@@ -408,7 +410,7 @@ class Selector:
             holdout_size=1,
             chunk_size=self.lq_chunk_size,
             limit=self.lq_chunk_size * self.steps,
-            rep="cMBDFLocal",
+            rep=self.rep,
             label_scale=627.509474,
             kernel="elemental",
         )
@@ -486,7 +488,7 @@ class Selector:
             holdout_size=1,
             chunk_size=self.lq_chunk_size,
             limit=self.lq_chunk_size * 10,
-            rep="cMBDFLocal",
+            rep=self.rep,
             label_scale=627.509474,
             kernel="elemental",
         )
@@ -582,6 +584,11 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.05)
     parser.add_argument("--hq-chunk-size", type=int, default=1024)
     parser.add_argument("--lq-chunk-size", type=int, default=1024)
+    parser.add_argument(
+        "--rep",
+        default="cMBDFLocal",
+        choices=["MBDFLocal", "cMBDFLocal", "SLATMLocal", "MACELocal", "FCHL19Local"],
+    )
     args = parser.parse_args()
 
     s = Selector(
@@ -590,5 +597,6 @@ if __name__ == "__main__":
         n_runs=args.n_runs,
         hq_chunk_size=args.hq_chunk_size,
         lq_chunk_size=args.lq_chunk_size,
+        rep=args.rep,
     )
     s.compress(path=args.data, output_path=args.output)
