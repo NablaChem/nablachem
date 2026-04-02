@@ -75,9 +75,13 @@ class AutoKRR:
         with self.tracker.track("Learning curve"):
             for i, ntrain in enumerate(self._training_sizes):
                 length_heuristic = self._kernel_matrix.length_scale(ntrain)
-                best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
-                    self._optimize_hyperparameters(ntrain, length_heuristic)
-                )
+                (
+                    best_parameters,
+                    best_val_rmse,
+                    best_val_mae,
+                    eig_count,
+                    direct_count,
+                ) = self._optimize_hyperparameters(ntrain, length_heuristic)
                 best_cases[ntrain] = best_parameters
 
                 improvement = {}
@@ -243,7 +247,7 @@ class AutoKRR:
             trend = A @ coefs
             y -= trend
         y -= np.mean(y)
-        #counter
+        # counter
         eig_count = 0
         direct_count = 0
         for factor in factors:
@@ -401,7 +405,9 @@ class AutoKRR:
             K_train_row_mean = K_train.mean(axis=1, keepdims=True)
             K_train_col_mean = K_train.mean(axis=0, keepdims=True)
             K_train_mean = K_train.mean()
-            K_train_centered = K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            K_train_centered = (
+                K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            )
             # #Save means for the test kernel centering
             train_col_means[ntrain] = K_train_col_mean
             train_means[ntrain] = K_train_mean
@@ -430,7 +436,9 @@ class AutoKRR:
                 if K_test is None:
                     break
                 K_test_row_mean = K_test.mean(axis=1, keepdims=True)
-                K_test_centered = K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                K_test_centered = (
+                    K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                )
                 model_preds[ntrain].append(K_test_centered @ alpha)
                 batch += 1
 

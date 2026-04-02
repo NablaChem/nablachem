@@ -255,15 +255,14 @@ def make_local_data_controller(
 def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=False):
     global _xtb_default_hyperparams
 
-    sigmas = 1.5 ** np.arange(0, 15)
-    lams = 10.0 ** np.arange(-10, -1)
-
     rng = np.random.default_rng(seed)
     test_rmse = np.nan
     test_mae = np.nan
 
     # Determine whether to run grid search or use cached/provided hyperparams
     if sigma is not None:
+        _, lams = mlo.get_hyperparameter_grid(len(y_train))
+        print(mlo.get_hyperparameter_grid(len(y_train)))
         best_sigma = float(sigma)
         best_lam = lams[len(lams) // 2]  # fallback mid-point if only sigma given
         best_rmse = np.nan
@@ -277,6 +276,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
 
     if run_grid:
         n = len(y_train)
+        sigmas, lams = mlo.get_hyperparameter_grid(n)
         perm = rng.permutation(n)
         n_val = max(1, int(round(0.2 * n)))
         val_idx = perm[:n_val]
@@ -326,7 +326,7 @@ def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=Fal
     }
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(30, 31)):
+def _pick_best_workers_for(ctrl, weights, candidates=(5, 6)):
     delta = 2
     y_train, y_test = ctrl["get_labels"]()
     mlo = ctrl["get_mlo"](weights, False, approx=False)
@@ -438,9 +438,9 @@ class Selector:
         test_errors, val_errors, weight_log, value_log, rmse_steps = [], [], [], [], []
 
         zero_threshold = 0.0
-        plateau_window = 300
+        plateau_window = 5
         _window_count = 0
-        _prev_active_dims = None
+        _prev_active_dims = len(params)
         active_dims = len(params)
 
         pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
