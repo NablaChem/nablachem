@@ -129,8 +129,9 @@ class SLATMGlobal(_SLATM):
 
 
 class _MACE(BaseRepresenter):
-    def __init__(self, local: bool):
+    def __init__(self, local: bool, model_path: str = "medium"):
         self._local = local
+        self._model_path = model_path
         self._model = None
 
     def build(self, datasets: list[dataset.DataSet]):
@@ -143,7 +144,7 @@ class _MACE(BaseRepresenter):
 
                 with contextlib.redirect_stdout(None):
                     self._model = mace_mp(
-                        model="medium", device="", default_dtype="float64"
+                        model=self._model_path, device="", default_dtype="float64"
                     )
 
         all_mols = [mol for ds in datasets for mol in ds.molecules]
@@ -161,13 +162,13 @@ class _MACE(BaseRepresenter):
 
 
 class MACEGlobal(_MACE):
-    def __init__(self):
-        super().__init__(local=False)
+    def __init__(self, model_path: str = "medium"):
+        super().__init__(local=False, model_path=model_path)
 
 
 class MACELocal(_MACE):
-    def __init__(self):
-        super().__init__(local=True)
+    def __init__(self, model_path: str = "medium"):
+        super().__init__(local=True, model_path=model_path)
 
 
 class _FCHL19(BaseRepresenter):

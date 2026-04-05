@@ -4,11 +4,20 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+# %% config
+# show_median   : plot the median across runs
+# show_individual : plot per-run lines (all runs, or only `run_idx` if set)
+# run_idx       : None = all runs; int = only that run index (0-based)
+
+show_median = True
+show_individual = True
+run_idx = None  # e.g. 0 to plot only the first run
+
 # %% load
 
 path = next(
     (a for a in sys.argv[1:] if a.endswith(".npz")),
-    "/Users/ali/second_project_data/results/out.npz",
+    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_512.npz",
 )
 d = np.load(path)
 
@@ -18,22 +27,24 @@ val_errors = d["val_errors"]  # (n_runs, n_eval_steps)
 value_log = d["value_log"]  # (n_runs, n_steps)
 weight_log = d["weight_log"]  # (n_runs, n_steps, 40)
 
-mean_test = d["mean_test_errors"]  # (n_eval_steps,)
-mean_val = d["mean_val_errors"]  # (n_eval_steps,)
-mean_value = d["mean_value_log"]  # (n_steps,)
-mean_weights = d["mean_weight_log"]  # (n_steps, 40)
-
 n_runs = test_errors.shape[0]
 
 # %% derived
 
-ref_test = mean_test[0]
-ref_val = mean_val[0]
-impr_test = (ref_test - mean_test) / ref_test * 100
-impr_val = (ref_val - mean_val) / ref_val * 100
+runs_to_plot = [run_idx] if run_idx is not None else list(range(n_runs))
 
-running_avg = np.cumsum(mean_value) / (np.arange(len(mean_value)) + 1)
-n_dims = (mean_weights > 0.001).sum(axis=1)
+median_test = np.median(test_errors[runs_to_plot], axis=0)
+median_val = np.median(val_errors[runs_to_plot], axis=0)
+median_value = np.median(value_log[runs_to_plot], axis=0)
+median_weights = np.median(weight_log[runs_to_plot], axis=0)
+
+ref_test = median_test[0]
+ref_val = median_val[0]
+impr_median_test = (ref_test - median_test) / ref_test * 100
+impr_median_val = (ref_val - median_val) / ref_val * 100
+
+running_avg = np.cumsum(median_value) / (np.arange(len(median_value)) + 1)
+n_dims = (median_weights > 0.001).sum(axis=1)
 
 # %% figure
 
@@ -44,39 +55,69 @@ ax_w = fig.add_subplot(gs[0, 1])
 ax_v = fig.add_subplot(gs[1, 1])
 ax_d = fig.add_subplot(gs[2, 1])
 
+label_suffix = (
+    f"run {run_idx}"
+    if run_idx is not None
+    else f"{n_runs} run{'s' if n_runs > 1 else ''}"
+)
 fig.suptitle(
-    f"Cluster results — {path}  ({n_runs} run{'s' if n_runs > 1 else ''})",
+    f"Cluster results — {path}  ({label_suffix})",
     fontsize=14,
     fontweight="bold",
 )
 
-# -- per-run shading
-for r in range(n_runs):
-    impr_r = (ref_test - test_errors[r]) / ref_test * 100
-    ax_main.plot(steps, impr_r, color="C0", alpha=0.2, linewidth=0.8)
+# -- per-run lines
+if show_individual:
+    for r in runs_to_plot:
+        impr_r = (ref_test - test_errors[r]) / ref_test * 100
+        ax_main.plot(
+            steps,
+            impr_r,
+            color="C0",
+            alpha=0.35 if show_median else 0.8,
+            linewidth=0.8 if show_median else 1.2,
+            label=f"Run {r}" if not show_median else None,
+        )
 
 # -- median line
-ax_main.plot(steps, impr_test, marker="o", color="C0", label="Test RMSE (median)")
-ax_main.plot(
-    steps,
-    impr_val,
-    marker="o",
-    color="C0",
-    linestyle="--",
-    alpha=0.5,
-    label="Val RMSE (median)",
-)
-
-for x, y in zip(steps, impr_test):
-    ax_main.annotate(
-        f"{y:.1f}%",
-        xy=(x, y),
-        xytext=(0, 8),
-        textcoords="offset points",
-        ha="center",
-        fontsize=9,
-        color="C0",
+if show_median:
+    ax_main.plot(
+        steps, impr_median_test, marker="o", color="C0", label="Test RMSE (median)"
     )
+    ax_main.plot(
+        steps,
+        impr_median_val,
+        marker="o",
+        color="C0",
+        linestyle="--",
+        alpha=0.5,
+        label="Val RMSE (median)",
+    )
+    for x, y in zip(steps, impr_median_test):
+        ax_main.annotate(
+            f"{y:.1f}%",
+            xy=(x, y),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+            color="C0",
+        )
+elif show_individual:
+    # annotate individual runs when median is off
+    for r in runs_to_plot:
+        impr_r = (ref_test - test_errors[r]) / ref_test * 100
+        for x, y in zip(steps, impr_r):
+            ax_main.annotate(
+                f"{y:.1f}%",
+                xy=(x, y),
+                xytext=(0, 8),
+                textcoords="offset points",
+                ha="center",
+                fontsize=7,
+                color=f"C{r % 10}",
+                alpha=0.6,
+            )
 
 ax_main.axhline(0, color="gray", linewidth=0.8, linestyle=":")
 ax_main.set_xlabel("Compression Step", fontsize=12)
@@ -94,17 +135,34 @@ ax_main.legend(
 )
 
 # -- weights
-for r in range(n_runs):
-    ax_w.plot(weight_log[r], alpha=0.1, linewidth=0.4, color="steelblue")
-ax_w.plot(mean_weights, alpha=0.6, linewidth=0.8, color="steelblue")
-ax_w.set_title("Feature Weights (median)")
+if show_individual:
+    for r in runs_to_plot:
+        ax_w.plot(
+            weight_log[r],
+            alpha=0.15 if show_median else 0.4,
+            linewidth=0.4,
+            color="steelblue",
+        )
+if show_median:
+    ax_w.plot(median_weights, alpha=0.8, linewidth=0.9, color="steelblue")
+ax_w.set_title(f"Feature Weights ({'median' if show_median else 'per-run'})")
 ax_w.set_ylabel("Weight")
 ax_w.set_xlabel("Step")
 ax_w.grid(True, alpha=0.3)
 
 # -- LQ value log
-ax_v.semilogy(mean_value, color="C3", alpha=0.4, linewidth=0.8, label="per-step")
-ax_v.semilogy(running_avg, color="C1", linewidth=1.5, label="running avg")
+if show_individual:
+    for r in runs_to_plot:
+        ax_v.semilogy(
+            value_log[r],
+            color=f"C{r % 10}",
+            alpha=0.3 if show_median else 0.7,
+            linewidth=0.6,
+            label=f"Run {r}" if not show_median else None,
+        )
+if show_median:
+    ax_v.semilogy(median_value, color="C3", alpha=0.5, linewidth=0.8, label="median")
+    ax_v.semilogy(running_avg, color="C1", linewidth=1.5, label="running avg")
 ax_v.set_title("Low-Quality Val Error")
 ax_v.set_ylabel("RMSE (log)")
 ax_v.set_xlabel("Step")
@@ -112,11 +170,24 @@ ax_v.legend(fontsize=8)
 ax_v.grid(True, alpha=0.3)
 
 # -- active dims
-ax_d.plot(n_dims, color="C2")
+if show_individual:
+    for r in runs_to_plot:
+        n_dims_r = (weight_log[r] > 0.001).sum(axis=1)
+        ax_d.plot(
+            n_dims_r,
+            color=f"C{r % 10}",
+            alpha=0.3 if show_median else 0.8,
+            linewidth=0.8,
+            label=f"Run {r}" if not show_median else None,
+        )
+if show_median:
+    ax_d.plot(n_dims, color="C2", linewidth=1.5, label="median")
 ax_d.set_title("Active Dimensions")
 ax_d.set_ylabel("Count")
 ax_d.set_xlabel("Step")
 ax_d.grid(True, alpha=0.3)
+if not show_median and show_individual and len(runs_to_plot) > 1:
+    ax_d.legend(fontsize=8)
 
 plt.tight_layout()
 plt.savefig(path.replace(".npz", "_plot.png"), dpi=150, bbox_inches="tight")

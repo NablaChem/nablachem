@@ -28,6 +28,7 @@ def make_local_data_controller(
     rep="cMBDFLocal",
     label_scale=1.0,
     kernel="elemental",
+    mace_model_path="medium",
 ):
     import numpy as np
     from nablachem.krr import krr
@@ -114,7 +115,8 @@ def make_local_data_controller(
     }
     if rep not in local_reps:
         raise ValueError(f"rep must be one of {list(local_reps.keys())}")
-    rep = local_reps[rep]()
+    rep_kwargs = {"model_path": mace_model_path} if rep.startswith("MACE") else {}
+    rep = local_reps[rep](**rep_kwargs)
     _ram(f"before rep.build limit={limit}")
     rep.build([ds])
     _ram(f"after rep.build limit={limit}")
@@ -485,6 +487,7 @@ class Selector:
         rep: str = "cMBDFLocal",
         kernel: str = "elemental",
         n_workers: int = None,
+        mace_model_path: str = "medium",
     ):
         self.lr = learning_rate
         self.steps = steps
@@ -494,6 +497,7 @@ class Selector:
         self.rep = rep
         self.kernel = kernel
         self.n_workers = n_workers
+        self.mace_model_path = mace_model_path
 
     def _run_once(self, n_workers, path, seed=0):
         np.random.seed(seed)
@@ -507,6 +511,7 @@ class Selector:
             rep=self.rep,
             label_scale=627.509474,
             kernel=self.kernel,
+            mace_model_path=self.mace_model_path,
         )
         ctrl["next_chunk"]()
 
@@ -523,6 +528,7 @@ class Selector:
             rep=self.rep,
             label_scale=627.509474,
             kernel=self.kernel,
+            mace_model_path=self.mace_model_path,
         )
 
         # One-time hyperparameter search on 4× training data before the main loop.
@@ -643,18 +649,6 @@ class Selector:
                     for r in range(self.n_runs)
                 ]
             ),
-            "mean_test_errors": np.median(all_test_errors, axis=0),
-            "mean_val_errors": np.median(all_val_errors, axis=0),
-            "mean_value_log": np.median(all_value_logs, axis=0),
-            "mean_weight_log": np.array(
-                [
-                    np.median(
-                        [np.array(all_weight_logs[r][i]) for r in range(self.n_runs)],
-                        axis=0,
-                    )
-                    for i in range(len(all_weight_logs[0]))
-                ]
-            ),
         }
 
         np.savez(
@@ -715,6 +709,11 @@ if __name__ == "__main__":
         default=None,
         help="Number of parallel workers. If omitted, auto-detected.",
     )
+    parser.add_argument(
+        "--mace-model",
+        default="medium",
+        help="MACE model name or path to a local .model file (required on nodes without internet).",
+    )
     args = parser.parse_args()
 
     s = Selector(
@@ -726,5 +725,6 @@ if __name__ == "__main__":
         rep=args.rep,
         kernel=args.kernel,
         n_workers=args.workers,
+        mace_model_path=args.mace_model,
     )
     s.compress(path=args.data, output_path=args.output)
