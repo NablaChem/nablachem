@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import time
 import warnings
 import jax
 import optax
@@ -60,13 +59,15 @@ def make_local_data_controller(
             self._X_holdout = X_holdout
             self._weights = weights
 
+            mask = weights != 0
+
             self._train_counts = np.array([rep.shape[0] for rep in X_train])
             self._X_train = np.concatenate(X_train, axis=0)
-            self._X_train *= self._weights
+            self._X_train = self._X_train[:, mask] * weights[mask]
 
             self._holdout_counts = np.array([rep.shape[0] for rep in X_holdout])
             self._X_holdout = np.concatenate(X_holdout, axis=0)
-            self._X_holdout *= self._weights
+            self._X_holdout = self._X_holdout[:, mask] * weights[mask]
 
             train_nuclear_charges = np.concatenate(Z_train)
             holdout_nuclear_charges = np.concatenate(Z_holdout)
@@ -435,47 +436,7 @@ def estimate_local_model_error(
         }
 
 
-def _pick_best_workers_for(ctrl, weights, candidates=(4, 8, 12, 16)):
-    delta = 2
-    xtb_cache = [None]
-    y_train, y_test = ctrl["get_labels"]()
-    mlo = ctrl["get_mlo"](weights, approx=False)
-    # First call populates xtb_cache via _grid_search_hyperparams internally
-    sigma, lam, _ = _grid_search_hyperparams(mlo, y_train)
-    xtb_cache[0] = (sigma, lam)
-    value = estimate_local_model_error(
-        y_train, y_test, mlo, xTB=True, xtb_cache=xtb_cache
-    )["test_rmse"]
-
-    def _probe(i):
-        weights_delta = weights.at[i].multiply(delta)
-        mlo_delta = ctrl["get_mlo"](weights_delta, approx=False)
-        E = estimate_local_model_error(
-            y_train, y_test, mlo_delta, xTB=True, xtb_cache=xtb_cache
-        )
-        return i, (E["test_rmse"] - value) / delta
-
-    nonzero = [i for i in range(len(weights)) if weights[i] != 0]
-    probe = nonzero[: max(4, len(nonzero) // 5)]
-    return _pick_best_workers(_probe, probe, candidates)
-
-
-def _pick_best_workers(fn, probe_indices, candidates=(4, 8, 12, 16)):
-    best, best_t = candidates[0], float("inf")
-    for n in candidates:
-        t0 = time.perf_counter()
-        with ThreadPoolExecutor(max_workers=n) as ex:
-            list(ex.map(fn, probe_indices))
-        t = time.perf_counter() - t0
-        print(f"workers={n}: {t:.2f}s")
-        if t < best_t:
-            best, best_t = n, t
-    return best
-
-
 def _value_and_grad(ctrl, weights, n_workers=11, xtb_cache=None):
-    delta = 2
-
     y_train, y_test = ctrl["get_labels"]()
 
     mlo = ctrl["get_mlo"](weights, approx=False)
@@ -489,12 +450,16 @@ def _value_and_grad(ctrl, weights, n_workers=11, xtb_cache=None):
     def _compute_grad_i(i):
         if weights[i] == 0:
             return i, 0.0
-        weights_delta = weights.at[i].multiply(delta)
-        mlo_delta = ctrl["get_mlo"](weights_delta, approx=False)
-        E = estimate_local_model_error(
-            y_train, y_test, mlo_delta, xTB=True, xtb_cache=xtb_cache
+        eps = abs(float(weights[i])) * 1e-2
+        mlo_fwd = ctrl["get_mlo"](weights.at[i].add(eps), approx=False)
+        mlo_bwd = ctrl["get_mlo"](weights.at[i].add(-eps), approx=False)
+        E_fwd = estimate_local_model_error(
+            y_train, y_test, mlo_fwd, xTB=True, xtb_cache=xtb_cache
         )
-        return i, (E["test_rmse"] - value) / delta
+        E_bwd = estimate_local_model_error(
+            y_train, y_test, mlo_bwd, xTB=True, xtb_cache=xtb_cache
+        )
+        return i, (E_fwd["test_rmse"] - E_bwd["test_rmse"]) / (2 * eps)
 
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         pbar = tqdm(
@@ -638,25 +603,8 @@ class Selector:
         return test_errors, val_errors, weight_log, value_log, rmse_steps
 
     def compress(self, path, output_path):
-        if self.n_workers is not None:
-            n_workers = self.n_workers
-            print(f"Workers        : {n_workers} (from --workers)")
-        else:
-            ctrl_xTB_probe = make_local_data_controller(
-                path,
-                "xtb_E_total",
-                holdout_size=1,
-                chunk_size=self.lq_chunk_size,
-                limit=self.lq_chunk_size * 10,
-                rep=self.rep,
-                label_scale=627.509474,
-                kernel=self.kernel,
-            )
-            ctrl_xTB_probe["next_chunk"]()
-            n_workers = _pick_best_workers_for(
-                ctrl_xTB_probe, jnp.ones(ctrl_xTB_probe["n_features"])
-            )
-            print(f"Workers        : {n_workers} (auto-detected)")
+        n_workers = self.n_workers
+        print(f"Workers        : {n_workers}")
 
         all_test_errors, all_val_errors, all_weight_logs, all_value_logs = (
             [],
