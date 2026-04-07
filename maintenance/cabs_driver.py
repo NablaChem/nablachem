@@ -26,16 +26,42 @@ from pathlib import Path
 import numpy as np
 
 
-from cabs2 import (
-    _MockSCF,
-    _hf_fill_worker,
+from nablachem.cabs import (
     _parse_gbs_per_element,
     form_basissets,
     form_cabs_singles,
     form_fock,
 )
-from pyscf import gto
+from pyscf import gto, scf
 import multiprocessing as mp
+
+
+class _MockSCF:
+    """Lightweight stand-in for pyscf RHF that carries precomputed arrays."""
+
+    def __init__(self, mol, F_ao, mo_coeff):
+        self.mol = mol
+        self.mo_coeff = mo_coeff
+        self._F_ao = F_ao
+
+    def get_fock(self):
+        return self._F_ao
+
+
+def _hf_fill_worker(args):
+    """Run HF for one molecule; returns picklable (E_hf, mo_coeff, F_ao)."""
+    atomspec, obs_basis = args
+    mol = gto.Mole()
+    mol.atom = atomspec
+    mol.basis = obs_basis
+    mol.unit = "Angstrom"
+    mol.verbose = 0
+    mol.build()
+    mf = scf.RHF(mol)
+    mf.verbose = 0
+    mf.kernel()
+    return mf.e_tot, mf.mo_coeff.copy(), mf.get_fock()
+
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 JSONL_PATH  = "Martinez_CABS_DZ_Mar.jsonl"
