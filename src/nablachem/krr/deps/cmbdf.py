@@ -651,6 +651,8 @@ def generate_mbdf(
     progress_bar=False,
     a2=2.0,
     n_atm=2.0,
+    asize=None,
+    keys=None,
 ):
     # assert nuclear_charges.shape[0] == coords.shape[0], "charges and coordinates array length mis-match"
 
@@ -726,9 +728,11 @@ def generate_mbdf(
             return np.asarray(reps)
 
     else:
-        keys = np.unique(np.concatenate(charges))
+        if keys is None:
+            keys = np.unique(np.concatenate(charges))
 
-        asize = {key: max([(mol == key).sum() for mol in charges]) for key in keys}
+        if asize is None:
+            asize = {key: max([(mol == key).sum() for mol in charges]) for key in keys}
 
         rep_size = sum(asize.values())
 

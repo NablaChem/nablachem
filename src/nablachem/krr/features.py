@@ -30,7 +30,16 @@ class _DF(BaseRepresenter):
         self._local = local
         self._dep = dep
 
+    def _prepare(self, molecules: list) -> None:
+        self._pad = max(len(mol.get_atomic_numbers()) for mol in molecules)
+        all_charges = [mol.get_atomic_numbers() for mol in molecules]
+        self._keys = np.unique(np.concatenate(all_charges))
+        self._asize = {key: max(int((mol == key).sum()) for mol in all_charges) for key in self._keys}
+
     def compute(self, molecules: list) -> list:
+        if not hasattr(self, "_pad"):
+            raise RuntimeError("call build() before accessing representations")
+
         if self._dep == "mbdf":
             from .deps import mbdf
             call = mbdf.generate_mbdf
@@ -42,7 +51,13 @@ class _DF(BaseRepresenter):
         mols_coords = [mol.get_positions() for mol in molecules]
         natoms = [len(c) for c in mols_charges]
 
-        reps = call(mols_charges, mols_coords, progress_bar=False, local=self._local)
+        kwargs = dict(progress_bar=False, local=self._local, pad=self._pad)
+        if self._dep == "mbdf":
+            kwargs["normalized"] = False
+        if not self._local:
+            kwargs["asize"] = self._asize
+            kwargs["keys"] = self._keys
+        reps = call(mols_charges, mols_coords, **kwargs)
 
         if self._local:
             return [reps[i][:natoms[i], :] for i in range(len(molecules))]

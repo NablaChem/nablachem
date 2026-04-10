@@ -398,6 +398,8 @@ def generate_mbdf(
     angular_scaling=4,
     normalized="min-max",
     progress_bar=False,
+    asize=None,
+    keys=None,
 ):
     """
     Generates the local MBDF representation arrays for a set of given molecules
@@ -503,9 +505,11 @@ def generate_mbdf(
             return normalize(mbdf, normal=normalized)
 
     else:
-        keys = np.unique(np.concatenate(charges))
+        if keys is None:
+            keys = np.unique(np.concatenate(charges))
 
-        asize = {key: max([(mol == key).sum() for mol in charges]) for key in keys}
+        if asize is None:
+            asize = {key: max([(mol == key).sum() for mol in charges]) for key in keys}
 
         rep_size = sum(asize.values())
 

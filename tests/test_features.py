@@ -28,13 +28,13 @@ def single_mol_dataset():
 
 
 @pytest.fixture
-def mol_co():
-    return Atoms("CO", positions=[[0, 0, 0], [1.0, 0, 0]])
+def mol_h2o():
+    return Atoms("OHH", positions=[[0, 0, 0], [0.96, 0, 0], [-0.24, 0.93, 0]])
 
 
 @pytest.fixture
-def mol_n2():
-    return Atoms("NN", positions=[[0, 0, 0], [1.1, 0, 0]])
+def mol_hcn():
+    return Atoms("HCN", positions=[[0, 0, 0], [1.065, 0, 0], [2.221, 0, 0]])
 
 
 @pytest.fixture
@@ -79,28 +79,28 @@ def test_global_rep_is_1d(single_mol_dataset, RepClass):
 
 
 @pytest.mark.parametrize("rep_name", _available)
-def test_slice_invariance(rep_name, mol_co, mol_n2, mol_co2):
+def test_slice_invariance(rep_name, mol_h2o, mol_hcn, mol_co2):
     """Feature vector for a molecule must be identical regardless of what else is in the slice."""
     rep = _rep_class_map[rep_name]()
-    rep.build(_FakeDS([mol_co, mol_n2, mol_co2]))
+    rep.build(_FakeDS([mol_h2o, mol_hcn, mol_co2]))
 
-    alone_co = rep[0]
-    alone_n2 = rep[1]
+    alone_h2o = rep[0]
+    alone_hcn = rep[1]
     alone_co2 = rep[2]
     together = rep[0:3]
 
-    np.testing.assert_array_equal(alone_co, together[0])
-    np.testing.assert_array_equal(alone_n2, together[1])
+    np.testing.assert_array_equal(alone_h2o, together[0])
+    np.testing.assert_array_equal(alone_hcn, together[1])
     np.testing.assert_array_equal(alone_co2, together[2])
 
 
 @pytest.mark.parametrize("rep_name", _available)
-def test_compatible_to_invariance(rep_name, mol_co, mol_n2, mol_co2):
+def test_compatible_to_invariance(rep_name, mol_h2o, mol_hcn, mol_co2):
     """Feature vector must be identical whether the other molecule is in compatible_to or the same ds."""
     rep_joint = _rep_class_map[rep_name]()
-    rep_joint.build(_FakeDS([mol_co, mol_n2, mol_co2]))
+    rep_joint.build(_FakeDS([mol_h2o, mol_hcn, mol_co2]))
 
     rep_split = _rep_class_map[rep_name]()
-    rep_split.build(_FakeDS([mol_co]), compatible_to=[_FakeDS([mol_n2]), _FakeDS([mol_co2])])
+    rep_split.build(_FakeDS([mol_h2o]), compatible_to=[_FakeDS([mol_hcn]), _FakeDS([mol_co2])])
 
     np.testing.assert_array_equal(rep_split[0], rep_joint[0])
