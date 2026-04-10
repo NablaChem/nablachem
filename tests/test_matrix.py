@@ -14,14 +14,14 @@ DATA_FILE = pathlib.Path(__file__).parent / "data" / "molecules.jsonl"
 @pytest.fixture(scope="module")
 def slatm_global_dataset():
     ds = DataSet(str(DATA_FILE), "A")
-    SLATMGlobal().build([ds])
+    SLATMGlobal().build(ds)
     return ds
 
 
 @pytest.fixture(scope="module")
 def slatm_local_dataset():
     ds = DataSet(str(DATA_FILE), "A")
-    SLATMLocal().build([ds])
+    SLATMLocal().build(ds)
     return ds
 
 
@@ -54,11 +54,9 @@ def test_local_kernel_matrices_differ_by_kernel_func(slatm_local_dataset):
         X,
         train_counts,
         kernels.Gaussian(),
-        X,
-        train_counts,
     ).compute_train_kernel_matrix_exact(sigma, ntrain)
     K_exponential = LocalKernelMatrix(
-        X, train_counts, kernels.Exponential(), X, train_counts
+        X, train_counts, kernels.Exponential()
     ).compute_train_kernel_matrix_exact(sigma, ntrain)
 
     assert not np.allclose(K_gaussian, K_exponential)
@@ -150,11 +148,10 @@ def test_global_test_batched(slatm_global_dataset):
         X_holdout[power] = reps[1]
 
     kernel = kernels.Gaussian()
-    kmat = GlobalKernelMatrix(X_train, kernel, X_holdout)
-    batch_0 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=0)
-    batch_1 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=1)
-    batch_2 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=2)
-    assert batch_2 is None
+    kmat = GlobalKernelMatrix(X_train, kernel)
+    batch_size = kmat._batch_size
+    batch_0 = kmat.compute_test_kernel_matrix(10.0, len(reps), X_holdout[:batch_size])
+    batch_1 = kmat.compute_test_kernel_matrix(10.0, len(reps), X_holdout[batch_size:])
 
     K_train = np.concatenate([batch_0, batch_1], axis=0)
     actual = np.where(K_train[:, 1] > 0.9)[0]
@@ -173,19 +170,20 @@ def test_local_test_batched(slatm_local_dataset):
     powers = 2 ** np.arange(1, 11) - 1
     for power in powers:
         holdout[power] = reps[1]
-    X_holdout = np.concatenate(holdout, axis=0)
 
-    kmat = LocalKernelMatrix(
-        X_train,
-        train_counts,
-        kernels.Gaussian(),
-        X_holdout,
-        np.array([rep.shape[0] for rep in holdout]),
+    kmat = LocalKernelMatrix(X_train, train_counts, kernels.Gaussian())
+    batch_size = kmat._batch_size
+
+    mols_0 = holdout[:batch_size]
+    counts_0 = np.array([rep.shape[0] for rep in mols_0])
+    batch_0 = kmat.compute_test_kernel_matrix(
+        10.0, len(reps), np.concatenate(mols_0, axis=0), counts_0
     )
-    batch_0 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=0)
-    batch_1 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=1)
-    batch_2 = kmat.compute_test_kernel_matrix(10.0, len(reps), batch=2)
-    assert batch_2 is None
+    mols_1 = holdout[batch_size:]
+    counts_1 = np.array([rep.shape[0] for rep in mols_1])
+    batch_1 = kmat.compute_test_kernel_matrix(
+        10.0, len(reps), np.concatenate(mols_1, axis=0), counts_1
+    )
 
     K_train = np.concatenate([batch_0, batch_1], axis=0)
     actual = np.where(K_train[:, 1] > 0.9)[0]
@@ -193,30 +191,6 @@ def test_local_test_batched(slatm_local_dataset):
     actual = np.where(K_train[:, 0] < 0.9)[0]
     assert np.array_equal(actual, powers)
 
-
-def test_local_kernel_holdout_count(slatm_local_dataset):
-    """Test that LocalKernelMatrix correctly counts holdout molecules."""
-    reps = slatm_local_dataset.representations
-    train_counts = np.array([rep.shape[0] for rep in reps])
-    X_train = np.concatenate(reps, axis=0)
-
-    kmat = LocalKernelMatrix(
-        X_train,
-        train_counts,
-        kernels.Gaussian(),
-        X_train,
-        np.array([rep.shape[0] for rep in reps]),
-    )
-    assert kmat._holdout_molecule_count == len(reps)
-
-
-def test_global_kernel_holdout_count(slatm_global_dataset):
-    """Test that GlobalKernelMatrix correctly counts holdout molecules."""
-    reps = slatm_global_dataset.representations
-    X_train = np.stack(reps, axis=0)
-
-    kmat = GlobalKernelMatrix(X_train, kernels.Gaussian(), X_train)
-    assert kmat._holdout_molecule_count == len(reps)
 
 
 def test_evaluate_models_uses_per_model_sigma():
@@ -228,9 +202,22 @@ def test_evaluate_models_uses_per_model_sigma():
     X = np.arange(n_all, dtype=float).reshape(-1, 1)
     y = X[:, 0].copy()
 
+    class _MockRepresenter:
+        def __init__(self, X):
+            self._molecules = list(range(len(X)))
+            self._X = X
+
+        def __getitem__(self, key):
+            if isinstance(key, slice):
+                return self.compute(self._molecules[key])
+            return [self._X[key]]
+
+        def compute(self, mol_indices):
+            return [self._X[i] for i in mol_indices]
+
     class _MockDataset:
         def __init__(self):
-            self.representations = [X[i] for i in range(n_all)]
+            self.representations = _MockRepresenter(X)
             self.labels = y.copy()
 
         def __len__(self):
@@ -253,14 +240,14 @@ def test_evaluate_models_uses_per_model_sigma():
 
     X_train = X[:n_train_max]
     X_holdout = X[n_train_max:]
-    kmat = GlobalKernelMatrix(X_train, kernels.Gaussian(), X_holdout)
+    kmat = GlobalKernelMatrix(X_train, kernels.Gaussian())
 
     shift = np.mean(y[:4])
     y_train_4 = y[:4] - shift
     K_train_4 = kmat.compute_train_kernel_matrix(sigma_map[4], 4)
     alpha_4 = np.linalg.solve(K_train_4 + lam * np.eye(4), y_train_4)
     y_test_4 = y[n_train_max:] - shift
-    K_test_4 = kmat.compute_test_kernel_matrix(sigma_map[4], 4, batch=0)
+    K_test_4 = kmat.compute_test_kernel_matrix(sigma_map[4], 4, X_holdout)
     expected_residuals = y_test_4 - K_test_4 @ alpha_4
 
     assert np.allclose(krr.holdout_residuals[4], expected_residuals, atol=1e-6)
@@ -357,16 +344,8 @@ def test_elemental_kernel_masks_cross_element_pairs_holdout():
         np.sqrt(self_h) * np.sqrt(self_1)
     )
 
-    kmat = ElementalKernelMatrix(
-        X_train,
-        train_counts,
-        kernel,
-        X_holdout,
-        holdout_counts,
-        nuclear_charges=train_charges,
-        holdout_nuclear_charges=holdout_charges,
-    )
-    K_test = kmat.compute_test_kernel_matrix(sigma, ntrain=2, batch=0)
+    kmat = ElementalKernelMatrix(X_train, train_counts, kernel, nuclear_charges=train_charges)
+    K_test = kmat.compute_test_kernel_matrix(sigma, ntrain=2, X_batch=X_holdout, counts_batch=holdout_counts, nc_batch=holdout_charges)
 
     assert K_test.shape == (1, 2)
     assert np.isclose(K_test[0, 0], expected_K_test_0), (

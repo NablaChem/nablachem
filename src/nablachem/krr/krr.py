@@ -48,18 +48,13 @@ class AutoKRR:
                         self._X_train,
                         self._train_counts,
                         kernel_func,
-                        self._X_holdout,
-                        self._holdout_counts,
                         nuclear_charges=self._train_nuclear_charges,
-                        holdout_nuclear_charges=self._holdout_nuclear_charges,
                     )
                 else:
                     self._kernel_matrix = matrix.LocalKernelMatrix(
                         self._X_train,
                         self._train_counts,
                         kernel_func,
-                        self._X_holdout,
-                        self._holdout_counts,
                     )
             else:
                 if self._elemental:
@@ -67,7 +62,7 @@ class AutoKRR:
                         "--elemental is not supported for global representations"
                     )
                 self._kernel_matrix = matrix.GlobalKernelMatrix(
-                    self._X_train, kernel_func, self._X_holdout
+                    self._X_train, kernel_func
                 )
 
         last_rmse = None
@@ -176,7 +171,8 @@ class AutoKRR:
         X_train = X_all[:max_training_size]
         self._y_train = y_all[:max_training_size]
 
-        self._X_holdout = X_all[max_training_size:]
+        self._holdout_representer = X_all
+        self._holdout_offset = max_training_size
         self._y_holdout = y_all[max_training_size:]
 
         self._local = X_train[0].ndim == 2 if X_train else False
@@ -184,19 +180,13 @@ class AutoKRR:
         if self._local:
             self._train_counts = np.array([rep.shape[0] for rep in X_train])
             self._X_train = np.concatenate(X_train, axis=0)
-            self._holdout_counts = np.array([rep.shape[0] for rep in self._X_holdout])
-            self._X_holdout = np.concatenate(self._X_holdout, axis=0)
             if elemental:
                 charges_all = self.dataset.nuclear_charges
                 self._train_nuclear_charges = np.concatenate(
                     charges_all[:max_training_size]
                 )
-                self._holdout_nuclear_charges = np.concatenate(
-                    charges_all[max_training_size:]
-                )
         else:
             self._X_train = np.stack(X_train, axis=0)
-            self._X_holdout = np.stack(self._X_holdout, axis=0)
 
         if self._detrend_atomic:
             element_counts, self._elements_Z = self.dataset.get_element_counts()
@@ -449,22 +439,38 @@ class AutoKRR:
             y_tests[ntrain] = y_test
 
         model_preds = {_: list() for _ in models.keys()}
-        # batched prediction to save memory
+        # batched prediction to save memory: materialize one batch of holdout
+        # representations at a time rather than keeping them all in memory
+        n_holdout = len(self._y_holdout)
+        batch_size = self._kernel_matrix._batch_size
         for ntrain, alpha in models.items():
             params_ntrain = best_cases[ntrain]
             K_train_col_mean = train_col_means[ntrain]
             K_train_mean = train_means[ntrain]
-            batch = 0
-            while True:
+            for start in range(0, n_holdout, batch_size):
+                end = min(start + batch_size, n_holdout)
+                mols = self._holdout_representer._molecules[
+                    self._holdout_offset + start : self._holdout_offset + end
+                ]
+                reps = self._holdout_representer.compute(mols)
+                if self._local:
+                    counts_batch = np.array([r.shape[0] for r in reps])
+                    X_batch = np.concatenate(reps, axis=0)
+                    nc_batch = (
+                        np.concatenate([mol.get_atomic_numbers() for mol in mols])
+                        if self._elemental
+                        else None
+                    )
+                else:
+                    X_batch = np.stack(reps, axis=0)
+                    counts_batch = None
+                    nc_batch = None
                 K_test = self._kernel_matrix.compute_test_kernel_matrix(
-                    params_ntrain["sigma"], ntrain, batch
+                    params_ntrain["sigma"], ntrain, X_batch, counts_batch, nc_batch
                 )
-                if K_test is None:
-                    break
                 K_test_row_mean = K_test.mean(axis=1, keepdims=True)
                 K_test_centered = K_test - K_test_row_mean - K_train_col_mean + K_train_mean
                 model_preds[ntrain].append(K_test_centered @ alpha)
-                batch += 1
 
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)

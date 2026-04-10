@@ -5,34 +5,18 @@ from .kernels import Kernel
 class KernelMatrix:
     """Base class for kernel matrix computation and management"""
 
-    def __init__(
-        self, X: np.ndarray, kernel_func: Kernel, X_holdout: np.ndarray = None
-    ):
-        """Initialize kernel matrix with training and optional holdout data
+    def __init__(self, X: np.ndarray, kernel_func: Kernel):
+        """Initialize kernel matrix with training data
 
         Args:
             X: Training data
-            X_holdout: Holdout/test data (optional)
-            kernel_func: Kernel function to use (optional)
+            kernel_func: Kernel function to use
         """
         self._X = X
-        self._X_holdout = X_holdout
         self._kernel_func = kernel_func
-        self._batch_size = 1000
+        self._batch_size = 100
 
         self._D2 = self._dist_squared(X)
-
-    def _calculate_D2_test(self, start: int, end: int, ntrain: int) -> np.ndarray:
-        return self._dist_squared(self._X[:ntrain], self._X_holdout[start:end])
-
-    def _get_batch_indices(self, batch: int) -> tuple[int, int] | tuple[None, None]:
-        """Get start and end indices for a given batch number"""
-        n_holdout = self._holdout_molecule_count
-        start = batch * self._batch_size
-        if start >= n_holdout:
-            return None, None
-        end = min(start + self._batch_size, n_holdout)
-        return start, end
 
     @staticmethod
     def _dist_squared(X_one: np.ndarray, X_other: np.ndarray = None) -> np.ndarray:
@@ -70,38 +54,22 @@ class _LocalKernelMatrix(KernelMatrix):
         X: np.ndarray,
         train_counts: np.ndarray,
         kernel_func: Kernel,
-        X_holdout: np.ndarray = None,
-        holdout_counts: np.ndarray = None,
         elemental: bool = False,
         nuclear_charges: np.ndarray = None,
-        holdout_nuclear_charges: np.ndarray = None,
     ):
         """Initialize local kernel matrix
 
         Args:
             X: Concatenated atom representations
             train_counts: Number of atoms per training molecule
-            X_holdout: Concatenated holdout atom representations (optional)
-            holdout_counts: Number of atoms per holdout molecule (optional)
             elemental: If True, zero contributions from cross-element atom pairs
             nuclear_charges: Nuclear charges per train atom (required when elemental=True)
-            holdout_nuclear_charges: Nuclear charges per holdout atom (required when
-                elemental=True and X_holdout is provided)
         """
         if elemental and nuclear_charges is None:
             raise ValueError("nuclear_charges is required when elemental=True")
-        if elemental and X_holdout is not None and holdout_nuclear_charges is None:
-            raise ValueError(
-                "holdout_nuclear_charges is required when elemental=True and X_holdout is provided"
-            )
 
-        super().__init__(
-            X,
-            kernel_func,
-            X_holdout,
-        )
+        super().__init__(X, kernel_func)
         self._train_counts = train_counts
-        self._holdout_counts = holdout_counts
         self._elemental = elemental
 
         if elemental:
@@ -109,22 +77,6 @@ class _LocalKernelMatrix(KernelMatrix):
             cross = self._nuclear_charges[:, None] != self._nuclear_charges[None, :]
             self._D2[cross] = np.inf
 
-        # Compute holdout self-distances if needed
-        if X_holdout is not None and holdout_counts is not None:
-            self._holdout_nuclear_charges = (
-                np.asarray(holdout_nuclear_charges, dtype=float) if elemental else None
-            )
-            self._test_self = []
-            start = 0
-            for count in holdout_counts:
-                end = start + count
-                d2 = self._dist_squared(X_holdout[start:end], X_holdout[start:end])
-                if elemental:
-                    z = self._holdout_nuclear_charges[start:end]
-                    cross = z[:, None] != z[None, :]
-                    d2[cross] = np.inf
-                self._test_self.append(d2)
-                start = end
         self._approx_fail_sigma = dict()
         self._kernel_func.approx_prepare(train_counts, self._D2)
 
@@ -200,44 +152,30 @@ class _LocalKernelMatrix(KernelMatrix):
 
         return K_train
 
-    @property
-    def _holdout_molecule_count(self) -> int:
-        return len(self._holdout_counts)
-
     def compute_test_kernel_matrix(
-        self, sigma: float, ntrain: int, batch: int
+        self,
+        sigma: float,
+        ntrain: int,
+        X_batch: np.ndarray,
+        counts_batch: np.ndarray,
+        nc_batch: np.ndarray = None,
     ) -> np.ndarray:
         """Compute test kernel matrix for local representations"""
-        if self._X_holdout is None:
-            raise ValueError("Holdout data not provided")
-
-        start, end = self._get_batch_indices(batch)
-        if start is None:
-            return None
-
         atom_counts_A = self._train_counts[:ntrain]
-        atom_counts_B_start = sum(self._holdout_counts[:start])
-        atom_counts_B_end = atom_counts_B_start + sum(self._holdout_counts[start:end])
-        atom_counts_B = self._holdout_counts[start:end]
         natoms = sum(atom_counts_A)
 
         # Compute atomic kernel between test and train
-        D2 = self._calculate_D2_test(atom_counts_B_start, atom_counts_B_end, natoms)
+        D2 = self._dist_squared(self._X[:natoms], X_batch)
         if self._elemental:
-            z_holdout = self._holdout_nuclear_charges[
-                atom_counts_B_start:atom_counts_B_end
-            ]
             z_train = self._nuclear_charges[:natoms]
-            cross = z_holdout[:, None] != z_train[None, :]
+            cross = nc_batch[:, None] != z_train[None, :]
             D2 = D2.copy()
             D2[cross] = np.inf
         K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma)
-        K_test = self.aggregate_atomic_kernel(K_atom, atom_counts_B, atom_counts_A)
+        K_test = self.aggregate_atomic_kernel(K_atom, counts_batch, atom_counts_A)
 
         # Compute normalization factors
         # For training: get unnormalized diagonal first
-        atom_counts_A = self._train_counts[:ntrain]
-        natoms = sum(atom_counts_A)
         K_atom_train = self._kernel_func.exact(
             np.sqrt(self._D2[:natoms, :natoms]) / sigma
         )
@@ -246,11 +184,24 @@ class _LocalKernelMatrix(KernelMatrix):
         )
         d_train_sqrt = np.sqrt(np.diag(K_train_unnorm))
 
-        # For test: self-kernel diagonal
+        # For test: self-kernel diagonal computed inline for this batch
+        test_self_list = []
+        atom_start = 0
+        for count in counts_batch:
+            d2 = self._dist_squared(
+                X_batch[atom_start : atom_start + count],
+                X_batch[atom_start : atom_start + count],
+            )
+            if self._elemental:
+                z = nc_batch[atom_start : atom_start + count]
+                d2[z[:, None] != z[None, :]] = np.inf
+            test_self_list.append(d2)
+            atom_start += count
+
         d_test = np.sqrt(
             [
                 self._kernel_func.exact(np.sqrt(test_self_dist) / sigma).sum()
-                for test_self_dist in self._test_self[start:end]
+                for test_self_dist in test_self_list
             ]
         )
 
@@ -283,22 +234,16 @@ class GlobalKernelMatrix(KernelMatrix):
         K_train = self._kernel_func(np.sqrt(D2_train) / sigma)
         return K_train
 
-    @property
-    def _holdout_molecule_count(self) -> int:
-        return len(self._X_holdout)
-
     def compute_test_kernel_matrix(
-        self, sigma: float, ntrain: int, batch: int
+        self,
+        sigma: float,
+        ntrain: int,
+        X_batch: np.ndarray,
+        counts_batch=None,
+        nc_batch=None,
     ) -> np.ndarray:
         """Compute test kernel matrix for global representations"""
-        if self._X_holdout is None:
-            raise ValueError("Holdout data not provided")
-
-        start, end = self._get_batch_indices(batch)
-        if start is None:
-            return None
-
-        D2_test = self._calculate_D2_test(start, end, ntrain)
+        D2_test = self._dist_squared(self._X[:ntrain], X_batch)
         K_test = self._kernel_func(np.sqrt(D2_test) / sigma)
         return K_test
 
