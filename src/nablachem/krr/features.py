@@ -4,7 +4,25 @@ import inspect
 
 
 class BaseRepresenter:
-    def build(self, datasets: list[dataset.DataSet]) -> None: ...
+    def _prepare(self, molecules: list) -> None:
+        pass
+
+    def compute(self, molecules: list) -> list:
+        raise NotImplementedError
+
+    def build(self, ds, compatible_to=None) -> None:
+        other_mols = [m for other in (compatible_to or []) for m in other.molecules]
+        self._molecules = ds.molecules
+        self._prepare(ds.molecules + other_mols)
+        ds.representations = self
+
+    def __len__(self) -> int:
+        return len(self._molecules)
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            return self.compute(self._molecules[key])
+        return self.compute([self._molecules[key]])[0]
 
 
 class _DF(BaseRepresenter):
@@ -12,7 +30,7 @@ class _DF(BaseRepresenter):
         self._local = local
         self._dep = dep
 
-    def build(self, datasets: list[dataset.DataSet]):
+    def compute(self, molecules: list) -> list:
         if self._dep == "mbdf":
             from .deps import mbdf
             call = mbdf.generate_mbdf
@@ -20,29 +38,16 @@ class _DF(BaseRepresenter):
             from .deps import cmbdf
             call = cmbdf.generate_mbdf
 
-        mols_charges = []
-        mols_coords = []
-        natoms = []
-        for ds in datasets:
-            for mol in ds.molecules:
-                mols_charges.append(mol.get_atomic_numbers())
-                mols_coords.append(mol.get_positions())
-                natoms.append(len(mol.get_atomic_numbers()))
-        reps = call(
-            mols_charges, mols_coords, progress_bar=False, local=self._local
-        )
+        mols_charges = [mol.get_atomic_numbers() for mol in molecules]
+        mols_coords = [mol.get_positions() for mol in molecules]
+        natoms = [len(c) for c in mols_charges]
+
+        reps = call(mols_charges, mols_coords, progress_bar=False, local=self._local)
 
         if self._local:
-            reps_short = []
-            for idx, natom in enumerate(natoms):
-                reps_short.append(reps[idx][:natom, :])
+            return [reps[i][:natoms[i], :] for i in range(len(molecules))]
         else:
-            reps_short = [rep for rep in reps]
-
-        offset = 0
-        for ds in datasets:
-            ds.representations = reps_short[offset : offset + len(ds.molecules)]
-            offset += len(ds.molecules)
+            return list(reps)
 
 
 class MBDFLocal(_DF):
@@ -69,53 +74,32 @@ class _SLATM(BaseRepresenter):
     def __init__(self, local: bool = False):
         self._local = local
 
-    def build(self, datasets: list[dataset.DataSet]):
-        # Collect nuclear charges and coordinates from all molecules
-        all_nuclear_charges = []
-        mols_charges = []
-        mols_coords = []
-        natoms = []
-
-        for ds in datasets:
-            for mol in ds.molecules:
-                charges = mol.get_atomic_numbers()
-                coords = mol.get_positions()
-                all_nuclear_charges.append(charges)
-                mols_charges.append(charges)
-                mols_coords.append(coords)
-                natoms.append(len(charges))
-
+    def _prepare(self, molecules: list) -> None:
         import qmllib.representations
-        # Get mbtypes for the entire dataset
-        mbtypes = qmllib.representations.get_slatm_mbtypes(all_nuclear_charges)
+        all_charges = [mol.get_atomic_numbers() for mol in molecules]
+        self._mbtypes = qmllib.representations.get_slatm_mbtypes(all_charges)
 
-        # Generate SLATM representations for each molecule
+    def compute(self, molecules: list) -> list:
+        import qmllib.representations
         reps = []
-        for charges, coords in zip(mols_charges, mols_coords):
+        for mol in molecules:
+            charges = mol.get_atomic_numbers()
+            coords = mol.get_positions()
             rep = qmllib.representations.generate_slatm(
                 nuclear_charges=charges,
                 coordinates=coords,
-                mbtypes=mbtypes,
+                mbtypes=self._mbtypes,
                 local=self._local,
             )
-            reps.append(rep)
-
-        if self._local:
-            # For local representation, truncate to actual number of atoms
-            reps_short = []
-            for idx, natom in enumerate(natoms):
-                if isinstance(reps[idx], list):
-                    reps_short.append(np.array(reps[idx][:natom]))
+            natom = len(charges)
+            if self._local:
+                if isinstance(rep, list):
+                    reps.append(np.array(rep[:natom]))
                 else:
-                    reps_short.append(reps[idx][:natom, :])
-        else:
-            reps_short = [rep for rep in reps]
-
-        # Assign representations to datasets
-        offset = 0
-        for ds in datasets:
-            ds.representations = reps_short[offset : offset + len(ds.molecules)]
-            offset += len(ds.molecules)
+                    reps.append(rep[:natom, :])
+            else:
+                reps.append(rep)
+        return reps
 
 
 class SLATMLocal(_SLATM):
@@ -133,31 +117,23 @@ class _MACE(BaseRepresenter):
         self._local = local
         self._model = None
 
-    def build(self, datasets: list[dataset.DataSet]):
+    def _prepare(self, molecules: list) -> None:
         if self._model is None:
             import warnings
             import contextlib
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 from mace.calculators import mace_mp
-
                 with contextlib.redirect_stdout(None):
                     self._model = mace_mp(
                         model="medium", device="", default_dtype="float64"
                     )
 
-        all_mols = [mol for ds in datasets for mol in ds.molecules]
+    def compute(self, molecules: list) -> list:
         if self._local:
-            reps = [self._model.get_descriptors(mol) for mol in all_mols]
+            return [self._model.get_descriptors(mol) for mol in molecules]
         else:
-            reps = [
-                np.sum(self._model.get_descriptors(mol), axis=0) for mol in all_mols
-            ]
-
-        offset = 0
-        for ds in datasets:
-            ds.representations = reps[offset : offset + len(ds.molecules)]
-            offset += len(ds.molecules)
+            return [np.sum(self._model.get_descriptors(mol), axis=0) for mol in molecules]
 
 
 class MACEGlobal(_MACE):
@@ -174,28 +150,24 @@ class _FCHL19(BaseRepresenter):
     def __init__(self, local: bool):
         self._local = local
 
-    def build(self, datasets: list[dataset.DataSet]):
-        all_mols = [mol for ds in datasets for mol in ds.molecules]
-        all_element_numbers = set()
-        for mol in all_mols:
-            all_element_numbers.update(mol.get_atomic_numbers())
+    def _prepare(self, molecules: list) -> None:
+        self._all_element_numbers = sorted(
+            set(n for mol in molecules for n in mol.get_atomic_numbers())
+        )
+
+    def compute(self, molecules: list) -> list:
         import qmllib.representations
-        all_element_numbers = sorted(all_element_numbers)
         reps = []
-        for mol in all_mols:
+        for mol in molecules:
             rep = qmllib.representations.generate_fchl19(
                 mol.get_atomic_numbers(),
                 mol.get_positions(),
-                elements=all_element_numbers,
+                elements=self._all_element_numbers,
             )
             if not self._local:
                 rep = np.sum(rep, axis=0)
             reps.append(rep)
-
-        offset = 0
-        for ds in datasets:
-            ds.representations = reps[offset : offset + len(ds.molecules)]
-            offset += len(ds.molecules)
+        return reps
 
 
 class FCHL19Global(_FCHL19):
