@@ -34,7 +34,10 @@ class _DF(BaseRepresenter):
         self._pad = max(len(mol.get_atomic_numbers()) for mol in molecules)
         all_charges = [mol.get_atomic_numbers() for mol in molecules]
         self._keys = np.unique(np.concatenate(all_charges))
-        self._asize = {key: max(int((mol == key).sum()) for mol in all_charges) for key in self._keys}
+        self._asize = {
+            key: max(int((mol == key).sum()) for mol in all_charges)
+            for key in self._keys
+        }
 
     def compute(self, molecules: list) -> list:
         if not hasattr(self, "_pad"):
@@ -42,9 +45,11 @@ class _DF(BaseRepresenter):
 
         if self._dep == "mbdf":
             from .deps import mbdf
+
             call = mbdf.generate_mbdf
         else:
             from .deps import cmbdf
+
             call = cmbdf.generate_mbdf
 
         mols_charges = [mol.get_atomic_numbers() for mol in molecules]
@@ -60,7 +65,7 @@ class _DF(BaseRepresenter):
         reps = call(mols_charges, mols_coords, **kwargs)
 
         if self._local:
-            return [reps[i][:natoms[i], :] for i in range(len(molecules))]
+            return [reps[i][: natoms[i], :] for i in range(len(molecules))]
         else:
             return list(reps)
 
@@ -91,11 +96,13 @@ class _SLATM(BaseRepresenter):
 
     def _prepare(self, molecules: list) -> None:
         import qmllib.representations
+
         all_charges = [mol.get_atomic_numbers() for mol in molecules]
         self._mbtypes = qmllib.representations.get_slatm_mbtypes(all_charges)
 
     def compute(self, molecules: list) -> list:
         import qmllib.representations
+
         reps = []
         for mol in molecules:
             charges = mol.get_atomic_numbers()
@@ -136,9 +143,11 @@ class _MACE(BaseRepresenter):
         if self._model is None:
             import warnings
             import contextlib
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 from mace.calculators import mace_mp
+
                 with contextlib.redirect_stdout(None):
                     self._model = mace_mp(
                         model="medium", device="", default_dtype="float64"
@@ -148,7 +157,9 @@ class _MACE(BaseRepresenter):
         if self._local:
             return [self._model.get_descriptors(mol) for mol in molecules]
         else:
-            return [np.sum(self._model.get_descriptors(mol), axis=0) for mol in molecules]
+            return [
+                np.sum(self._model.get_descriptors(mol), axis=0) for mol in molecules
+            ]
 
 
 class MACEGlobal(_MACE):
@@ -172,6 +183,7 @@ class _FCHL19(BaseRepresenter):
 
     def compute(self, molecules: list) -> list:
         import qmllib.representations
+
         reps = []
         for mol in molecules:
             rep = qmllib.representations.generate_fchl19(

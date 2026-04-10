@@ -1,7 +1,6 @@
 import click
 import os
 import hashlib
-import tracemalloc
 
 from .utils import info, error, warning
 from .dataset import DataSet
@@ -72,12 +71,6 @@ and the remaining molecules used as holdout/test data.
     help="Mask cross-element atom pairs in local kernel (requires local representation)",
 )
 @click.option(
-    "--track",
-    type=click.Choice(["compute", "memory"]),
-    default=None,
-    help="Enable profiling: 'compute' for timing only, 'memory' for allocation tracking",
-)
-@click.option(
     "--archive", default="archive.json", help="Output file for KRR archive data"
 )
 def main(
@@ -93,13 +86,8 @@ def main(
     detrend_pairs,
     elemental,
     holdout_residuals,
-    track,
     archive,
 ):
-    if track == "memory":
-        AutoKRR.tracker.start_memory_tracking()
-        tracemalloc.start(10)
-
     if os.path.exists(archive):
         warning(f"Archive file {archive} will be overwritten.")
 
@@ -195,7 +183,3 @@ def main(
         ds.write_holdout_residuals_jsonl(
             autokrr.holdout_residuals, maxcount, holdout_residuals
         )
-
-    if track:
-        print("\nPerformance Summary:")
-        autokrr.tracker.summary(mode=track)

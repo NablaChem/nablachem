@@ -9,13 +9,8 @@ from . import matrix
 from .dataset import DataSet
 from . import kernels
 
-from ..utils.perftracker import PerformanceTracker
-
 
 class AutoKRR:
-    tracker: PerformanceTracker = PerformanceTracker()
-
-    @tracker.track("AutoKRR")
     def __init__(
         self,
         dataset: DataSet,
@@ -26,85 +21,78 @@ class AutoKRR:
         detrend_pairs: str | None = None,
         elemental: bool = False,
     ) -> None:
-        with self.tracker.track("Initialization"):
-            self._archive = {}
-            self._archive["hyperopt"] = []
-            self.dataset = dataset
-            self._training_sizes = utils.get_training_sizes(mincount, maxcount)
-            self._detrend_atomic = detrend_atomic
-            self._detrend_pairs = detrend_pairs
-            self._elemental = elemental
+        self._archive = {}
+        self._archive["hyperopt"] = []
+        self.dataset = dataset
+        self._training_sizes = utils.get_training_sizes(mincount, maxcount)
+        self._detrend_atomic = detrend_atomic
+        self._detrend_pairs = detrend_pairs
+        self._elemental = elemental
 
-            self._create_holdout_split(elemental)
+        self._create_holdout_split(elemental)
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
-        with self.tracker.track("Kernel matrix setup"):
-            if self._local:
-                if self._elemental:
-                    self._kernel_matrix = matrix.ElementalKernelMatrix(
-                        self._X_train,
-                        self._train_counts,
-                        kernel_func,
-                        nuclear_charges=self._train_nuclear_charges,
-                    )
-                else:
-                    self._kernel_matrix = matrix.LocalKernelMatrix(
-                        self._X_train,
-                        self._train_counts,
-                        kernel_func,
-                    )
-            else:
-                if self._elemental:
-                    utils.error(
-                        "--elemental is not supported for global representations"
-                    )
-                self._kernel_matrix = matrix.GlobalKernelMatrix(
-                    self._X_train, kernel_func
+        if self._local:
+            if self._elemental:
+                self._kernel_matrix = matrix.ElementalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                    nuclear_charges=self._train_nuclear_charges,
                 )
+            else:
+                self._kernel_matrix = matrix.LocalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                )
+        else:
+            if self._elemental:
+                utils.error("--elemental is not supported for global representations")
+            self._kernel_matrix = matrix.GlobalKernelMatrix(self._X_train, kernel_func)
 
         last_rmse = None
         last_size = None
         best_cases = {}
 
-        with self.tracker.track("Learning curve"):
-            for i, ntrain in enumerate(self._training_sizes):
-                length_heuristic = self._kernel_matrix.length_scale(ntrain)
-                best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
-                    self._optimize_hyperparameters(ntrain, length_heuristic)
+        for i, ntrain in enumerate(self._training_sizes):
+            length_heuristic = self._kernel_matrix.length_scale(ntrain)
+            best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
+                self._optimize_hyperparameters(ntrain, length_heuristic)
+            )
+            best_cases[ntrain] = best_parameters
+
+            improvement = {}
+            if last_rmse is not None:
+                improvement["validation_slope"] = float(
+                    np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
                 )
-                best_cases[ntrain] = best_parameters
+            else:
+                improvement["validation_slope"] = None
 
-                improvement = {}
-                if last_rmse is not None:
-                    improvement["validation_slope"] = float(
-                        np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
-                    )
-                else:
-                    improvement["validation_slope"] = None
+            last_rmse = best_val_rmse
+            last_size = ntrain
 
-                last_rmse = best_val_rmse
-                last_size = ntrain
+            utils.info(
+                "Training size completed",
+                ntrain=ntrain,
+                validation_rmse=float(best_val_rmse),
+                eig_count=eig_count,
+                direct_count=direct_count,
+                **improvement,
+            )
 
-                utils.info(
-                    "Training size completed",
-                    ntrain=ntrain,
-                    validation_rmse=float(best_val_rmse),
-                    eig_count=eig_count,
-                    direct_count=direct_count,
-                    **improvement,
-                )
-
-                self.results[ntrain] = {
-                    "parameters": best_parameters,
-                    "val_rmse": float(best_val_rmse),
-                    "val_mae": float(best_val_mae),
-                    "eig_count": eig_count,
-                    "direct_count": direct_count,
-                    **improvement,
-                }
+            self.results[ntrain] = {
+                "parameters": best_parameters,
+                "val_rmse": float(best_val_rmse),
+                "val_mae": float(best_val_mae),
+                "eig_count": eig_count,
+                "direct_count": direct_count,
+                **improvement,
+            }
 
         utils.info("Evaluate models on test set")
         self._evaluate_models(best_cases)
@@ -153,7 +141,6 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
-    @tracker.track
     def _create_holdout_split(self, elemental: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
@@ -200,7 +187,9 @@ class AutoKRR:
             self._pairs_train = pair_features[:max_training_size]
             self._pairs_holdout = pair_features[max_training_size:]
 
-    def _detrend_matrix(self, is_train: bool, n: int | None = None) -> np.ndarray | None:
+    def _detrend_matrix(
+        self, is_train: bool, n: int | None = None
+    ) -> np.ndarray | None:
         """Build joint detrending design matrix from active detrending modes.
 
         Args:
@@ -234,7 +223,6 @@ class AutoKRR:
         # if too large, far from ntrain, if too small, noisy
         return min(valcount, 200)
 
-    @tracker.track
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
     ) -> tuple[float, float, float, int, int]:
@@ -266,10 +254,12 @@ class AutoKRR:
             if self._detrend_pairs:
                 n_atomic = len(self._elements_Z) if self._detrend_atomic else 0
                 for label, coef in zip(self._pairs_labels, coefs[n_atomic:]):
-                    utils.info("Pairwise detrending coefficient", label=label, coef=float(coef))
+                    utils.info(
+                        "Pairwise detrending coefficient", label=label, coef=float(coef)
+                    )
             y -= A @ coefs
         y -= np.mean(y)
-        #counter
+        # counter
         eig_count = 0
         direct_count = 0
         for factor in factors:
@@ -393,7 +383,6 @@ class AutoKRR:
         )
         return best_params, best_val_rmse, best_val_mae, eig_count, direct_count
 
-    @tracker.track
     def _evaluate_models(
         self,
         best_cases: dict[int, dict[str, float]],
@@ -423,7 +412,9 @@ class AutoKRR:
             K_train_row_mean = K_train.mean(axis=1, keepdims=True)
             K_train_col_mean = K_train.mean(axis=0, keepdims=True)
             K_train_mean = K_train.mean()
-            K_train_centered = K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            K_train_centered = (
+                K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            )
             # #Save means for the test kernel centering
             train_col_means[ntrain] = K_train_col_mean
             train_means[ntrain] = K_train_mean
@@ -469,7 +460,9 @@ class AutoKRR:
                     params_ntrain["sigma"], ntrain, X_batch, counts_batch, nc_batch
                 )
                 K_test_row_mean = K_test.mean(axis=1, keepdims=True)
-                K_test_centered = K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                K_test_centered = (
+                    K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                )
                 model_preds[ntrain].append(K_test_centered @ alpha)
 
         for ntrain, preds in model_preds.items():
