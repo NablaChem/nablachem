@@ -78,14 +78,16 @@ class _LocalKernelMatrix(KernelMatrix):
             self._D2[cross] = np.inf
 
         self._approx_fail_sigma = dict()
+        self._d_train_cache: dict[tuple, np.ndarray] = {}
         self._kernel_func.approx_prepare(train_counts, self._D2)
 
     def length_scale(self, ntrain: int) -> float:
         # get median nearest neighbor distance for first ntrain points
         nentries = sum(self._train_counts[:ntrain])
-        section = self._D2[:nentries, :nentries].copy()
-        np.fill_diagonal(section, np.inf)
-        nnvals = np.amin(section, axis=0)
+        section = self._D2[:nentries, :nentries]
+        # diagonal is always 0 (self-distance), so the 2nd-smallest per column
+        # is the nearest-neighbour distance — np.partition avoids a full copy
+        nnvals = np.partition(section, 1, axis=0)[1]
         return np.median(nnvals) ** 0.5
 
     @staticmethod
@@ -175,14 +177,17 @@ class _LocalKernelMatrix(KernelMatrix):
         K_test = self.aggregate_atomic_kernel(K_atom, counts_batch, atom_counts_A)
 
         # Compute normalization factors
-        # For training: get unnormalized diagonal first
-        K_atom_train = self._kernel_func.exact(
-            np.sqrt(self._D2[:natoms, :natoms]) / sigma
-        )
-        K_train_unnorm = self.aggregate_atomic_kernel(
-            K_atom_train, atom_counts_A, atom_counts_A
-        )
-        d_train_sqrt = np.sqrt(np.diag(K_train_unnorm))
+        # For training: get unnormalized diagonal (cached per sigma/ntrain)
+        cache_key = (sigma, ntrain)
+        if cache_key not in self._d_train_cache:
+            K_atom_train = self._kernel_func.exact(
+                np.sqrt(self._D2[:natoms, :natoms]) / sigma
+            )
+            K_train_unnorm = self.aggregate_atomic_kernel(
+                K_atom_train, atom_counts_A, atom_counts_A
+            )
+            self._d_train_cache[cache_key] = np.sqrt(np.diag(K_train_unnorm))
+        d_train_sqrt = self._d_train_cache[cache_key]
 
         # For test: self-kernel diagonal computed inline for this batch
         test_self_list = []
