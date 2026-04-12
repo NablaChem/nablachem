@@ -17,7 +17,7 @@ run_idx = None  # e.g. 0 to plot only the first run
 
 path = next(
     (a for a in sys.argv[1:] if a.endswith(".npz")),
-    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_512.npz",
+    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_512_VQM24.npz",
 )
 d = np.load(path)
 
@@ -43,6 +43,18 @@ ref_val = median_val[0]
 impr_median_test = (ref_test - median_test) / ref_test * 100
 impr_median_val = (ref_val - median_val) / ref_val * 100
 
+# per-run improvement arrays
+impr_all_test = (
+    (ref_test - test_errors[runs_to_plot]) / ref_test * 100
+)  # (n_runs, n_steps)
+
+# IQR across runs
+q25_test = np.percentile(impr_all_test, 25, axis=0)
+q75_test = np.percentile(impr_all_test, 75, axis=0)
+
+# running best (cumulative max of median improvement)
+running_best_test = np.maximum.accumulate(impr_median_test)
+
 running_avg = np.cumsum(median_value) / (np.arange(len(median_value)) + 1)
 n_dims = (median_weights > 0.001).sum(axis=1)
 
@@ -66,72 +78,84 @@ fig.suptitle(
     fontweight="bold",
 )
 
-# -- per-run lines
-if show_individual:
-    for r in runs_to_plot:
-        impr_r = (ref_test - test_errors[r]) / ref_test * 100
+# -- per-run lines (light traces behind median)
+if show_individual and n_runs > 1:
+    for i, r in enumerate(runs_to_plot):
         ax_main.plot(
             steps,
-            impr_r,
+            impr_all_test[i],
             color="C0",
-            alpha=0.35 if show_median else 0.8,
-            linewidth=0.8 if show_median else 1.2,
-            label=f"Run {r}" if not show_median else None,
+            alpha=0.15,
+            linewidth=0.7,
         )
+
+# -- IQR band
+if show_median and n_runs > 1:
+    ax_main.fill_between(
+        steps, q25_test, q75_test, color="C0", alpha=0.15, label="IQR (runs)"
+    )
 
 # -- median line
 if show_median:
     ax_main.plot(
-        steps, impr_median_test, marker="o", color="C0", label="Test RMSE (median)"
+        steps,
+        impr_median_test,
+        marker="o",
+        markersize=4,
+        color="C0",
+        linewidth=1.5,
+        label="Test RMSE (median)",
     )
     ax_main.plot(
         steps,
         impr_median_val,
-        marker="o",
-        color="C0",
+        marker="s",
+        markersize=3,
+        color="C1",
+        linewidth=1.2,
         linestyle="--",
-        alpha=0.5,
+        alpha=0.8,
         label="Val RMSE (median)",
     )
-    for x, y in zip(steps, impr_median_test):
-        ax_main.annotate(
-            f"{y:.1f}%",
-            xy=(x, y),
-            xytext=(0, 8),
-            textcoords="offset points",
-            ha="center",
-            fontsize=9,
-            color="C0",
-        )
-elif show_individual:
-    # annotate individual runs when median is off
-    for r in runs_to_plot:
-        impr_r = (ref_test - test_errors[r]) / ref_test * 100
-        for x, y in zip(steps, impr_r):
-            ax_main.annotate(
-                f"{y:.1f}%",
-                xy=(x, y),
-                xytext=(0, 8),
-                textcoords="offset points",
-                ha="center",
-                fontsize=7,
-                color=f"C{r % 10}",
-                alpha=0.6,
-            )
+    # running best envelope
+    ax_main.plot(
+        steps,
+        running_best_test,
+        color="C2",
+        linewidth=1.5,
+        linestyle=":",
+        label="Best so far (test)",
+    )
+    # annotate the best step
+    best_idx = np.argmax(impr_median_test)
+    ax_main.scatter(
+        [steps[best_idx]],
+        [impr_median_test[best_idx]],
+        color="C2",
+        zorder=5,
+        s=80,
+        marker="*",
+    )
+    ax_main.annotate(
+        f"best: {impr_median_test[best_idx]:.1f}%\nstep {steps[best_idx]}",
+        xy=(steps[best_idx], impr_median_test[best_idx]),
+        xytext=(10, -20),
+        textcoords="offset points",
+        fontsize=9,
+        color="C2",
+        arrowprops=dict(arrowstyle="->", color="C2", lw=1),
+    )
 
 ax_main.axhline(0, color="gray", linewidth=0.8, linestyle=":")
 ax_main.set_xlabel("Compression Step", fontsize=12)
-ax_main.set_ylabel("RMSE Improvement (%)", fontsize=12)
+ax_main.set_ylabel("RMSE Improvement (%, higher = better)", fontsize=12)
 ax_main.set_title("High-Quality RMSE vs Compression Steps", fontsize=12)
-ax_main.invert_yaxis()
 ax_main.grid(True, alpha=0.4)
 ax_main.legend(
     fontsize=9,
-    loc="upper center",
-    bbox_to_anchor=(0.5, 0.98),
+    loc="upper left",
     ncol=2,
     framealpha=0.9,
-    borderaxespad=0,
 )
 
 # -- weights

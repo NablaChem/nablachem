@@ -554,7 +554,7 @@ class Selector:
         pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
         for step in pbar:
 
-            if step % 5 == 0:
+            if step % 1 == 0:
                 y_train, y_test, mlo = ctrl["get_current_data"](params)
                 E_high = estimate_local_model_error(
                     y_train, y_test, mlo, n_workers=n_workers
@@ -652,10 +652,11 @@ class Selector:
         }
 
         np.savez(
-            f"{output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}", **results
+            f"{output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_VQM24",
+            **results,
         )
         print(
-            f"\nResults saved to {output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}.npz"
+            f"\nResults saved to {output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_VQM24.npz"
         )
         return results
 
