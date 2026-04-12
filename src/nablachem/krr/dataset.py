@@ -7,7 +7,6 @@ import ase
 import ase.io
 import numpy as np
 import pandas as pd
-from numpy.char import isdigit
 
 from .utils import info, warning, error
 
