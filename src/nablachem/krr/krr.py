@@ -9,13 +9,8 @@ from . import matrix
 from .dataset import DataSet
 from . import kernels
 
-from ..utils.perftracker import PerformanceTracker
-
 
 class AutoKRR:
-    tracker: PerformanceTracker = PerformanceTracker()
-
-    @tracker.track("AutoKRR")
     def __init__(
         self,
         dataset: DataSet,
@@ -26,90 +21,78 @@ class AutoKRR:
         detrend_pairs: str | None = None,
         elemental: bool = False,
     ) -> None:
-        with self.tracker.track("Initialization"):
-            self._archive = {}
-            self._archive["hyperopt"] = []
-            self.dataset = dataset
-            self._training_sizes = utils.get_training_sizes(mincount, maxcount)
-            self._detrend_atomic = detrend_atomic
-            self._detrend_pairs = detrend_pairs
-            self._elemental = elemental
+        self._archive = {}
+        self._archive["hyperopt"] = []
+        self.dataset = dataset
+        self._training_sizes = utils.get_training_sizes(mincount, maxcount)
+        self._detrend_atomic = detrend_atomic
+        self._detrend_pairs = detrend_pairs
+        self._elemental = elemental
 
-            self._create_holdout_split(elemental)
+        self._create_holdout_split(elemental)
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
-        with self.tracker.track("Kernel matrix setup"):
-            if self._local:
-                if self._elemental:
-                    self._kernel_matrix = matrix.ElementalKernelMatrix(
-                        self._X_train,
-                        self._train_counts,
-                        kernel_func,
-                        self._X_holdout,
-                        self._holdout_counts,
-                        nuclear_charges=self._train_nuclear_charges,
-                        holdout_nuclear_charges=self._holdout_nuclear_charges,
-                    )
-                else:
-                    self._kernel_matrix = matrix.LocalKernelMatrix(
-                        self._X_train,
-                        self._train_counts,
-                        kernel_func,
-                        self._X_holdout,
-                        self._holdout_counts,
-                    )
-            else:
-                if self._elemental:
-                    utils.error(
-                        "--elemental is not supported for global representations"
-                    )
-                self._kernel_matrix = matrix.GlobalKernelMatrix(
-                    self._X_train, kernel_func, self._X_holdout
+        if self._local:
+            if self._elemental:
+                self._kernel_matrix = matrix.ElementalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                    nuclear_charges=self._train_nuclear_charges,
                 )
+            else:
+                self._kernel_matrix = matrix.LocalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                )
+        else:
+            if self._elemental:
+                utils.error("--elemental is not supported for global representations")
+            self._kernel_matrix = matrix.GlobalKernelMatrix(self._X_train, kernel_func)
 
         last_rmse = None
         last_size = None
         best_cases = {}
 
-        with self.tracker.track("Learning curve"):
-            for i, ntrain in enumerate(self._training_sizes):
-                length_heuristic = self._kernel_matrix.length_scale(ntrain)
-                best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
-                    self._optimize_hyperparameters(ntrain, length_heuristic)
+        for i, ntrain in enumerate(self._training_sizes):
+            length_heuristic = self._kernel_matrix.length_scale(ntrain)
+            best_parameters, best_val_rmse, best_val_mae, eig_count, direct_count = (
+                self._optimize_hyperparameters(ntrain, length_heuristic)
+            )
+            best_cases[ntrain] = best_parameters
+
+            improvement = {}
+            if last_rmse is not None:
+                improvement["validation_slope"] = float(
+                    np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
                 )
-                best_cases[ntrain] = best_parameters
+            else:
+                improvement["validation_slope"] = None
 
-                improvement = {}
-                if last_rmse is not None:
-                    improvement["validation_slope"] = float(
-                        np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
-                    )
-                else:
-                    improvement["validation_slope"] = None
+            last_rmse = best_val_rmse
+            last_size = ntrain
 
-                last_rmse = best_val_rmse
-                last_size = ntrain
+            utils.info(
+                "Training size completed",
+                ntrain=ntrain,
+                validation_rmse=float(best_val_rmse),
+                eig_count=eig_count,
+                direct_count=direct_count,
+                **improvement,
+            )
 
-                utils.info(
-                    "Training size completed",
-                    ntrain=ntrain,
-                    validation_rmse=float(best_val_rmse),
-                    eig_count=eig_count,
-                    direct_count=direct_count,
-                    **improvement,
-                )
-
-                self.results[ntrain] = {
-                    "parameters": best_parameters,
-                    "val_rmse": float(best_val_rmse),
-                    "val_mae": float(best_val_mae),
-                    "eig_count": eig_count,
-                    "direct_count": direct_count,
-                    **improvement,
-                }
+            self.results[ntrain] = {
+                "parameters": best_parameters,
+                "val_rmse": float(best_val_rmse),
+                "val_mae": float(best_val_mae),
+                "eig_count": eig_count,
+                "direct_count": direct_count,
+                **improvement,
+            }
 
         utils.info("Evaluate models on test set")
         self._evaluate_models(best_cases)
@@ -158,7 +141,6 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
-    @tracker.track
     def _create_holdout_split(self, elemental: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
@@ -176,7 +158,8 @@ class AutoKRR:
         X_train = X_all[:max_training_size]
         self._y_train = y_all[:max_training_size]
 
-        self._X_holdout = X_all[max_training_size:]
+        self._holdout_representer = X_all
+        self._holdout_offset = max_training_size
         self._y_holdout = y_all[max_training_size:]
 
         self._local = X_train[0].ndim == 2 if X_train else False
@@ -184,19 +167,13 @@ class AutoKRR:
         if self._local:
             self._train_counts = np.array([rep.shape[0] for rep in X_train])
             self._X_train = np.concatenate(X_train, axis=0)
-            self._holdout_counts = np.array([rep.shape[0] for rep in self._X_holdout])
-            self._X_holdout = np.concatenate(self._X_holdout, axis=0)
             if elemental:
                 charges_all = self.dataset.nuclear_charges
                 self._train_nuclear_charges = np.concatenate(
                     charges_all[:max_training_size]
                 )
-                self._holdout_nuclear_charges = np.concatenate(
-                    charges_all[max_training_size:]
-                )
         else:
             self._X_train = np.stack(X_train, axis=0)
-            self._X_holdout = np.stack(self._X_holdout, axis=0)
 
         if self._detrend_atomic:
             element_counts, self._elements_Z = self.dataset.get_element_counts()
@@ -210,7 +187,9 @@ class AutoKRR:
             self._pairs_train = pair_features[:max_training_size]
             self._pairs_holdout = pair_features[max_training_size:]
 
-    def _detrend_matrix(self, is_train: bool, n: int | None = None) -> np.ndarray | None:
+    def _detrend_matrix(
+        self, is_train: bool, n: int | None = None
+    ) -> np.ndarray | None:
         """Build joint detrending design matrix from active detrending modes.
 
         Args:
@@ -244,7 +223,6 @@ class AutoKRR:
         # if too large, far from ntrain, if too small, noisy
         return min(valcount, 200)
 
-    @tracker.track
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
     ) -> tuple[float, float, float, int, int]:
@@ -276,10 +254,12 @@ class AutoKRR:
             if self._detrend_pairs:
                 n_atomic = len(self._elements_Z) if self._detrend_atomic else 0
                 for label, coef in zip(self._pairs_labels, coefs[n_atomic:]):
-                    utils.info("Pairwise detrending coefficient", label=label, coef=float(coef))
+                    utils.info(
+                        "Pairwise detrending coefficient", label=label, coef=float(coef)
+                    )
             y -= A @ coefs
         y -= np.mean(y)
-        #counter
+        # counter
         eig_count = 0
         direct_count = 0
         for factor in factors:
@@ -403,7 +383,6 @@ class AutoKRR:
         )
         return best_params, best_val_rmse, best_val_mae, eig_count, direct_count
 
-    @tracker.track
     def _evaluate_models(
         self,
         best_cases: dict[int, dict[str, float]],
@@ -433,7 +412,9 @@ class AutoKRR:
             K_train_row_mean = K_train.mean(axis=1, keepdims=True)
             K_train_col_mean = K_train.mean(axis=0, keepdims=True)
             K_train_mean = K_train.mean()
-            K_train_centered = K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            K_train_centered = (
+                K_train - K_train_row_mean - K_train_col_mean + K_train_mean
+            )
             # #Save means for the test kernel centering
             train_col_means[ntrain] = K_train_col_mean
             train_means[ntrain] = K_train_mean
@@ -449,22 +430,40 @@ class AutoKRR:
             y_tests[ntrain] = y_test
 
         model_preds = {_: list() for _ in models.keys()}
-        # batched prediction to save memory
+        # batched prediction to save memory: materialize one batch of holdout
+        # representations at a time rather than keeping them all in memory
+        n_holdout = len(self._y_holdout)
+        batch_size = self._kernel_matrix._batch_size
         for ntrain, alpha in models.items():
             params_ntrain = best_cases[ntrain]
             K_train_col_mean = train_col_means[ntrain]
             K_train_mean = train_means[ntrain]
-            batch = 0
-            while True:
+            for start in range(0, n_holdout, batch_size):
+                end = min(start + batch_size, n_holdout)
+                mols = self._holdout_representer._molecules[
+                    self._holdout_offset + start : self._holdout_offset + end
+                ]
+                reps = self._holdout_representer.compute(mols)
+                if self._local:
+                    counts_batch = np.array([r.shape[0] for r in reps])
+                    X_batch = np.concatenate(reps, axis=0)
+                    nc_batch = (
+                        np.concatenate([mol.get_atomic_numbers() for mol in mols])
+                        if self._elemental
+                        else None
+                    )
+                else:
+                    X_batch = np.stack(reps, axis=0)
+                    counts_batch = None
+                    nc_batch = None
                 K_test = self._kernel_matrix.compute_test_kernel_matrix(
-                    params_ntrain["sigma"], ntrain, batch
+                    params_ntrain["sigma"], ntrain, X_batch, counts_batch, nc_batch
                 )
-                if K_test is None:
-                    break
                 K_test_row_mean = K_test.mean(axis=1, keepdims=True)
-                K_test_centered = K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                K_test_centered = (
+                    K_test - K_test_row_mean - K_train_col_mean + K_train_mean
+                )
                 model_preds[ntrain].append(K_test_centered @ alpha)
-                batch += 1
 
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)

@@ -71,9 +71,6 @@ and the remaining molecules used as holdout/test data.
     help="Mask cross-element atom pairs in local kernel (requires local representation)",
 )
 @click.option(
-    "--track", is_flag=True, default=False, help="Enable performance tracking"
-)
-@click.option(
     "--archive", default="archive.json", help="Output file for KRR archive data"
 )
 def main(
@@ -89,7 +86,6 @@ def main(
     detrend_pairs,
     elemental,
     holdout_residuals,
-    track,
     archive,
 ):
     if os.path.exists(archive):
@@ -125,8 +121,8 @@ def main(
         )
 
     rep = rep_class_map[representation_name]()
-    rep.build([ds])
-    info("Built representation", first_entry_shape=ds.representations[0].shape)
+    rep.build(ds)
+    info("Prepared representation", first_entry_shape=ds.representations[0].shape)
 
     # Validate kernel name
     if kernel_name not in available_kernels:
@@ -187,7 +183,3 @@ def main(
         ds.write_holdout_residuals_jsonl(
             autokrr.holdout_residuals, maxcount, holdout_residuals
         )
-
-    if track:
-        print("\nPerformance Summary:")
-        autokrr.tracker.summary()
