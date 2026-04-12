@@ -1,11 +1,17 @@
-import numpy as np
-from numpy.char import isdigit
-import pandas as pd
-import ase
-import ase.io
+import gzip
+import random
+import re
 from io import StringIO
 
+import ase
+import ase.io
+import numpy as np
+import pandas as pd
+from numpy.char import isdigit
+
 from .utils import info, warning, error
+
+_CALC_COL_RE = re.compile(r"\bn_atoms\b|\bn_[A-Z][a-z]?\b")
 
 
 class DataSet:
@@ -16,30 +22,70 @@ class DataSet:
         limit: int = None,
         select: str = None,
     ):
-        """Read gzipped JSONL file.
+        """Read gzipped or plain JSONL file.
 
         Args:
-            filename: Path to .gz file containing JSON lines
+            filename: Path to .jsonl or .jsonl.gz file containing JSON lines
             labelname: String expression for pandas DataFrame.eval() to compute labels
                       Examples: "energy", "energy - baseline", "E_high - E_low"
             limit: Maximum number of molecules to load (None = no limit)
             select: Optional selection expression for pandas DataFrame.query()
         """
-        try:
-            df = pd.read_json(filename, lines=True)
-        except Exception as e:
-            error("Failed to load JSONL file", filename=filename, error_msg=str(e))
+        if limit is not None:
+            df = DataSet._reservoir_sample(filename, limit, select)
+        else:
+            try:
+                df = pd.read_json(filename, lines=True)
+            except Exception as e:
+                error("Failed to load JSONL file", filename=filename, error_msg=str(e))
+
+            mode = DataSet._detect_select_mode(select)
+
+            if select is not None:
+                if mode == "C":
+                    atom_cols = (
+                        pd.DataFrame(
+                            df["xyz"].apply(DataSet._parse_xyz_counts).tolist()
+                        )
+                        .fillna(0)
+                        .astype(int)
+                    )
+                    df = pd.concat([df, atom_cols], axis=1)
+                    for col in _CALC_COL_RE.findall(select):
+                        if col not in df.columns:
+                            df[col] = 0
+
+                try:
+                    starting_rows = len(df)
+                    df = df.query(select)
+                    remaining_rows = len(df)
+                    if remaining_rows == starting_rows:
+                        warning("Selection without effect", select=select)
+                    elif remaining_rows == 0:
+                        error(
+                            "There are no remaining rows",
+                            filename=filename,
+                            select=select,
+                        )
+                    else:
+                        info(
+                            "Applied selection",
+                            select=select,
+                            remaining_rows=remaining_rows,
+                        )
+                except Exception as e:
+                    error(
+                        "Failed to apply selection", select=select, error_msg=str(e)
+                    )
+
+                if mode == "C":
+                    df = df.drop(columns=atom_cols.columns)
 
         if "xyz" not in df.columns:
             error(
                 "Required 'xyz' column not found in dataset",
                 columns=df.columns.tolist(),
             )
-
-        atom_cols = pd.DataFrame(df["xyz"].apply(self._parse_xyz_counts).tolist())
-        atom_cols = atom_cols.fillna(0).astype(int)
-
-        df = pd.concat([df, atom_cols], axis=1)
 
         found_keys = [col for col in df.columns if col != "xyz"]
         info(
@@ -49,32 +95,7 @@ class DataSet:
             total_rows=len(df),
         )
 
-        if select is not None:
-            try:
-                starting_rows = len(df)
-                df = df.query(select)
-                remaining_rows = len(df)
-                if remaining_rows == starting_rows:
-                    warning("Selection without effect", select=select)
-                elif remaining_rows == 0:
-                    error(
-                        "There are no remaining rows", filename=filename, select=select
-                    )
-                else:
-                    info(
-                        "Applied selection",
-                        select=select,
-                        remaining_rows=remaining_rows,
-                    )
-
-            except Exception as e:
-                error("Failed to apply selection", select=select, error_msg=str(e))
-
         df = df.sample(frac=1).reset_index(drop=True)
-
-        if limit is not None:
-            df = df.head(limit)
-            info("Applied limit", limit=limit, final_rows=len(df))
 
         try:
             labels = df.eval(labelname)
@@ -181,6 +202,115 @@ class DataSet:
                 Z[i_idx] ** 2.5 * Z[j_idx] ** 2.5 * np.exp(-3 * dists)
             )
         return features, [label]
+
+    @staticmethod
+    def _detect_select_mode(select: str | None) -> str:
+        """Classify the select expression into one of three loading modes.
+
+        Returns:
+            "A": no select expression
+            "B": select references only native JSON columns
+            "C": select references calculated atom-count columns (n_atoms, n_X)
+        """
+        if select is None:
+            return "A"
+        if _CALC_COL_RE.search(select):
+            return "C"
+        return "B"
+
+    @staticmethod
+    def _open_jsonl(filename: str):
+        """Return an open file handle for a plain or gzip-compressed JSONL file."""
+        with open(filename, "rb") as probe:
+            magic = probe.read(2)
+        if magic == b"\x1f\x8b":
+            return gzip.open(filename, "rt")
+        return open(filename, "r")
+
+    @staticmethod
+    def _reservoir_sample(
+        filename: str,
+        limit: int,
+        select: str | None,
+        batch_size: int = 5000,
+    ) -> pd.DataFrame:
+        """Load up to *limit* rows from a JSONL file using reservoir sampling.
+
+        Processes the file in batches of *batch_size* lines.  Three modes,
+        selected automatically from *select*:
+
+        A (no select): reservoir-sample raw line strings; parse JSON only for
+                       the final reservoir.
+        B (native cols): parse each batch as a DataFrame, apply query, then
+                         reservoir-sample surviving rows.
+        C (calc cols):  same as B but also compute atom-count columns before
+                        querying; drop them before storing in the reservoir.
+
+        Returns a DataFrame with at most *limit* rows.  Atom-count columns are
+        never present in the result.
+        """
+        mode = DataSet._detect_select_mode(select)
+        reservoir: list = []
+        n_seen = 0
+
+        def _insert(item: object) -> None:
+            nonlocal n_seen
+            if len(reservoir) < limit:
+                reservoir.append(item)
+            else:
+                j = random.randint(0, n_seen)
+                if j < limit:
+                    reservoir[j] = item
+            n_seen += 1
+
+        def _process_batch(lines: list[str]) -> None:
+            if mode == "A":
+                for line in lines:
+                    _insert(line)
+                return
+
+            batch_df = pd.read_json(StringIO("\n".join(lines)), lines=True)
+
+            if mode == "C":
+                atom_cols = (
+                    pd.DataFrame(
+                        batch_df["xyz"].apply(DataSet._parse_xyz_counts).tolist()
+                    )
+                    .fillna(0)
+                    .astype(int)
+                )
+                batch_df = pd.concat([batch_df, atom_cols], axis=1)
+                for col in _CALC_COL_RE.findall(select):
+                    if col not in batch_df.columns:
+                        batch_df[col] = 0
+
+            batch_df = batch_df.query(select)
+
+            if mode == "C":
+                batch_df = batch_df.drop(columns=atom_cols.columns)
+
+            for row in batch_df.to_dict("records"):
+                _insert(row)
+
+        with DataSet._open_jsonl(filename) as f:
+            batch: list[str] = []
+            for raw_line in f:
+                line = raw_line.rstrip("\n")
+                if not line:
+                    continue
+                batch.append(line)
+                if len(batch) >= batch_size:
+                    _process_batch(batch)
+                    batch = []
+            if batch:
+                _process_batch(batch)
+
+        if not reservoir:
+            return pd.DataFrame()
+
+        if mode == "A":
+            return pd.read_json(StringIO("\n".join(reservoir)), lines=True)
+        return pd.DataFrame(reservoir)
 
     @staticmethod
     def _parse_xyz_counts(xyz: str) -> dict:
