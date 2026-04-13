@@ -454,14 +454,10 @@ def _value_and_grad(ctrl, weights, n_workers=11, xtb_cache=None):
             return i, 0.0
         eps = abs(float(weights[i])) * 1e-2
         mlo_fwd = ctrl["get_mlo"](weights.at[i].add(eps), approx=False)
-        mlo_bwd = ctrl["get_mlo"](weights.at[i].add(-eps), approx=False)
         E_fwd = estimate_local_model_error(
             y_train, y_test, mlo_fwd, xTB=True, xtb_cache=xtb_cache
         )
-        E_bwd = estimate_local_model_error(
-            y_train, y_test, mlo_bwd, xTB=True, xtb_cache=xtb_cache
-        )
-        return i, (E_fwd["test_rmse"] - E_bwd["test_rmse"]) / (2 * eps)
+        return i, (E_fwd["test_rmse"] - value) / eps
 
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         pbar = tqdm(
@@ -554,7 +550,7 @@ class Selector:
         pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
         for step in pbar:
 
-            if step % 1 == 0:
+            if step % 5 == 0:
                 y_train, y_test, mlo = ctrl["get_current_data"](params)
                 E_high = estimate_local_model_error(
                     y_train, y_test, mlo, n_workers=n_workers
@@ -620,7 +616,7 @@ class Selector:
         )
         rmse_steps = None
 
-        seeds = [1, 2, 3, 4, 5]
+        seeds = [2, 3, 4, 5]
         for run in range(self.n_runs):
             print(
                 f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}  (seed={seeds[run]})\n{'='*40}"

@@ -11,13 +11,13 @@ import matplotlib.pyplot as plt
 
 show_median = True
 show_individual = True
-run_idx = None  # e.g. 0 to plot only the first run
+run_idx = 2  # e.g. 0 to plot only the first run
 
 # %% load
 
 path = next(
     (a for a in sys.argv[1:] if a.endswith(".npz")),
-    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_512_VQM24.npz",
+    "/Users/ali/second_project_data/results/round_one_results/out_cMBDFLocal_elemental_512.npz",
 )
 d = np.load(path)
 
