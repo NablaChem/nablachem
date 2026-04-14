@@ -17,19 +17,25 @@ run_idx = 2  # e.g. 0 to plot only the first run
 
 path = next(
     (a for a in sys.argv[1:] if a.endswith(".npz")),
-    "/Users/ali/second_project_data/results/round_one_results/out_cMBDFLocal_elemental_512.npz",
+    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_512_test.npz",
 )
 d = np.load(path)
 
-steps = d["rmse_steps"]  # (n_eval_steps,)
-test_errors = d["test_errors"]  # (n_runs, n_eval_steps)
-val_errors = d["val_errors"]  # (n_runs, n_eval_steps)
+steps = d["rmse_steps"]  # (n_steps,)
+test_errors = d["test_errors"]  # (n_runs, n_steps)
+val_errors = d["val_errors"]  # (n_runs, n_steps)
 value_log = d["value_log"]  # (n_runs, n_steps)
 weight_log = d["weight_log"]  # (n_runs, n_steps, 40)
 
 n_runs = test_errors.shape[0]
 
 # %% derived
+
+if run_idx is not None and run_idx >= n_runs:
+    print(
+        f"Warning: run_idx={run_idx} out of range for {n_runs} run(s); using all runs."
+    )
+    run_idx = None
 
 runs_to_plot = [run_idx] if run_idx is not None else list(range(n_runs))
 
