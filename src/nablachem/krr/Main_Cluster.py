@@ -616,7 +616,9 @@ class Selector:
         )
         rmse_steps = None
 
-        seeds = [2, 3, 4, 5]
+        seeds = [
+            5,
+        ]
         for run in range(self.n_runs):
             print(
                 f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}  (seed={seeds[run]})\n{'='*40}"
@@ -648,11 +650,11 @@ class Selector:
         }
 
         np.savez(
-            f"{output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_VQM24",
+            f"{output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_{seeds[0]}",
             **results,
         )
         print(
-            f"\nResults saved to {output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_VQM24.npz"
+            f"\nResults saved to {output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_{seeds[0]}.npz"
         )
         return results
 
