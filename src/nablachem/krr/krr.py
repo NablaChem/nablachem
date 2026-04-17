@@ -290,11 +290,8 @@ class AutoKRR:
             for lam_idx in range(len(lam_grid)):
                 lam = lam_grid[lam_idx]
 
-                if mode == "eig" and useschur:
-                    mid = 1.0 / (eigvals + lam)
-                    Kinv = (Q * mid) @ Q.T
-                if mode == "direct" and useschur:
-                    Kinv = np.linalg.inv(K_full + lam * np.eye(ntrain))
+                if useschur:
+                    diag_L = 1.0 / (eigvals + lam)
 
                 split_rmse = []
                 split_mae = []
@@ -304,16 +301,15 @@ class AutoKRR:
                     np.random.shuffle(idx)
                     y_shuf = y[idx]
                     if useschur:
-                        Kinv_shuf = Kinv[idx][:, idx]
-                        E = Kinv_shuf[:-validation, :-validation]
-                        H = Kinv_shuf[-validation:, -validation:]
-                        F = Kinv_shuf[:-validation, -validation:]
-                        G = Kinv_shuf[-validation:, :-validation]
-                        H_inv = np.linalg.inv(H)
-                        alphapart = E @ y_shuf[:-validation] - F @ (
-                            H_inv @ (G @ y_shuf[:-validation])
-                        )
-                        alpha = alphapart
+                        Q_train = Q[idx[:-validation], :]
+                        Q_val = Q[idx[-validation:], :]
+                        y_train = y_shuf[:-validation]
+                        H = (Q_val * diag_L) @ Q_val.T
+                        L_Qt_y = diag_L * (Q_train.T @ y_train)
+                        E_v = Q_train @ L_Qt_y
+                        G_v = Q_val @ L_Qt_y
+                        x = np.linalg.solve(H, G_v)
+                        alpha = E_v - Q_train @ (diag_L * (Q_val.T @ x))
                     else:
                         K_full_shuf = K_full[idx][:, idx]
                         try:
