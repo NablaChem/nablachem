@@ -4,6 +4,7 @@ from scipy.special import gamma, kv
 import inspect
 
 from numpy.polynomial.chebyshev import Chebyshev
+from numba import njit
 
 
 class Kernel:
@@ -186,8 +187,110 @@ class Polynomial(Kernel):
         return k_vals / norm_const
 
 
+@njit(inline="always")
+def _grid_bin(grid, x):
+    """Smallest m with grid[m] >= x. Returns len(grid) if x exceeds all bins."""
+    lo = 0
+    hi = len(grid)
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        if grid[mid] < x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+@njit(cache=True)
+def _build_power_moments(power_moments, X, atoms_per_mol, power, ncheby, grid):
+    BATCH_TARGET = 1000
+    nmols = len(atoms_per_mol)
+    ngrid = len(grid)
+
+    off = np.empty(nmols + 1, dtype=np.int64)
+    off[0] = 0
+    for m in range(nmols):
+        off[m + 1] = off[m] + atoms_per_mol[m]
+    total_atoms = off[nmols]
+
+    all_norms = np.empty(total_atoms, dtype=np.float64)
+    for a in range(total_atoms):
+        s = 0.0
+        for f in range(X.shape[1]):
+            s += X[a, f] * X[a, f]
+        all_norms[a] = s
+
+    # Pack molecules into ~BATCH_TARGET-atom batches; one BLAS call per batch pair.
+    batch = np.empty(nmols + 2, dtype=np.int64)
+    batch[0] = 0
+    nb = 0
+    cur = 0
+    for m in range(nmols):
+        cur += atoms_per_mol[m]
+        if cur >= BATCH_TARGET:
+            nb += 1
+            batch[nb] = m + 1
+            cur = 0
+    if batch[nb] < nmols:
+        nb += 1
+        batch[nb] = nmols
+
+    for P in range(nb):
+        aP0, aP1 = off[batch[P]], off[batch[P + 1]]
+        for Q in range(P, nb):
+            aQ0, aQ1 = off[batch[Q]], off[batch[Q + 1]]
+            G = X[aP0:aP1] @ X[aQ0:aQ1].T
+
+            for i in range(batch[P], batch[P + 1]):
+                ai, ni = off[i], atoms_per_mol[i]
+                ai_l = ai - aP0
+                j_lo = i if P == Q else batch[Q]
+                for j in range(j_lo, batch[Q + 1]):
+                    aj, nj = off[j], atoms_per_mol[j]
+                    aj_l = aj - aQ0
+                    pair_idx = i * nmols - i * (i - 1) // 2 + (j - i)
+
+                    contrib = np.zeros((ncheby, ngrid), dtype=np.float64)
+                    x_max = -1.0  # sentinel; any real x_val is >= 0 after clamp
+                    for b in range(ni):
+                        nb_sq = all_norms[ai + b]
+                        row = ai_l + b
+                        for a in range(nj):
+                            d = all_norms[aj + a] + nb_sq - 2.0 * G[row, aj_l + a]
+                            if d < 0.0:
+                                d = 0.0
+                            x_val = np.sqrt(d) if power == 1 else d
+                            if x_val > x_max:
+                                x_max = x_val
+                            bi = _grid_bin(grid, x_val)
+                            if bi < ngrid:
+                                contrib[0, bi] += 1.0
+                                xk = 1.0
+                                for p in range(1, ncheby):
+                                    xk *= x_val
+                                    contrib[p, bi] += xk
+
+                    if x_max < 0.0:
+                        continue
+
+                    # Cap-to-(n-1) quirk: exclude one copy of the pair's max.
+                    bi = _grid_bin(grid, x_max)
+                    if bi < ngrid:
+                        contrib[0, bi] -= 1.0
+                        xk = 1.0
+                        for p in range(1, ncheby):
+                            xk *= x_max
+                            contrib[p, bi] -= xk
+
+                    for p in range(ncheby):
+                        run = 0.0
+                        for mm in range(ngrid):
+                            run += contrib[p, mm]
+                            power_moments[pair_idx, p, mm] = run
+
+
 class ExponentialToChebychev:
-    def __init__(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
+    def __init__(self, atoms_per_mol: np.ndarray, X: np.ndarray, power: int):
         self._local_grid = 1.5 ** np.linspace(-15, 15, 100)
         self._local_ymax = 20.0
 
@@ -224,36 +327,17 @@ class ExponentialToChebychev:
         nmols = len(atoms_per_mol)
         self._nmols = nmols
         grid = self._local_grid
-        npowers = len(cheby_p)
+        ncheby = len(cheby_p)
         npairs = nmols * (nmols + 1) // 2
+        if power not in (1, 2):
+            raise NotImplementedError(
+                "Only power=1 (for exp(-r)) and power=2 (for exp(-r^2)) are implemented"
+            )
 
-        power_moments = np.zeros((npairs, npowers, len(grid)), dtype=np.float64)
-        pair_idx = 0
-        atoms_per_mol_cumsum = np.concatenate([[0], np.cumsum(atoms_per_mol)])
-        for i in range(nmols):
-            for j in range(i, nmols):
-                x = Ds[
-                    atoms_per_mol_cumsum[i] : atoms_per_mol_cumsum[i + 1],
-                    atoms_per_mol_cumsum[j] : atoms_per_mol_cumsum[j + 1],
-                ].flatten()
-                x = np.sort(x).astype(np.float64)
-                x = x[np.isfinite(x)]
-
-                if len(x) == 0:
-                    pair_idx += 1
-                    continue
-
-                cum_moments = np.zeros((len(cheby_p), len(x) + 1))
-                cum_moments[0, 1:] = np.cumsum(np.ones_like(x))
-                for k in range(1, len(cheby_p)):
-                    cum_moments[k, 1:] = np.cumsum(x**k)
-
-                select_indices = np.minimum(
-                    np.searchsorted(x, grid, side="right"), len(x) - 1
-                )
-
-                power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
-                pair_idx += 1
+        power_moments = np.zeros((npairs, ncheby, len(grid)), dtype=np.float64)
+        _build_power_moments(
+            power_moments, X, atoms_per_mol, power, ncheby, self._local_grid
+        )
 
         self._local_power_moments = power_moments
         self._cache_built = True
@@ -293,8 +377,8 @@ class Gaussian(Kernel):
     def exact(self, dr):
         return np.exp(-(dr**2))
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=Ds)
+    def approx_prepare(self, atoms_per_mol: np.ndarray, X: np.ndarray):
+        self._chebytrick = ExponentialToChebychev(atoms_per_mol, X=X, power=2)
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma**2, ntrain)
@@ -304,8 +388,8 @@ class Exponential(Kernel):
     def exact(self, dr):
         return np.exp(-dr)
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=np.sqrt(Ds))
+    def approx_prepare(self, atoms_per_mol: np.ndarray, X: np.ndarray):
+        self._chebytrick = ExponentialToChebychev(atoms_per_mol, X=X, power=1)
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma, ntrain)
