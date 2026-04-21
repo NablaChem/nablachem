@@ -16,8 +16,6 @@ class KernelMatrix:
         self._kernel_func = kernel_func
         self._batch_size = 100
 
-        self._D2 = self._dist_squared(X)
-
     @staticmethod
     def _dist_squared(X_one: np.ndarray, X_other: np.ndarray = None) -> np.ndarray:
         """Compute squared Euclidean distances between points"""
@@ -80,13 +78,32 @@ class _LocalKernelMatrix(KernelMatrix):
         self._kernel_func.approx_prepare(train_counts, self._X)
 
     def length_scale(self, ntrain: int) -> float:
-        # get median nearest neighbor distance for first ntrain points
-        nentries = sum(self._train_counts[:ntrain])
-        section = self._D2[:nentries, :nentries]
-        # diagonal is always 0 (self-distance), so the 2nd-smallest per column
-        # is the nearest-neighbour distance — np.partition avoids a full copy
-        nnvals = np.partition(section, 1, axis=0)[1]
-        return np.median(nnvals) ** 0.5
+        return 1
+
+    @staticmethod
+    def _pack_batches(counts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Pack molecules into ~BATCH_TARGET-atom batches.
+
+        Returns (batch_mol_edges, atom_offsets): batch P covers molecules
+        batch_mol_edges[P]..batch_mol_edges[P+1], and atom_offsets is the
+        prefix-sum of counts (length nmols+1).
+        """
+        BATCH_TARGET = 1000
+        counts = np.asarray(counts)
+        nmols = len(counts)
+        atom_offsets = np.concatenate(([0], np.cumsum(counts))).astype(np.int64)
+
+        batches = [0]
+        cur = 0
+        for m in range(nmols):
+            cur += int(counts[m])
+            if cur >= BATCH_TARGET:
+                batches.append(m + 1)
+                cur = 0
+        if batches[-1] < nmols:
+            batches.append(nmols)
+
+        return np.asarray(batches, dtype=np.int64), atom_offsets
 
     @staticmethod
     def aggregate_atomic_kernel(
@@ -138,19 +155,54 @@ class _LocalKernelMatrix(KernelMatrix):
     def compute_train_kernel_matrix_exact(
         self, sigma: float, ntrain: int
     ) -> np.ndarray:
-        atom_counts_A = self._train_counts[:ntrain]
-        natoms = sum(atom_counts_A)
+        counts_A = np.asarray(self._train_counts[:ntrain])
+        natoms = int(counts_A.sum())
+        X_A = self._X[:natoms]
+        z_A = self._nuclear_charges[:natoms] if self._elemental else None
 
-        # Compute atomic kernel between test and train
-        K_atom = self._kernel_func.exact(np.sqrt(self._D2[:natoms, :natoms]) / sigma)
-        K_atom_train = self.aggregate_atomic_kernel(
-            K_atom, atom_counts_A, atom_counts_A
-        )
+        batches, atom_off = self._pack_batches(counts_A)
+        nbatches = len(batches) - 1
 
-        d_train_sqrt = np.sqrt(np.diag(K_atom_train))
-        K_train = K_atom_train / np.outer(d_train_sqrt, d_train_sqrt)
+        K = np.zeros((ntrain, ntrain))
 
-        return K_train
+        for P in range(nbatches):
+            iP0, iP1 = int(batches[P]), int(batches[P + 1])
+            aP0, aP1 = int(atom_off[iP0]), int(atom_off[iP1])
+            X_P = X_A[aP0:aP1]
+            counts_P = counts_A[iP0:iP1]
+            z_P = z_A[aP0:aP1] if z_A is not None else None
+
+            D2 = self._dist_squared(X_P)
+            if z_P is not None:
+                D2[z_P[:, None] != z_P[None, :]] = np.inf
+            K_atom_block = self._kernel_func.exact(np.sqrt(D2) / sigma)
+            K[iP0:iP1, iP0:iP1] = self.aggregate_atomic_kernel(
+                K_atom_block, counts_P, counts_P
+            )
+
+            for Q in range(P + 1, nbatches):
+                iQ0, iQ1 = int(batches[Q]), int(batches[Q + 1])
+                aQ0, aQ1 = int(atom_off[iQ0]), int(atom_off[iQ1])
+                X_Q = X_A[aQ0:aQ1]
+                counts_Q = counts_A[iQ0:iQ1]
+
+                # rows: batch-P atoms, cols: batch-Q atoms
+                D2 = self._dist_squared(X_Q, X_P)
+                if z_A is not None:
+                    z_Q = z_A[aQ0:aQ1]
+                    D2[z_P[:, None] != z_Q[None, :]] = np.inf
+                K_atom_block = self._kernel_func.exact(np.sqrt(D2) / sigma)
+                K_block = self.aggregate_atomic_kernel(
+                    K_atom_block, counts_P, counts_Q
+                )
+                K[iP0:iP1, iQ0:iQ1] = K_block
+                K[iQ0:iQ1, iP0:iP1] = K_block.T
+
+        d_train_sqrt = np.sqrt(np.diag(K))
+        K /= np.outer(d_train_sqrt, d_train_sqrt)
+        self._d_train_cache[(sigma, ntrain)] = d_train_sqrt
+
+        return K
 
     def compute_test_kernel_matrix(
         self,
@@ -161,55 +213,74 @@ class _LocalKernelMatrix(KernelMatrix):
         nc_batch: np.ndarray = None,
     ) -> np.ndarray:
         """Compute test kernel matrix for local representations"""
-        atom_counts_A = self._train_counts[:ntrain]
-        natoms = sum(atom_counts_A)
+        counts_A = np.asarray(self._train_counts[:ntrain])
+        natoms_A = int(counts_A.sum())
+        X_A = self._X[:natoms_A]
+        z_A = self._nuclear_charges[:natoms_A] if self._elemental else None
 
-        # Compute atomic kernel between test and train
-        D2 = self._dist_squared(self._X[:natoms], X_batch)
-        if self._elemental:
-            z_train = self._nuclear_charges[:natoms]
-            cross = nc_batch[:, None] != z_train[None, :]
-            D2 = D2.copy()
-            D2[cross] = np.inf
-        K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma)
-        K_test = self.aggregate_atomic_kernel(K_atom, counts_batch, atom_counts_A)
+        counts_B = np.asarray(counts_batch)
+        n_test_mols = len(counts_B)
+        X_B = np.asarray(X_batch)
+        z_B = np.asarray(nc_batch) if z_A is not None else None
 
-        # Compute normalization factors
-        # For training: get unnormalized diagonal (cached per sigma/ntrain)
+        batches_A, atom_off_A = self._pack_batches(counts_A)
+        batches_B, atom_off_B = self._pack_batches(counts_B)
+
+        K_test = np.zeros((n_test_mols, ntrain))
+
+        for P in range(len(batches_B) - 1):
+            iP0, iP1 = int(batches_B[P]), int(batches_B[P + 1])
+            aP0, aP1 = int(atom_off_B[iP0]), int(atom_off_B[iP1])
+            X_BP = X_B[aP0:aP1]
+            counts_BP = counts_B[iP0:iP1]
+            z_BP = z_B[aP0:aP1] if z_B is not None else None
+
+            for Q in range(len(batches_A) - 1):
+                iQ0, iQ1 = int(batches_A[Q]), int(batches_A[Q + 1])
+                aQ0, aQ1 = int(atom_off_A[iQ0]), int(atom_off_A[iQ1])
+                X_AQ = X_A[aQ0:aQ1]
+                counts_AQ = counts_A[iQ0:iQ1]
+
+                # rows: test-batch-P atoms, cols: train-batch-Q atoms
+                D2 = self._dist_squared(X_AQ, X_BP)
+                if z_A is not None:
+                    z_AQ = z_A[aQ0:aQ1]
+                    D2[z_BP[:, None] != z_AQ[None, :]] = np.inf
+                K_atom_block = self._kernel_func.exact(np.sqrt(D2) / sigma)
+                K_test[iP0:iP1, iQ0:iQ1] = self.aggregate_atomic_kernel(
+                    K_atom_block, counts_BP, counts_AQ
+                )
+
         cache_key = (sigma, ntrain)
         if cache_key not in self._d_train_cache:
-            K_atom_train = self._kernel_func.exact(
-                np.sqrt(self._D2[:natoms, :natoms]) / sigma
-            )
-            K_train_unnorm = self.aggregate_atomic_kernel(
-                K_atom_train, atom_counts_A, atom_counts_A
-            )
-            self._d_train_cache[cache_key] = np.sqrt(np.diag(K_train_unnorm))
+            d_train = np.empty(ntrain)
+            atom_start = 0
+            for i, count in enumerate(counts_A):
+                count = int(count)
+                atoms_i = X_A[atom_start : atom_start + count]
+                d2 = self._dist_squared(atoms_i)
+                if z_A is not None:
+                    z_i = z_A[atom_start : atom_start + count]
+                    d2[z_i[:, None] != z_i[None, :]] = np.inf
+                d_train[i] = self._kernel_func.exact(np.sqrt(d2) / sigma).sum()
+                atom_start += count
+            self._d_train_cache[cache_key] = np.sqrt(d_train)
         d_train_sqrt = self._d_train_cache[cache_key]
 
-        # For test: self-kernel diagonal computed inline for this batch
-        test_self_list = []
+        d_test = np.empty(n_test_mols)
         atom_start = 0
-        for count in counts_batch:
-            d2 = self._dist_squared(
-                X_batch[atom_start : atom_start + count],
-                X_batch[atom_start : atom_start + count],
-            )
-            if self._elemental:
-                z = nc_batch[atom_start : atom_start + count]
-                d2[z[:, None] != z[None, :]] = np.inf
-            test_self_list.append(d2)
+        for i, count in enumerate(counts_B):
+            count = int(count)
+            atoms_i = X_B[atom_start : atom_start + count]
+            d2 = self._dist_squared(atoms_i)
+            if z_B is not None:
+                z_i = z_B[atom_start : atom_start + count]
+                d2[z_i[:, None] != z_i[None, :]] = np.inf
+            d_test[i] = self._kernel_func.exact(np.sqrt(d2) / sigma).sum()
             atom_start += count
+        d_test_sqrt = np.sqrt(d_test)
 
-        d_test = np.sqrt(
-            [
-                self._kernel_func.exact(np.sqrt(test_self_dist) / sigma).sum()
-                for test_self_dist in test_self_list
-            ]
-        )
-
-        # Apply normalization
-        K_test /= np.outer(d_test, d_train_sqrt)
+        K_test /= np.outer(d_test_sqrt, d_train_sqrt)
 
         return K_test
 

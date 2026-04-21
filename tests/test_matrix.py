@@ -6,7 +6,12 @@ import pytest
 from nablachem.krr.dataset import DataSet
 from nablachem.krr.features import SLATMGlobal, SLATMLocal
 from nablachem.krr import kernels
-from nablachem.krr.matrix import GlobalKernelMatrix, LocalKernelMatrix, ElementalKernelMatrix
+from nablachem.krr.matrix import (
+    GlobalKernelMatrix,
+    LocalKernelMatrix,
+    ElementalKernelMatrix,
+    _LocalKernelMatrix,
+)
 
 DATA_FILE = pathlib.Path(__file__).parent / "data" / "molecules.jsonl"
 
@@ -354,3 +359,320 @@ def test_elemental_kernel_masks_cross_element_pairs_holdout():
     assert np.isclose(K_test[0, 1], expected_K_test_1), (
         f"K_test[0,1]={K_test[0,1]:.6f} but expected {expected_K_test_1:.6f}"
     )
+
+
+# --- Blockwise local kernel matrix reference + tests --------------------------
+#
+# Memory-heavy reference implementations mirror the pre-block code path: build
+# the full atom-atom distance matrix, apply the kernel, aggregate to molecular
+# kernel, and normalize. The block-based production code must produce the same
+# result up to floating-point reassociation.
+
+
+def _reference_local_train_exact(X, counts, kernel_func, sigma, nuclear_charges=None):
+    counts = np.asarray(counts)
+    natoms = int(counts.sum())
+    X = np.asarray(X[:natoms])
+
+    D2 = _LocalKernelMatrix._dist_squared(X)
+    if nuclear_charges is not None:
+        z = np.asarray(nuclear_charges[:natoms])
+        D2[z[:, None] != z[None, :]] = np.inf
+    K_atom = kernel_func.exact(np.sqrt(D2) / sigma)
+    K_mol = _LocalKernelMatrix.aggregate_atomic_kernel(K_atom, counts, counts)
+    d_sqrt = np.sqrt(np.diag(K_mol))
+    return K_mol / np.outer(d_sqrt, d_sqrt)
+
+
+def _reference_local_test(
+    X_train, train_counts, X_batch, counts_batch, kernel_func, sigma,
+    train_charges=None, batch_charges=None,
+):
+    train_counts = np.asarray(train_counts)
+    counts_batch = np.asarray(counts_batch)
+    natoms_train = int(train_counts.sum())
+    X_train = np.asarray(X_train[:natoms_train])
+    X_batch = np.asarray(X_batch)
+
+    D2 = _LocalKernelMatrix._dist_squared(X_train, X_batch)
+    if train_charges is not None:
+        z_train = np.asarray(train_charges[:natoms_train])
+        z_batch = np.asarray(batch_charges)
+        D2[z_batch[:, None] != z_train[None, :]] = np.inf
+    K_atom = kernel_func.exact(np.sqrt(D2) / sigma)
+    K_test = _LocalKernelMatrix.aggregate_atomic_kernel(K_atom, counts_batch, train_counts)
+
+    D2_tt = _LocalKernelMatrix._dist_squared(X_train)
+    if train_charges is not None:
+        D2_tt[z_train[:, None] != z_train[None, :]] = np.inf
+    K_atom_tt = kernel_func.exact(np.sqrt(D2_tt) / sigma)
+    K_train_unnorm = _LocalKernelMatrix.aggregate_atomic_kernel(
+        K_atom_tt, train_counts, train_counts
+    )
+    d_train_sqrt = np.sqrt(np.diag(K_train_unnorm))
+
+    d_test = np.empty(len(counts_batch))
+    start = 0
+    for i, c in enumerate(counts_batch):
+        c = int(c)
+        atoms_i = X_batch[start : start + c]
+        d2_ii = _LocalKernelMatrix._dist_squared(atoms_i)
+        if train_charges is not None:
+            z_i = z_batch[start : start + c]
+            d2_ii[z_i[:, None] != z_i[None, :]] = np.inf
+        d_test[i] = kernel_func.exact(np.sqrt(d2_ii) / sigma).sum()
+        start += c
+    d_test_sqrt = np.sqrt(d_test)
+
+    return K_test / np.outer(d_test_sqrt, d_train_sqrt)
+
+
+def _pad_to_total_atoms(counts, target, rng):
+    deficit = target - int(counts.sum())
+    if deficit > 0:
+        idx = rng.choice(len(counts), size=deficit, replace=True)
+        for k in idx:
+            counts[k] += 1
+    return counts
+
+
+class TestLocalKernelMatrixBlockwise:
+    FEATURES = 50
+    KERNELS = [kernels.Gaussian, kernels.Exponential]
+    TOL = dict(rtol=1e-10, atol=1e-8)
+
+    @pytest.mark.parametrize("seed", [0, 1, 42])
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    @pytest.mark.parametrize("sigma", [0.5, 5.0])
+    @pytest.mark.parametrize(
+        "nmols,atom_lo,atom_hi",
+        [(5, 2, 6), (15, 3, 10), (25, 2, 8)],
+    )
+    def test_train_matches_reference(
+        self, seed, kernel_cls, sigma, nmols, atom_lo, atom_hi
+    ):
+        rng = np.random.default_rng(seed)
+        counts = rng.integers(atom_lo, atom_hi + 1, size=nmols).astype(np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+
+        kf = kernel_cls()
+        K_got = LocalKernelMatrix(X, counts, kf).compute_train_kernel_matrix_exact(
+            sigma, nmols
+        )
+        K_ref = _reference_local_train_exact(X, counts, kf, sigma)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("seed", [0, 1, 42])
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    @pytest.mark.parametrize("sigma", [0.5, 5.0])
+    @pytest.mark.parametrize(
+        "nmols,atom_lo,atom_hi,n_test",
+        [(5, 2, 6, 3), (15, 3, 10, 7), (25, 2, 8, 10)],
+    )
+    def test_test_matches_reference(
+        self, seed, kernel_cls, sigma, nmols, atom_lo, atom_hi, n_test
+    ):
+        rng = np.random.default_rng(seed)
+        counts = rng.integers(atom_lo, atom_hi + 1, size=nmols).astype(np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+        counts_test = rng.integers(atom_lo, atom_hi + 1, size=n_test).astype(np.int64)
+        X_test = rng.uniform(size=(int(counts_test.sum()), self.FEATURES))
+
+        kf = kernel_cls()
+        kmat = LocalKernelMatrix(X, counts, kf)
+        K_got = kmat.compute_test_kernel_matrix(sigma, nmols, X_test, counts_test)
+        K_ref = _reference_local_test(X, counts, X_test, counts_test, kf, sigma)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    def test_train_batching_boundary(self, kernel_cls):
+        # ~2500 train atoms across ~300 molecules → multiple batches of 1000.
+        rng = np.random.default_rng(7)
+        nmols = 300
+        counts = rng.integers(6, 12, size=nmols).astype(np.int64)
+        counts = _pad_to_total_atoms(counts, 2500, rng)
+        assert int(counts.sum()) >= 2500
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+
+        kf = kernel_cls()
+        sigma = 5.0
+        K_got = LocalKernelMatrix(X, counts, kf).compute_train_kernel_matrix_exact(
+            sigma, nmols
+        )
+        K_ref = _reference_local_train_exact(X, counts, kf, sigma)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    def test_test_batching_boundary(self, kernel_cls):
+        # ~2500 train atoms × ~1500 test atoms → multi-batch × multi-batch sweep.
+        rng = np.random.default_rng(11)
+        counts = rng.integers(6, 12, size=300).astype(np.int64)
+        counts = _pad_to_total_atoms(counts, 2500, rng)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+        counts_test = rng.integers(6, 12, size=180).astype(np.int64)
+        counts_test = _pad_to_total_atoms(counts_test, 1500, rng)
+        assert int(counts_test.sum()) >= 1500
+        X_test = rng.uniform(size=(int(counts_test.sum()), self.FEATURES))
+
+        kf = kernel_cls()
+        sigma = 5.0
+        kmat = LocalKernelMatrix(X, counts, kf)
+        K_got = kmat.compute_test_kernel_matrix(sigma, len(counts), X_test, counts_test)
+        K_ref = _reference_local_test(X, counts, X_test, counts_test, kf, sigma)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("seed", [0, 5, 42])
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    def test_single_atom_molecules(self, seed, kernel_cls):
+        rng = np.random.default_rng(seed)
+        counts = np.array([1, 3, 1, 5, 2, 1, 4], dtype=np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+        X_test_counts = np.array([1, 2, 1], dtype=np.int64)
+        X_test = rng.uniform(size=(int(X_test_counts.sum()), self.FEATURES))
+
+        kf = kernel_cls()
+        sigma = 1.5
+        kmat = LocalKernelMatrix(X, counts, kf)
+        K_train = kmat.compute_train_kernel_matrix_exact(sigma, len(counts))
+        K_train_ref = _reference_local_train_exact(X, counts, kf, sigma)
+        np.testing.assert_allclose(K_train, K_train_ref, **self.TOL)
+
+        # Fresh instance so the cache doesn't hide bugs in the test-path diag.
+        kmat2 = LocalKernelMatrix(X, counts, kf)
+        K_test = kmat2.compute_test_kernel_matrix(
+            sigma, len(counts), X_test, X_test_counts
+        )
+        K_test_ref = _reference_local_test(X, counts, X_test, X_test_counts, kf, sigma)
+        np.testing.assert_allclose(K_test, K_test_ref, **self.TOL)
+
+    @pytest.mark.parametrize("seed", [0, 1, 42])
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    @pytest.mark.parametrize("sigma", [0.5, 5.0])
+    def test_elemental_train_matches_reference(self, seed, kernel_cls, sigma):
+        rng = np.random.default_rng(seed)
+        counts = rng.integers(3, 10, size=20).astype(np.int64)
+        natoms = int(counts.sum())
+        X = rng.uniform(size=(natoms, self.FEATURES))
+        charges = rng.choice([1, 6, 7, 8, 9], size=natoms).astype(float)
+
+        kf = kernel_cls()
+        K_got = ElementalKernelMatrix(
+            X, counts, kf, nuclear_charges=charges
+        ).compute_train_kernel_matrix_exact(sigma, len(counts))
+        K_ref = _reference_local_train_exact(X, counts, kf, sigma, nuclear_charges=charges)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("seed", [0, 1, 42])
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    @pytest.mark.parametrize("sigma", [0.5, 5.0])
+    def test_elemental_test_matches_reference(self, seed, kernel_cls, sigma):
+        rng = np.random.default_rng(seed)
+        counts = rng.integers(3, 10, size=20).astype(np.int64)
+        natoms = int(counts.sum())
+        X = rng.uniform(size=(natoms, self.FEATURES))
+        charges = rng.choice([1, 6, 7, 8, 9], size=natoms).astype(float)
+
+        counts_test = rng.integers(3, 10, size=8).astype(np.int64)
+        natoms_test = int(counts_test.sum())
+        X_test = rng.uniform(size=(natoms_test, self.FEATURES))
+        charges_test = rng.choice([1, 6, 7, 8, 9], size=natoms_test).astype(float)
+
+        kf = kernel_cls()
+        kmat = ElementalKernelMatrix(X, counts, kf, nuclear_charges=charges)
+        K_got = kmat.compute_test_kernel_matrix(
+            sigma, len(counts), X_test, counts_test, nc_batch=charges_test
+        )
+        K_ref = _reference_local_test(
+            X, counts, X_test, counts_test, kf, sigma,
+            train_charges=charges, batch_charges=charges_test,
+        )
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    @pytest.mark.parametrize("kernel_cls", KERNELS)
+    def test_elemental_batching_boundary(self, kernel_cls):
+        rng = np.random.default_rng(13)
+        counts = rng.integers(6, 12, size=300).astype(np.int64)
+        counts = _pad_to_total_atoms(counts, 2500, rng)
+        natoms = int(counts.sum())
+        X = rng.uniform(size=(natoms, self.FEATURES))
+        charges = rng.choice([1, 6, 7, 8, 9], size=natoms).astype(float)
+
+        counts_test = rng.integers(6, 12, size=180).astype(np.int64)
+        counts_test = _pad_to_total_atoms(counts_test, 1500, rng)
+        natoms_test = int(counts_test.sum())
+        X_test = rng.uniform(size=(natoms_test, self.FEATURES))
+        charges_test = rng.choice([1, 6, 7, 8, 9], size=natoms_test).astype(float)
+
+        kf = kernel_cls()
+        sigma = 5.0
+        kmat = ElementalKernelMatrix(X, counts, kf, nuclear_charges=charges)
+        K_train_got = kmat.compute_train_kernel_matrix_exact(sigma, len(counts))
+        K_train_ref = _reference_local_train_exact(
+            X, counts, kf, sigma, nuclear_charges=charges
+        )
+        np.testing.assert_allclose(K_train_got, K_train_ref, **self.TOL)
+
+        # Use a second instance so the test-path diag is recomputed from scratch.
+        kmat2 = ElementalKernelMatrix(X, counts, kf, nuclear_charges=charges)
+        K_test_got = kmat2.compute_test_kernel_matrix(
+            sigma, len(counts), X_test, counts_test, nc_batch=charges_test
+        )
+        K_test_ref = _reference_local_test(
+            X, counts, X_test, counts_test, kf, sigma,
+            train_charges=charges, batch_charges=charges_test,
+        )
+        np.testing.assert_allclose(K_test_got, K_test_ref, **self.TOL)
+
+    def test_train_ntrain_subset(self):
+        rng = np.random.default_rng(0)
+        counts = rng.integers(2, 8, size=30).astype(np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+
+        kf = kernels.Gaussian()
+        sigma = 3.0
+        kmat = LocalKernelMatrix(X, counts, kf)
+        K_got = kmat.compute_train_kernel_matrix_exact(sigma, 15)
+        K_ref = _reference_local_train_exact(X, counts[:15], kf, sigma)
+
+        np.testing.assert_allclose(K_got, K_ref, **self.TOL)
+
+    def test_d_train_cache_populated_by_train_path(self):
+        rng = np.random.default_rng(1)
+        counts = rng.integers(3, 8, size=12).astype(np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+
+        kf = kernels.Gaussian()
+        sigma = 2.0
+        kmat = LocalKernelMatrix(X, counts, kf)
+        kmat.compute_train_kernel_matrix_exact(sigma, len(counts))
+        assert (sigma, len(counts)) in kmat._d_train_cache
+
+    def test_d_train_cache_populated_by_test_path(self):
+        rng = np.random.default_rng(2)
+        counts = rng.integers(3, 8, size=12).astype(np.int64)
+        X = rng.uniform(size=(int(counts.sum()), self.FEATURES))
+        counts_test = rng.integers(3, 8, size=4).astype(np.int64)
+        X_test = rng.uniform(size=(int(counts_test.sum()), self.FEATURES))
+
+        kf = kernels.Gaussian()
+        sigma = 2.0
+        kmat = LocalKernelMatrix(X, counts, kf)
+        kmat.compute_test_kernel_matrix(sigma, len(counts), X_test, counts_test)
+
+        key = (sigma, len(counts))
+        assert key in kmat._d_train_cache
+
+        # Cached diag equals the reference train self-kernel diag.
+        D2_tt = _LocalKernelMatrix._dist_squared(X)
+        K_atom_tt = kf.exact(np.sqrt(D2_tt) / sigma)
+        K_train_unnorm = _LocalKernelMatrix.aggregate_atomic_kernel(
+            K_atom_tt, counts, counts
+        )
+        expected = np.sqrt(np.diag(K_train_unnorm))
+        np.testing.assert_allclose(kmat._d_train_cache[key], expected, **self.TOL)
