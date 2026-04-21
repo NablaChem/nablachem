@@ -74,12 +74,10 @@ class _LocalKernelMatrix(KernelMatrix):
 
         if elemental:
             self._nuclear_charges = np.asarray(nuclear_charges, dtype=float)
-            cross = self._nuclear_charges[:, None] != self._nuclear_charges[None, :]
-            self._D2[cross] = np.inf
 
         self._approx_fail_sigma = dict()
         self._d_train_cache: dict[tuple, np.ndarray] = {}
-        self._kernel_func.approx_prepare(train_counts, self._D2)
+        self._kernel_func.approx_prepare(train_counts, self._X)
 
     def length_scale(self, ntrain: int) -> float:
         # get median nearest neighbor distance for first ntrain points
@@ -231,6 +229,10 @@ class LocalKernelMatrix(_LocalKernelMatrix):
 
 class GlobalKernelMatrix(KernelMatrix):
     """Kernel matrix for global (molecule-based) representations"""
+
+    def __init__(self, X: np.ndarray, kernel_func: Kernel):
+        super().__init__(X, kernel_func)
+        self._D2 = self._dist_squared(X)
 
     def compute_train_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
         """Compute training kernel matrix for global representations"""

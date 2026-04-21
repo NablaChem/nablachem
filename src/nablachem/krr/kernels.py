@@ -291,7 +291,7 @@ def _build_power_moments(power_moments, X, atoms_per_mol, power, ncheby, grid):
 
 class ExponentialToChebychev:
     def __init__(self, atoms_per_mol: np.ndarray, X: np.ndarray, power: int):
-        self._local_grid = 1.5 ** np.linspace(-15, 15, 100)
+        self._local_grid = 1.5 ** np.linspace(-15, 15, 20)
         self._local_ymax = 20.0
 
         # Chebyshev polynomial coefficients for exp approximation
@@ -317,7 +317,7 @@ class ExponentialToChebychev:
             1.9431609391984766e-07,
             -5.0571492223751847e-08,
             1.1357243950084354e-08,
-        ]
+        ][:12]
 
         P = Chebyshev(cheby_p, domain=[0, self._local_ymax])
         Q = P.convert(kind=np.polynomial.Polynomial)
