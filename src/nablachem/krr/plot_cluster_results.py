@@ -76,7 +76,7 @@ aggregate_files = True
 
 path = next(
     (a for a in sys.argv[1:] if a.endswith(".npz")),
-    "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_2048_1.npz",
+    "/Users/ali/second_project_data/results/out_MACELocal_local_2048_1.npz",
 )
 
 
@@ -95,7 +95,7 @@ def _dedup(nd, impr, select_by=None):
 
 if aggregate_files:
     _stem = re.sub(r"_\d+\.npz$", "", path)
-    _ds = [np.load(f"{_stem}_{i}.npz") for i in range(1, 6)]
+    _ds = [np.load(f"{_stem}_{i}.npz") for i in range(1, 5)]
     print(f"Loaded {len(_ds)} files")
 
     # Per-file: compute median improvement curve, then dedup
