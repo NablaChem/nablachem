@@ -75,7 +75,10 @@ class _LocalKernelMatrix(KernelMatrix):
 
         self._approx_fail_sigma = dict()
         self._d_train_cache: dict[tuple, np.ndarray] = {}
-        self._kernel_func.approx_prepare(train_counts, self._X)
+        charges_arg = self._nuclear_charges if elemental else None
+        self._kernel_func.approx_prepare(
+            train_counts, self._X, nuclear_charges=charges_arg
+        )
 
     def length_scale(self, ntrain: int) -> float:
         return 1

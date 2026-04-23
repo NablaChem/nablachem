@@ -202,7 +202,9 @@ def _grid_bin(grid, x):
 
 
 @njit(cache=True)
-def _build_power_moments(power_moments, X, atoms_per_mol, power, ncheby, grid):
+def _build_power_moments(
+    power_moments, X, atoms_per_mol, power, ncheby, grid, charges, use_elemental
+):
     BATCH_TARGET = 1000
     nmols = len(atoms_per_mol)
     ngrid = len(grid)
@@ -256,6 +258,8 @@ def _build_power_moments(power_moments, X, atoms_per_mol, power, ncheby, grid):
                         nb_sq = all_norms[ai + b]
                         row = ai_l + b
                         for a in range(nj):
+                            if use_elemental and charges[ai + b] != charges[aj + a]:
+                                continue
                             d = all_norms[aj + a] + nb_sq - 2.0 * G[row, aj_l + a]
                             if d < 0.0:
                                 d = 0.0
@@ -290,7 +294,13 @@ def _build_power_moments(power_moments, X, atoms_per_mol, power, ncheby, grid):
 
 
 class ExponentialToChebychev:
-    def __init__(self, atoms_per_mol: np.ndarray, X: np.ndarray, power: int):
+    def __init__(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        power: int,
+        nuclear_charges: np.ndarray = None,
+    ):
         self._local_grid = 1.5 ** np.linspace(-15, 15, 20)
         self._local_ymax = 20.0
 
@@ -335,8 +345,21 @@ class ExponentialToChebychev:
             )
 
         power_moments = np.zeros((npairs, ncheby, len(grid)), dtype=np.float64)
+        if nuclear_charges is None:
+            charges_arr = np.zeros(0, dtype=np.float64)
+            use_elemental = False
+        else:
+            charges_arr = np.asarray(nuclear_charges, dtype=np.float64)
+            use_elemental = True
         _build_power_moments(
-            power_moments, X, atoms_per_mol, power, ncheby, self._local_grid
+            power_moments,
+            X,
+            atoms_per_mol,
+            power,
+            ncheby,
+            self._local_grid,
+            charges_arr,
+            use_elemental,
         )
 
         self._local_power_moments = power_moments
@@ -377,8 +400,15 @@ class Gaussian(Kernel):
     def exact(self, dr):
         return np.exp(-(dr**2))
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, X: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, X=X, power=2)
+    def approx_prepare(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        nuclear_charges: np.ndarray = None,
+    ):
+        self._chebytrick = ExponentialToChebychev(
+            atoms_per_mol, X=X, power=2, nuclear_charges=nuclear_charges
+        )
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma**2, ntrain)
@@ -388,8 +418,15 @@ class Exponential(Kernel):
     def exact(self, dr):
         return np.exp(-dr)
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, X: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, X=X, power=1)
+    def approx_prepare(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        nuclear_charges: np.ndarray = None,
+    ):
+        self._chebytrick = ExponentialToChebychev(
+            atoms_per_mol, X=X, power=1, nuclear_charges=nuclear_charges
+        )
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma, ntrain)

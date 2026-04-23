@@ -676,3 +676,19 @@ class TestLocalKernelMatrixBlockwise:
         )
         expected = np.sqrt(np.diag(K_train_unnorm))
         np.testing.assert_allclose(kmat._d_train_cache[key], expected, **self.TOL)
+
+
+def test_elemental_approx_masks_disjoint_element_pair():
+    # Two molecules with no shared elements: N2 and H2. Every atom-atom pair
+    # across them is cross-element, so under elemental masking the Chebyshev
+    # power moments for pair (0, 1) must be identically zero.
+    kf = kernels.Gaussian()
+    counts = np.array([2, 2], dtype=np.int64)
+    charges = np.array([7.0, 7.0, 1.0, 1.0])  # N2, H2
+    X = np.random.default_rng(0).uniform(size=(4, 5))
+
+    ElementalKernelMatrix(X, counts, kf, nuclear_charges=charges)
+
+    # pair_idx layout for 2 mols: 0→(0,0), 1→(0,1), 2→(1,1).
+    cross = kf._chebytrick._local_power_moments[1]
+    assert np.all(cross == 0.0)
