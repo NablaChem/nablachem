@@ -221,7 +221,7 @@ class AutoKRR:
         valcount = int(ntrain * 0.2)
 
         # if too large, far from ntrain, if too small, noisy
-        return min(valcount, 200)
+        return valcount
 
     def _optimize_hyperparameters(
         self, ntrain: int, length_heuristic: float
@@ -277,74 +277,88 @@ class AutoKRR:
             condition_number = eigvals[-1] / eigvals[1]
             if condition_number > 1e15:
                 continue
-            if condition_number < 5e8 and ntrain > 64:
+            if  ntrain > 64:
                 mode = "eig"
                 eig_count += 1
             else:
                 mode = "direct"
                 direct_count += 1
             useschur = False
-            if condition_number < 5e8 and ntrain > 128:
+            if  ntrain > 128:
                 useschur = True
 
-            for lam_idx in range(len(lam_grid)):
-                lam = lam_grid[lam_idx]
+            split_results = [
+                {"rmse": [], "mae": [], "train_rmse": [], "train_mae": []}
+                for _ in lam_grid
+            ]
+            converged = [False] * len(lam_grid)
+
+            for shuf_idx in range(shufs):
+                if all(converged):
+                    break
+                np.random.shuffle(idx)
+                y_shuf = y[idx]
+                train_idx = idx[:-validation]
+                val_idx = idx[-validation:]
+                K_val_train = K_full[np.ix_(val_idx, train_idx)]
+                K_train_train = K_full[np.ix_(train_idx, train_idx)]
 
                 if useschur:
-                    diag_L = 1.0 / (eigvals + lam)
+                    Q_train = Q[train_idx, :]
+                    Q_val = Q[val_idx, :]
+                    Qt_y_train = Q_train.T @ y_shuf[:-validation]
 
-                split_rmse = []
-                split_mae = []
-                split_train_rmse = []
-                split_train_mae = []
-                for shuf_idx in range(shufs):
-                    np.random.shuffle(idx)
-                    y_shuf = y[idx]
+                for lam_idx, lam in enumerate(lam_grid):
+                    if converged[lam_idx]:
+                        continue
+
                     if useschur:
-                        Q_train = Q[idx[:-validation], :]
-                        Q_val = Q[idx[-validation:], :]
-                        y_train = y_shuf[:-validation]
+                        diag_L = 1.0 / (eigvals + lam)
                         H = (Q_val * diag_L) @ Q_val.T
-                        L_Qt_y = diag_L * (Q_train.T @ y_train)
+                        L_Qt_y = diag_L * Qt_y_train
                         E_v = Q_train @ L_Qt_y
                         G_v = Q_val @ L_Qt_y
                         x = np.linalg.solve(H, G_v)
                         alpha = E_v - Q_train @ (diag_L * (Q_val.T @ x))
                     else:
-                        K_full_shuf = K_full[idx][:, idx]
                         try:
                             with warnings.catch_warnings():
                                 warnings.simplefilter("ignore", LinAlgWarning)
                                 alpha = linalg.solve(
-                                    K_full_shuf[:-validation, :-validation]
-                                    + lam * np.eye(ntrain - validation),
+                                    K_train_train + lam * np.eye(ntrain - validation),
                                     y_shuf[:-validation],
                                     assume_a="pos",
                                 )
                         except linalg.LinAlgError:
                             continue
 
-                    # validation
-                    pred = K_full[idx[-validation:]][:, idx[:-validation]] @ alpha
+                    pred = K_val_train @ alpha
                     rmse = np.sqrt(((pred - y_shuf[-validation:]) ** 2).mean())
                     mae = np.abs(pred - y_shuf[-validation:]).mean()
-                    split_rmse.append(rmse)
-                    split_mae.append(mae)
+                    split_results[lam_idx]["rmse"].append(rmse)
+                    split_results[lam_idx]["mae"].append(mae)
 
-                    # training
-                    pred_train = K_full[idx[:-validation]][:, idx[:-validation]] @ alpha
+                    pred_train = K_train_train @ alpha
                     rmse_train = np.sqrt(
                         ((pred_train - y_shuf[:-validation]) ** 2).mean()
                     )
                     mae_train = np.abs(pred_train - y_shuf[:-validation]).mean()
-                    split_train_rmse.append(rmse_train)
-                    split_train_mae.append(mae_train)
+                    split_results[lam_idx]["train_rmse"].append(rmse_train)
+                    split_results[lam_idx]["train_mae"].append(mae_train)
 
-                    if len(split_rmse) > 5:
-                        one = np.median(split_rmse[::2])
-                        two = np.median(split_rmse[1::2])
-                        if abs(one - two) / np.median(split_rmse) < 5e-2:
-                            break
+                    res = split_results[lam_idx]["rmse"]
+                    if len(res) > 5:
+                        one = np.median(res[::2])
+                        two = np.median(res[1::2])
+                        if abs(one - two) / np.median(res) < 5e-2:
+                            converged[lam_idx] = True
+
+            for lam_idx, lam in enumerate(lam_grid):
+                res = split_results[lam_idx]
+                split_rmse = res["rmse"]
+                split_mae = res["mae"]
+                split_train_rmse = res["train_rmse"]
+                split_train_mae = res["train_mae"]
 
                 if len(split_rmse) < 5:
                     continue
