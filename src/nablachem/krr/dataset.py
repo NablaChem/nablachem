@@ -73,9 +73,7 @@ class DataSet:
                             remaining_rows=remaining_rows,
                         )
                 except Exception as e:
-                    error(
-                        "Failed to apply selection", select=select, error_msg=str(e)
-                    )
+                    error("Failed to apply selection", select=select, error_msg=str(e))
 
                 if mode == "C":
                     df = df.drop(columns=atom_cols.columns)

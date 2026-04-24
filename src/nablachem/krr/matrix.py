@@ -195,9 +195,7 @@ class _LocalKernelMatrix(KernelMatrix):
                     z_Q = z_A[aQ0:aQ1]
                     D2[z_P[:, None] != z_Q[None, :]] = np.inf
                 K_atom_block = self._kernel_func.exact(np.sqrt(D2) / sigma)
-                K_block = self.aggregate_atomic_kernel(
-                    K_atom_block, counts_P, counts_Q
-                )
+                K_block = self.aggregate_atomic_kernel(K_atom_block, counts_P, counts_Q)
                 K[iP0:iP1, iQ0:iQ1] = K_block
                 K[iQ0:iQ1, iP0:iP1] = K_block.T
 

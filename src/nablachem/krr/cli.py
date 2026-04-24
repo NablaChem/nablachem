@@ -149,6 +149,7 @@ def main(
         "kernel": kernel_name,
         "detrend_atomic": detrend_atomic,
         "detrend_pairs": detrend_pairs,
+        "elemental": elemental,
         "file_hash": hash,
         "file_path": jsonl_path,
         "column_name": column_name,
