@@ -4,6 +4,7 @@ from scipy.special import gamma, kv
 import inspect
 
 from numpy.polynomial.chebyshev import Chebyshev
+from numba import njit
 
 
 class Kernel:
@@ -186,9 +187,138 @@ class Polynomial(Kernel):
         return k_vals / norm_const
 
 
+@njit(inline="always")
+def _grid_bin(grid, x):
+    """Smallest m with grid[m] >= x. Returns len(grid) if x exceeds all bins."""
+    lo = 0
+    hi = len(grid)
+    while lo < hi:
+        mid = (lo + hi) >> 1
+        if grid[mid] < x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+@njit(cache=True)
+def _build_power_moments(
+    power_moments,
+    X,
+    atoms_per_mol,
+    power,
+    ncheby,
+    grid,
+    charges,
+    use_elemental,
+    anchor_bucket_of_mol,
+    nn_per_anchor,
+):
+    BATCH_TARGET = 1000
+    nmols = len(atoms_per_mol)
+    ngrid = len(grid)
+
+    off = np.empty(nmols + 1, dtype=np.int64)
+    off[0] = 0
+    for m in range(nmols):
+        off[m + 1] = off[m] + atoms_per_mol[m]
+    total_atoms = off[nmols]
+
+    all_norms = np.empty(total_atoms, dtype=np.float64)
+    for a in range(total_atoms):
+        s = 0.0
+        for f in range(X.shape[1]):
+            s += X[a, f] * X[a, f]
+        all_norms[a] = s
+
+    # Pack molecules into ~BATCH_TARGET-atom batches; one BLAS call per batch pair.
+    batch = np.empty(nmols + 2, dtype=np.int64)
+    batch[0] = 0
+    nb = 0
+    cur = 0
+    for m in range(nmols):
+        cur += atoms_per_mol[m]
+        if cur >= BATCH_TARGET:
+            nb += 1
+            batch[nb] = m + 1
+            cur = 0
+    if batch[nb] < nmols:
+        nb += 1
+        batch[nb] = nmols
+
+    # NN tracking is only active for atom pairs where the "row" atom is in batch 0.
+    batch0_atom_end = off[batch[1]]
+
+    for P in range(nb):
+        aP0, aP1 = off[batch[P]], off[batch[P + 1]]
+        for Q in range(P, nb):
+            aQ0, aQ1 = off[batch[Q]], off[batch[Q + 1]]
+            G = X[aP0:aP1] @ X[aQ0:aQ1].T
+
+            for i in range(batch[P], batch[P + 1]):
+                ai, ni = off[i], atoms_per_mol[i]
+                ai_l = ai - aP0
+                j_lo = i if P == Q else batch[Q]
+                bk_i = anchor_bucket_of_mol[i]
+                for j in range(j_lo, batch[Q + 1]):
+                    aj, nj = off[j], atoms_per_mol[j]
+                    aj_l = aj - aQ0
+                    pair_idx = i * nmols - i * (i - 1) // 2 + (j - i)
+                    bk_j = anchor_bucket_of_mol[j]
+
+                    contrib = np.zeros((ncheby, ngrid), dtype=np.float64)
+                    x_max = -1.0  # sentinel; any real x_val is >= 0 after clamp
+                    for b in range(ni):
+                        nb_sq = all_norms[ai + b]
+                        row = ai_l + b
+                        for a in range(nj):
+                            if use_elemental and charges[ai + b] != charges[aj + a]:
+                                continue
+                            d = all_norms[aj + a] + nb_sq - 2.0 * G[row, aj_l + a]
+                            if d < 0.0:
+                                d = 0.0
+                            x_val = np.sqrt(d) if power == 1 else d
+                            if x_val > x_max:
+                                x_max = x_val
+                            bi = _grid_bin(grid, x_val)
+                            if bi < ngrid:
+                                contrib[0, bi] += 1.0
+                                xk = 1.0
+                                for p in range(1, ncheby):
+                                    xk *= x_val
+                                    contrib[p, bi] += xk
+
+                            # NN tracking (P==0 only): update per-sample-atom NN
+                            # against the pool-atom's mol-anchor-bucket. Skip the
+                            # identity pair (same atom).
+                            if P == 0 and not (i == j and b == a):
+                                s_i = ai + b
+                                if d < nn_per_anchor[s_i, bk_j]:
+                                    nn_per_anchor[s_i, bk_j] = d
+                                s_j = aj + a
+                                if s_j < batch0_atom_end:
+                                    if d < nn_per_anchor[s_j, bk_i]:
+                                        nn_per_anchor[s_j, bk_i] = d
+
+                    if x_max < 0.0:
+                        continue
+
+                    for p in range(ncheby):
+                        run = 0.0
+                        for mm in range(ngrid):
+                            run += contrib[p, mm]
+                            power_moments[pair_idx, p, mm] = run
+
+
 class ExponentialToChebychev:
-    def __init__(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
-        self._local_grid = 1.5 ** np.linspace(-15, 15, 100)
+    def __init__(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        power: int,
+        nuclear_charges: np.ndarray = None,
+    ):
+        self._local_grid = 1.5 ** np.linspace(-15, 15, 20)
         self._local_ymax = 20.0
 
         # Chebyshev polynomial coefficients for exp approximation
@@ -224,39 +354,105 @@ class ExponentialToChebychev:
         nmols = len(atoms_per_mol)
         self._nmols = nmols
         grid = self._local_grid
-        npowers = len(cheby_p)
+        ncheby = len(cheby_p)
         npairs = nmols * (nmols + 1) // 2
+        if power not in (1, 2):
+            raise NotImplementedError(
+                "Only power=1 (for exp(-r)) and power=2 (for exp(-r^2)) are implemented"
+            )
 
-        power_moments = np.zeros((npairs, npowers, len(grid)), dtype=np.float64)
-        pair_idx = 0
-        atoms_per_mol_cumsum = np.concatenate([[0], np.cumsum(atoms_per_mol)])
-        for i in range(nmols):
-            for j in range(i, nmols):
-                x = Ds[
-                    atoms_per_mol_cumsum[i] : atoms_per_mol_cumsum[i + 1],
-                    atoms_per_mol_cumsum[j] : atoms_per_mol_cumsum[j + 1],
-                ].flatten()
-                x = np.sort(x).astype(np.float64)
-                x = x[np.isfinite(x)]
+        power_moments = np.zeros((npairs, ncheby, len(grid)), dtype=np.float64)
+        if nuclear_charges is None:
+            charges_arr = np.zeros(0, dtype=np.float64)
+            use_elemental = False
+        else:
+            charges_arr = np.asarray(nuclear_charges, dtype=np.float64)
+            use_elemental = True
 
-                if len(x) == 0:
-                    pair_idx += 1
-                    continue
+        # Anchor setup for per-atom NN length-scale tracking (piggybacks on the
+        # moments build). Anchors are powers of 2 starting at 4, capped by nmols;
+        # nmols is appended as the last anchor when it isn't already a power of 2.
+        atoms_per_mol_i64 = np.asarray(atoms_per_mol, dtype=np.int64)
+        atom_offsets = np.concatenate(([0], np.cumsum(atoms_per_mol_i64))).astype(
+            np.int64
+        )
+        anchors_list = []
+        k = 4
+        while k < nmols:
+            anchors_list.append(k)
+            k *= 2
+        anchors_list.append(nmols)
+        anchors = np.asarray(anchors_list, dtype=np.int64)
+        n_anchors = len(anchors)
+        # bucket[j] = smallest i with anchors[i] > j  (mol j contributes to anchor i onward)
+        anchor_bucket_of_mol = np.searchsorted(anchors, np.arange(nmols), side="right")
+        anchor_bucket_of_mol = anchor_bucket_of_mol.astype(np.int64)
 
-                cum_moments = np.zeros((len(cheby_p), len(x) + 1))
-                cum_moments[0, 1:] = np.cumsum(np.ones_like(x))
-                for k in range(1, len(cheby_p)):
-                    cum_moments[k, 1:] = np.cumsum(x**k)
+        # Determine size of batch 0 (must match the packing inside _build_power_moments).
+        BATCH_TARGET = 1000
+        batch0_end_mol = 0
+        cur = 0
+        for m in range(nmols):
+            cur += int(atoms_per_mol_i64[m])
+            if cur >= BATCH_TARGET:
+                batch0_end_mol = m + 1
+                break
+        if batch0_end_mol == 0:
+            batch0_end_mol = nmols
+        batch0_atom_end = int(atom_offsets[batch0_end_mol])
 
-                select_indices = np.minimum(
-                    np.searchsorted(x, grid, side="right"), len(x) - 1
-                )
+        nn_per_anchor = np.full((batch0_atom_end, n_anchors), np.inf, dtype=np.float64)
 
-                power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
-                pair_idx += 1
+        _build_power_moments(
+            power_moments,
+            X,
+            atoms_per_mol_i64,
+            power,
+            ncheby,
+            self._local_grid,
+            charges_arr,
+            use_elemental,
+            anchor_bucket_of_mol,
+            nn_per_anchor,
+        )
 
         self._local_power_moments = power_moments
         self._cache_built = True
+
+        # Post-process: cumulative min across buckets, then median per anchor
+        # over sample atoms belonging to mols < anchor. Runs in Python per the
+        # user's preference to keep this logic outside the numba hot loop.
+        sample_mol_id = np.empty(batch0_atom_end, dtype=np.int64)
+        for m in range(batch0_end_mol):
+            sample_mol_id[atom_offsets[m] : atom_offsets[m + 1]] = m
+
+        nn_cum = np.minimum.accumulate(nn_per_anchor, axis=1)
+        length_scale_by_anchor = np.empty(n_anchors, dtype=np.float64)
+        for k_idx in range(n_anchors):
+            valid = (sample_mol_id < anchors[k_idx]) & np.isfinite(nn_cum[:, k_idx])
+            if valid.any():
+                length_scale_by_anchor[k_idx] = float(
+                    np.sqrt(np.median(nn_cum[valid, k_idx]))
+                )
+            else:
+                length_scale_by_anchor[k_idx] = 1.0
+        self._anchors = anchors
+        self._length_scale_by_anchor = length_scale_by_anchor
+
+    def length_scale(self, ntrain: int) -> float:
+        """Median nearest-neighbour atomic distance heuristic.
+
+        Returns the value at the anchor closest to ntrain in log2 space.
+        """
+        anchors = self._anchors
+        values = self._length_scale_by_anchor
+        if ntrain <= anchors[0]:
+            return float(values[0])
+        if ntrain >= anchors[-1]:
+            return float(values[-1])
+        log_ntrain = np.log2(float(ntrain))
+        idx = int(np.argmin(np.abs(np.log2(anchors.astype(np.float64)) - log_ntrain)))
+        return float(values[idx])
 
     def __call__(self, q, ntrain):
         cutoff = np.searchsorted(self._local_grid, self._local_ymax * q) - 1
@@ -293,8 +489,15 @@ class Gaussian(Kernel):
     def exact(self, dr):
         return np.exp(-(dr**2))
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=Ds)
+    def approx_prepare(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        nuclear_charges: np.ndarray = None,
+    ):
+        self._chebytrick = ExponentialToChebychev(
+            atoms_per_mol, X=X, power=2, nuclear_charges=nuclear_charges
+        )
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma**2, ntrain)
@@ -304,8 +507,15 @@ class Exponential(Kernel):
     def exact(self, dr):
         return np.exp(-dr)
 
-    def approx_prepare(self, atoms_per_mol: np.ndarray, Ds: np.ndarray):
-        self._chebytrick = ExponentialToChebychev(atoms_per_mol, Ds=np.sqrt(Ds))
+    def approx_prepare(
+        self,
+        atoms_per_mol: np.ndarray,
+        X: np.ndarray,
+        nuclear_charges: np.ndarray = None,
+    ):
+        self._chebytrick = ExponentialToChebychev(
+            atoms_per_mol, X=X, power=1, nuclear_charges=nuclear_charges
+        )
 
     def approx(self, sigma: float, ntrain: int) -> np.ndarray:
         return self._chebytrick(sigma, ntrain)

@@ -212,7 +212,7 @@ class AutoKRR:
         return np.hstack(parts)
 
     def get_hyperparameter_grid(self, ntrain: int):
-        factors = 1.5 ** np.arange(0, 15)
+        factors = 2.0 ** np.arange(-1, 20)
         lam_grid = 10.0 ** np.arange(-10, -1)
         return factors, lam_grid
 
