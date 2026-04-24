@@ -444,28 +444,28 @@ class AutoKRR:
         # representations at a time rather than keeping them all in memory
         n_holdout = len(self._y_holdout)
         batch_size = self._kernel_matrix._batch_size
-        for ntrain, alpha in models.items():
-            params_ntrain = best_cases[ntrain]
-            K_train_col_mean = train_col_means[ntrain]
-            K_train_mean = train_means[ntrain]
-            for start in range(0, n_holdout, batch_size):
-                end = min(start + batch_size, n_holdout)
-                mols = self._holdout_representer._molecules[
-                    self._holdout_offset + start : self._holdout_offset + end
-                ]
-                reps = self._holdout_representer.compute(mols)
-                if self._local:
-                    counts_batch = np.array([r.shape[0] for r in reps])
-                    X_batch = np.concatenate(reps, axis=0)
-                    nc_batch = (
-                        np.concatenate([mol.get_atomic_numbers() for mol in mols])
-                        if self._elemental
-                        else None
-                    )
-                else:
-                    X_batch = np.stack(reps, axis=0)
-                    counts_batch = None
-                    nc_batch = None
+        for start in range(0, n_holdout, batch_size):
+            end = min(start + batch_size, n_holdout)
+            mols = self._holdout_representer._molecules[
+                self._holdout_offset + start : self._holdout_offset + end
+            ]
+            reps = self._holdout_representer.compute(mols)
+            if self._local:
+                counts_batch = np.array([r.shape[0] for r in reps])
+                X_batch = np.concatenate(reps, axis=0)
+                nc_batch = (
+                    np.concatenate([mol.get_atomic_numbers() for mol in mols])
+                    if self._elemental
+                    else None
+                )
+            else:
+                X_batch = np.stack(reps, axis=0)
+                counts_batch = None
+                nc_batch = None
+            for ntrain, alpha in models.items():
+                params_ntrain = best_cases[ntrain]
+                K_train_col_mean = train_col_means[ntrain]
+                K_train_mean = train_means[ntrain]
                 K_test = self._kernel_matrix.compute_test_kernel_matrix(
                     params_ntrain["sigma"], ntrain, X_batch, counts_batch, nc_batch
                 )
