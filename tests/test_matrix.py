@@ -748,3 +748,42 @@ def test_length_scale_elemental_matches_reference(seed, kernel_cls):
         got = kmat.length_scale(anchor)
         expected = _reference_length_scale(X, counts, anchor, charges=charges)
         np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-10)
+
+
+@pytest.mark.parametrize("seed", [0, 1, 42])
+@pytest.mark.parametrize("kernel_cls", [kernels.Gaussian, kernels.Exponential])
+def test_approx_matches_exact_local(seed, kernel_cls):
+    """Chebyshev-trick approx kernel matches the exact kernel within 1e-8."""
+    rng = np.random.default_rng(seed)
+    nmols = 20
+    counts = rng.integers(3, 8, size=nmols).astype(np.int64)
+    natoms = int(counts.sum())
+    X = rng.uniform(size=(natoms, 4))
+
+    kf = kernel_cls()
+    kmat = LocalKernelMatrix(X, counts, kf)
+    sigma = 0.4 if kernel_cls is kernels.Gaussian else 0.2
+    K_approx = kmat.compute_train_kernel_matrix_approx(sigma, nmols)
+    K_exact = kmat.compute_train_kernel_matrix_exact(sigma, nmols)
+    assert K_approx is not None, "approx rejected by validity check"
+    np.testing.assert_allclose(K_approx, K_exact, atol=1e-8, rtol=0)
+
+
+@pytest.mark.parametrize("seed", [0, 1, 42])
+@pytest.mark.parametrize("kernel_cls", [kernels.Gaussian, kernels.Exponential])
+def test_approx_matches_exact_elemental(seed, kernel_cls):
+    """Elemental Chebyshev-trick approx matches elemental exact within 1e-8."""
+    rng = np.random.default_rng(seed)
+    nmols = 20
+    counts = rng.integers(3, 8, size=nmols).astype(np.int64)
+    natoms = int(counts.sum())
+    X = rng.uniform(size=(natoms, 4))
+    charges = rng.choice([1.0, 6.0, 7.0, 8.0], size=natoms)
+
+    kf = kernel_cls()
+    kmat = ElementalKernelMatrix(X, counts, kf, nuclear_charges=charges)
+    sigma = 0.4 if kernel_cls is kernels.Gaussian else 0.2
+    K_approx = kmat.compute_train_kernel_matrix_approx(sigma, nmols)
+    K_exact = kmat.compute_train_kernel_matrix_exact(sigma, nmols)
+    assert K_approx is not None, "approx rejected by validity check"
+    np.testing.assert_allclose(K_approx, K_exact, atol=1e-8, rtol=0)

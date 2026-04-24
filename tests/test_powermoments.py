@@ -39,7 +39,7 @@ def _reference_build_power_moments(power_moments, Ds, atoms_per_mol, ncheby, gri
                 cum_moments[k, 1:] = np.cumsum(x**k)
 
             select_indices = np.minimum(
-                np.searchsorted(x, grid, side="right"), len(x) - 1
+                np.searchsorted(x, grid, side="right"), len(x)
             )
 
             power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
@@ -55,6 +55,29 @@ def _distance_matrix(X, power):
     return np.sqrt(d) if power == 1 else d
 
 
+def _nn_tracking_args(atoms_per_mol):
+    """Dummy NN-tracking args for `_build_power_moments`.
+
+    These tests only check the moments output; the NN buffer is written but
+    not inspected. Shapes must still be valid for the JIT function.
+    """
+    atoms_per_mol = np.asarray(atoms_per_mol, dtype=np.int64)
+    nmols = len(atoms_per_mol)
+    total = int(atoms_per_mol.sum())
+    anchors_list = []
+    k = 4
+    while k < nmols:
+        anchors_list.append(k)
+        k *= 2
+    anchors_list.append(nmols)
+    anchors = np.asarray(anchors_list, dtype=np.int64)
+    anchor_bucket_of_mol = np.searchsorted(
+        anchors, np.arange(nmols), side="right"
+    ).astype(np.int64)
+    nn_per_anchor = np.full((total, len(anchors)), np.inf, dtype=np.float64)
+    return anchor_bucket_of_mol, nn_per_anchor
+
+
 def _run_comparison(X, atoms_per_mol, power):
     Ds = _distance_matrix(X, power)
     nmols = len(atoms_per_mol)
@@ -64,8 +87,18 @@ def _run_comparison(X, atoms_per_mol, power):
     _reference_build_power_moments(ref, Ds, atoms_per_mol, NCHEBY, GRID)
 
     got = np.zeros_like(ref)
+    anchor_bucket_of_mol, nn_per_anchor = _nn_tracking_args(atoms_per_mol)
     kernels_module._build_power_moments(
-        got, X, atoms_per_mol, power, NCHEBY, GRID
+        got,
+        X,
+        atoms_per_mol,
+        power,
+        NCHEBY,
+        GRID,
+        np.zeros(0, dtype=np.float64),
+        False,
+        anchor_bucket_of_mol,
+        nn_per_anchor,
     )
 
     # atol covers self-pair diagonal FP residuals: the new impl computes

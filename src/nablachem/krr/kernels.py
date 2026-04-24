@@ -303,15 +303,6 @@ def _build_power_moments(
                     if x_max < 0.0:
                         continue
 
-                    # Cap-to-(n-1) quirk: exclude one copy of the pair's max.
-                    bi = _grid_bin(grid, x_max)
-                    if bi < ngrid:
-                        contrib[0, bi] -= 1.0
-                        xk = 1.0
-                        for p in range(1, ncheby):
-                            xk *= x_max
-                            contrib[p, bi] -= xk
-
                     for p in range(ncheby):
                         run = 0.0
                         for mm in range(ngrid):
