@@ -277,14 +277,14 @@ class AutoKRR:
             condition_number = eigvals[-1] / eigvals[1]
             if condition_number > 1e15:
                 continue
-            if  ntrain > 64:
+            if ntrain > 64:
                 mode = "eig"
                 eig_count += 1
             else:
                 mode = "direct"
                 direct_count += 1
             useschur = False
-            if  ntrain > 128:
+            if ntrain > 128:
                 useschur = True
 
             split_results = [
