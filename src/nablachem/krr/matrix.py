@@ -81,7 +81,7 @@ class _LocalKernelMatrix(KernelMatrix):
         )
 
     def length_scale(self, ntrain: int) -> float:
-        return 1
+        return self._kernel_func._chebytrick.length_scale(ntrain)
 
     @staticmethod
     def _pack_batches(counts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

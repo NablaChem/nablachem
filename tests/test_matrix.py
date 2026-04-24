@@ -692,3 +692,59 @@ def test_elemental_approx_masks_disjoint_element_pair():
     # pair_idx layout for 2 mols: 0→(0,0), 1→(0,1), 2→(1,1).
     cross = kf._chebytrick._local_power_moments[1]
     assert np.all(cross == 0.0)
+
+
+def _reference_length_scale(X, counts, ntrain, charges=None):
+    """Median atomic nearest-neighbour distance over atoms of first ``ntrain`` mols.
+
+    Mirrors the pre-block implementation on main: full atom-atom squared-distance
+    matrix (diag=0 is the self-pair, the 2nd-smallest per column is the NN).
+    """
+    counts = np.asarray(counts)
+    natoms = int(counts[:ntrain].sum())
+    X_sub = np.asarray(X[:natoms])
+    D2 = _LocalKernelMatrix._dist_squared(X_sub)
+    if charges is not None:
+        z = np.asarray(charges[:natoms])
+        D2[z[:, None] != z[None, :]] = np.inf
+    nnvals = np.partition(D2, 1, axis=0)[1]
+    return float(np.sqrt(np.median(nnvals)))
+
+
+@pytest.mark.parametrize("seed", [0, 1, 42])
+@pytest.mark.parametrize("kernel_cls", [kernels.Gaussian, kernels.Exponential])
+def test_length_scale_matches_reference(seed, kernel_cls):
+    """length_scale at anchor ntrain values matches a simple np.partition reference."""
+    rng = np.random.default_rng(seed)
+    nmols = 16
+    counts = rng.integers(4, 8, size=nmols).astype(np.int64)
+    natoms = int(counts.sum())
+    X = rng.uniform(size=(natoms, 6))
+
+    kmat = LocalKernelMatrix(X, counts, kernel_cls())
+    for anchor in [4, 8, 16]:
+        got = kmat.length_scale(anchor)
+        expected = _reference_length_scale(X, counts, anchor)
+        np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-10)
+
+
+@pytest.mark.parametrize("seed", [0, 1, 42])
+@pytest.mark.parametrize("kernel_cls", [kernels.Gaussian, kernels.Exponential])
+def test_length_scale_elemental_matches_reference(seed, kernel_cls):
+    """Elemental length_scale restricts NN to same-element pairs; matches reference."""
+    rng = np.random.default_rng(seed)
+    nmols = 16
+    # Enough atoms per mol so that even at anchor 4 every element has neighbours.
+    counts = rng.integers(8, 14, size=nmols).astype(np.int64)
+    natoms = int(counts.sum())
+    X = rng.uniform(size=(natoms, 6))
+    # Only two elements → robust same-element sampling at every anchor.
+    charges = rng.choice([1.0, 6.0], size=natoms)
+
+    kmat = ElementalKernelMatrix(
+        X, counts, kernel_cls(), nuclear_charges=charges
+    )
+    for anchor in [4, 8, 16]:
+        got = kmat.length_scale(anchor)
+        expected = _reference_length_scale(X, counts, anchor, charges=charges)
+        np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-10)

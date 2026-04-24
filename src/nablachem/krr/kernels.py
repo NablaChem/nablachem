@@ -203,7 +203,16 @@ def _grid_bin(grid, x):
 
 @njit(cache=True)
 def _build_power_moments(
-    power_moments, X, atoms_per_mol, power, ncheby, grid, charges, use_elemental
+    power_moments,
+    X,
+    atoms_per_mol,
+    power,
+    ncheby,
+    grid,
+    charges,
+    use_elemental,
+    anchor_bucket_of_mol,
+    nn_per_anchor,
 ):
     BATCH_TARGET = 1000
     nmols = len(atoms_per_mol)
@@ -237,6 +246,9 @@ def _build_power_moments(
         nb += 1
         batch[nb] = nmols
 
+    # NN tracking is only active for atom pairs where the "row" atom is in batch 0.
+    batch0_atom_end = off[batch[1]]
+
     for P in range(nb):
         aP0, aP1 = off[batch[P]], off[batch[P + 1]]
         for Q in range(P, nb):
@@ -247,10 +259,12 @@ def _build_power_moments(
                 ai, ni = off[i], atoms_per_mol[i]
                 ai_l = ai - aP0
                 j_lo = i if P == Q else batch[Q]
+                bk_i = anchor_bucket_of_mol[i]
                 for j in range(j_lo, batch[Q + 1]):
                     aj, nj = off[j], atoms_per_mol[j]
                     aj_l = aj - aQ0
                     pair_idx = i * nmols - i * (i - 1) // 2 + (j - i)
+                    bk_j = anchor_bucket_of_mol[j]
 
                     contrib = np.zeros((ncheby, ngrid), dtype=np.float64)
                     x_max = -1.0  # sentinel; any real x_val is >= 0 after clamp
@@ -273,6 +287,18 @@ def _build_power_moments(
                                 for p in range(1, ncheby):
                                     xk *= x_val
                                     contrib[p, bi] += xk
+
+                            # NN tracking (P==0 only): update per-sample-atom NN
+                            # against the pool-atom's mol-anchor-bucket. Skip the
+                            # identity pair (same atom).
+                            if P == 0 and not (i == j and b == a):
+                                s_i = ai + b
+                                if d < nn_per_anchor[s_i, bk_j]:
+                                    nn_per_anchor[s_i, bk_j] = d
+                                s_j = aj + a
+                                if s_j < batch0_atom_end:
+                                    if d < nn_per_anchor[s_j, bk_i]:
+                                        nn_per_anchor[s_j, bk_i] = d
 
                     if x_max < 0.0:
                         continue
@@ -351,19 +377,93 @@ class ExponentialToChebychev:
         else:
             charges_arr = np.asarray(nuclear_charges, dtype=np.float64)
             use_elemental = True
+
+        # Anchor setup for per-atom NN length-scale tracking (piggybacks on the
+        # moments build). Anchors are powers of 2 starting at 4, capped by nmols;
+        # nmols is appended as the last anchor when it isn't already a power of 2.
+        atoms_per_mol_i64 = np.asarray(atoms_per_mol, dtype=np.int64)
+        atom_offsets = np.concatenate(
+            ([0], np.cumsum(atoms_per_mol_i64))
+        ).astype(np.int64)
+        anchors_list = []
+        k = 4
+        while k < nmols:
+            anchors_list.append(k)
+            k *= 2
+        anchors_list.append(nmols)
+        anchors = np.asarray(anchors_list, dtype=np.int64)
+        n_anchors = len(anchors)
+        # bucket[j] = smallest i with anchors[i] > j  (mol j contributes to anchor i onward)
+        anchor_bucket_of_mol = np.searchsorted(anchors, np.arange(nmols), side="right")
+        anchor_bucket_of_mol = anchor_bucket_of_mol.astype(np.int64)
+
+        # Determine size of batch 0 (must match the packing inside _build_power_moments).
+        BATCH_TARGET = 1000
+        batch0_end_mol = 0
+        cur = 0
+        for m in range(nmols):
+            cur += int(atoms_per_mol_i64[m])
+            if cur >= BATCH_TARGET:
+                batch0_end_mol = m + 1
+                break
+        if batch0_end_mol == 0:
+            batch0_end_mol = nmols
+        batch0_atom_end = int(atom_offsets[batch0_end_mol])
+
+        nn_per_anchor = np.full(
+            (batch0_atom_end, n_anchors), np.inf, dtype=np.float64
+        )
+
         _build_power_moments(
             power_moments,
             X,
-            atoms_per_mol,
+            atoms_per_mol_i64,
             power,
             ncheby,
             self._local_grid,
             charges_arr,
             use_elemental,
+            anchor_bucket_of_mol,
+            nn_per_anchor,
         )
 
         self._local_power_moments = power_moments
         self._cache_built = True
+
+        # Post-process: cumulative min across buckets, then median per anchor
+        # over sample atoms belonging to mols < anchor. Runs in Python per the
+        # user's preference to keep this logic outside the numba hot loop.
+        sample_mol_id = np.empty(batch0_atom_end, dtype=np.int64)
+        for m in range(batch0_end_mol):
+            sample_mol_id[atom_offsets[m] : atom_offsets[m + 1]] = m
+
+        nn_cum = np.minimum.accumulate(nn_per_anchor, axis=1)
+        length_scale_by_anchor = np.empty(n_anchors, dtype=np.float64)
+        for k_idx in range(n_anchors):
+            valid = (sample_mol_id < anchors[k_idx]) & np.isfinite(nn_cum[:, k_idx])
+            if valid.any():
+                length_scale_by_anchor[k_idx] = float(
+                    np.sqrt(np.median(nn_cum[valid, k_idx]))
+                )
+            else:
+                length_scale_by_anchor[k_idx] = 1.0
+        self._anchors = anchors
+        self._length_scale_by_anchor = length_scale_by_anchor
+
+    def length_scale(self, ntrain: int) -> float:
+        """Median nearest-neighbour atomic distance heuristic.
+
+        Returns the value at the anchor closest to ntrain in log2 space.
+        """
+        anchors = self._anchors
+        values = self._length_scale_by_anchor
+        if ntrain <= anchors[0]:
+            return float(values[0])
+        if ntrain >= anchors[-1]:
+            return float(values[-1])
+        log_ntrain = np.log2(float(ntrain))
+        idx = int(np.argmin(np.abs(np.log2(anchors.astype(np.float64)) - log_ntrain)))
+        return float(values[idx])
 
     def __call__(self, q, ntrain):
         cutoff = np.searchsorted(self._local_grid, self._local_ymax * q) - 1
