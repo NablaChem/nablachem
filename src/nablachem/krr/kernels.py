@@ -353,7 +353,7 @@ class ExponentialToChebychev:
             1.9431609391984766e-07,
             -5.0571492223751847e-08,
             1.1357243950084354e-08,
-        ][:12]
+        ]
 
         P = Chebyshev(cheby_p, domain=[0, self._local_ymax])
         Q = P.convert(kind=np.polynomial.Polynomial)
@@ -382,9 +382,9 @@ class ExponentialToChebychev:
         # moments build). Anchors are powers of 2 starting at 4, capped by nmols;
         # nmols is appended as the last anchor when it isn't already a power of 2.
         atoms_per_mol_i64 = np.asarray(atoms_per_mol, dtype=np.int64)
-        atom_offsets = np.concatenate(
-            ([0], np.cumsum(atoms_per_mol_i64))
-        ).astype(np.int64)
+        atom_offsets = np.concatenate(([0], np.cumsum(atoms_per_mol_i64))).astype(
+            np.int64
+        )
         anchors_list = []
         k = 4
         while k < nmols:
@@ -410,9 +410,7 @@ class ExponentialToChebychev:
             batch0_end_mol = nmols
         batch0_atom_end = int(atom_offsets[batch0_end_mol])
 
-        nn_per_anchor = np.full(
-            (batch0_atom_end, n_anchors), np.inf, dtype=np.float64
-        )
+        nn_per_anchor = np.full((batch0_atom_end, n_anchors), np.inf, dtype=np.float64)
 
         _build_power_moments(
             power_moments,
