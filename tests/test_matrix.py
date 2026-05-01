@@ -233,7 +233,7 @@ def test_evaluate_models_uses_per_model_sigma():
 
     class _ForcedSigmaKRR(AutoKRR):
         def _optimize_hyperparameters(self, ntrain, _length_heuristic):
-            return {"sigma": sigma_map[ntrain], "lambda": lam}, 1.0, 1.0, 2, 2
+            return {"sigma": sigma_map[ntrain], "lambda": lam}, 1.0, 1.0
 
     krr = _ForcedSigmaKRR(
         _MockDataset(),

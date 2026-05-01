@@ -458,22 +458,23 @@ class ExponentialToChebychev:
         cutoff = np.searchsorted(self._local_grid, self._local_ymax * q) - 1
         cutoff = max(0, min(cutoff, len(self._local_grid) - 1))
 
-        moments = self._local_power_moments[:, :, cutoff]
-        triu = moments * self._exp_coef
-        triu /= q ** np.arange(len(self._exp_coef))
-        triu = np.sum(triu, axis=1)
-
-        # build full K matrix
         nmols = self._nmols
-        K = np.zeros((nmols, nmols))
-        pair_idx = 0
-        for i in range(nmols):
-            for j in range(i, nmols):
-                K[i, j] = triu[pair_idx]
-                K[j, i] = K[i, j]
-                pair_idx += 1
+        cache = self.__dict__.setdefault("_subblock_cache", {})
+        entry = cache.get(ntrain)
+        if entry is None:
+            i_idx, j_idx = np.triu_indices(ntrain)
+            pair_indices = i_idx * nmols - i_idx * (i_idx - 1) // 2 + (j_idx - i_idx)
+            entry = (i_idx, j_idx, pair_indices)
+            cache[ntrain] = entry
+        i_idx, j_idx, pair_indices = entry
 
-        K_sub = K[:ntrain, :ntrain]
+        moments_sub = self._local_power_moments[pair_indices, :, cutoff]
+        coef = self._exp_coef / q ** np.arange(len(self._exp_coef))
+        triu = moments_sub @ coef
+
+        K_sub = np.empty((ntrain, ntrain))
+        K_sub[i_idx, j_idx] = triu
+        K_sub[j_idx, i_idx] = triu
 
         # normalize
         d = np.diag(K_sub)
