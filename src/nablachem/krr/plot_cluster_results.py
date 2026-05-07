@@ -57,6 +57,8 @@ def format_panel(ax, letter: str = ""):
 
 load_style()
 
+_panel_w = 4.5
+_panel_h = 4.5
 _label_fs = rcParams["axes.labelsize"] * 1.2
 
 # %% config
@@ -68,18 +70,18 @@ aggregate_files = True
 # %% representations to compare — edit paths as needed
 REPRESENTATIONS = [
     (
+        "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_2048_1.npz",
+        "cMBDF",
+        "C0",
+    ),
+    (
         "/Users/ali/second_project_data/results/out_FCHL19Local_elemental_2048_1.npz",
         "FCHL19",
-        "C0",
+        "C1",
     ),
     (
         "/Users/ali/second_project_data/results/out_MACELocal_local_2048_1.npz",
         "MACE",
-        "C1",
-    ),
-    (
-        "/Users/ali/second_project_data/results/out_cMBDFLocal_elemental_2048_1.npz",
-        "cMBDF",
         "C2",
     ),
 ]
@@ -173,19 +175,8 @@ def load_repr(path):
 
 # %% main figure — all representations on one plot
 
-fig_main, ax_main = plt.subplots(1, 1, figsize=(10, 7))
+fig_main, ax_main = plt.subplots(1, 1, figsize=(_panel_w, _panel_h))
 format_panel(ax_main)
-ax_main.annotate(
-    "a)",
-    xy=(0.0, 1.0),
-    xycoords="axes fraction",
-    xytext=(0, 6),
-    textcoords="offset points",
-    ha="left",
-    va="bottom",
-    fontsize=_label_fs,
-    fontweight="bold",
-)
 
 _max_x = 0
 for _path, _label, _color in REPRESENTATIONS:
