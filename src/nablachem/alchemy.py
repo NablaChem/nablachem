@@ -19,12 +19,9 @@ class Monomial:
     def __init__(self, prefactor: float, powers: dict[str, int] = {}):
         """Define the monomial.
 
-        Parameters
-        ----------
-        prefactor : float
-            Weight or coefficient of the monomial.
-        powers : dict[str, int], optional
-            Involved variables as keys and the exponent as value, by default {}.
+        Args:
+            prefactor (float): Weight or coefficient of the monomial.
+            powers (dict[str, int], optional): Involved variables as keys and the exponent as value, by default {}.
         """
         self._powers = powers
         self._prefactor = prefactor
@@ -36,9 +33,7 @@ class Monomial:
     def prefactor(self) -> float:
         """Calculates the Taylor expansion prefactor.
 
-        Returns
-        -------
-        float
+        Returns:
             Prefactor for the summation in the Taylor expansion.
         """
         if self._cached_prefactor is None:
@@ -50,17 +45,12 @@ class Monomial:
     def distance(self, pos: dict[str, float], center: dict[str, float]) -> float:
         """Evaluate the distance term of the Taylor expansion.
 
-        Parameters
-        ----------
-        pos : dict[str, float]
-            The position at which the Monomial is evaluated. Keys are the variable names, values are the positions.
-        center : dict[str, float]
-            The center of the Taylor expansion. Keys are the variable names, values are the positions.
+        Args:
+            pos (dict[str, float]): The position at which the Monomial is evaluated. Keys are the variable names, values are the positions.
+            center (dict[str, float]): The center of the Taylor expansion. Keys are the variable names, values are the positions.
 
-        Returns
-        -------
-        float
-            Distance
+        Returns:
+            Distance.
         """
         ret = []
         for column, power in self._powers.items():
@@ -71,41 +61,37 @@ class Monomial:
 class MultiTaylor:
     """Multi-dimensional multi-variate arbitrary order Taylor expansion from any evenly spaced finite difference stencil.
 
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> df = pd.read_csv("some_file.csv")
-    >>> df.columns
-    Index(['RX', 'RY', 'RZ', 'QX', 'QY', 'QZ', 'E', 'BETA1', 'BETA2',
-       'SIGMA'],
-      dtype='object')
-    >>> mt = MultiTaylor(df, outputs="BETA1 BETA2 SIGMA".split())
-    >>> spatial_center, electronic_center = 3, 2.5
-    >>> mt.reset_center(
-        RX=spatial_center,
-        RY=spatial_center,
-        RZ=spatial_center,
-        QX=electronic_center,
-        QY=electronic_center,
-        QZ=electronic_center,
-    )
-    >>> mt.reset_filter(E=4)
-    >>> mt.build_model(2)
-    >>> mt.query(RX=3.1, RY=3.1, RZ=3.1, QX=2.4, QY=2.4, QZ=2.4)
-    {'BETA1': 0.022412699999999976,
-    'BETA2': 0.014047600000000134,
-    'SIGMA': 0.0018744333333333316}
+    Examples:
+        >>> import pandas as pd
+        >>> df = pd.read_csv("some_file.csv")
+        >>> df.columns
+        Index(['RX', 'RY', 'RZ', 'QX', 'QY', 'QZ', 'E', 'BETA1', 'BETA2',
+           'SIGMA'],
+          dtype='object')
+        >>> mt = MultiTaylor(df, outputs="BETA1 BETA2 SIGMA".split())
+        >>> spatial_center, electronic_center = 3, 2.5
+        >>> mt.reset_center(
+            RX=spatial_center,
+            RY=spatial_center,
+            RZ=spatial_center,
+            QX=electronic_center,
+            QY=electronic_center,
+            QZ=electronic_center,
+        )
+        >>> mt.reset_filter(E=4)
+        >>> mt.build_model(2)
+        >>> mt.query(RX=3.1, RY=3.1, RZ=3.1, QX=2.4, QY=2.4, QZ=2.4)
+        {'BETA1': 0.022412699999999976,
+        'BETA2': 0.014047600000000134,
+        'SIGMA': 0.0018744333333333316}
     """
 
     def __init__(self, dataframe: pd.DataFrame, outputs: list[str]):
         """Initialize the Taylor expansion from a dataframe of data points forming the superset of stencils.
 
-        Parameters
-        ----------
-        dataframe : pd.DataFrame
-            Holds all data points available for the vicinity of the future center of the expansion.
-        outputs : list[str]
-            Those columns of the dataframe that are considered to be outputs rather than input coordinates.
+        Args:
+            dataframe (pd.DataFrame): Holds all data points available for the vicinity of the future center of the expansion.
+            outputs (list[str]): Those columns of the dataframe that are considered to be outputs rather than input coordinates.
         """
         self._dataframe = dataframe
         self._outputs = outputs
@@ -128,16 +114,11 @@ class MultiTaylor:
     def _dict_filter(self, df: pd.DataFrame, filter: dict[str, float]) -> pd.DataFrame:
         """Applies a filter to a dataframe.
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Stencil dataframe
-        filter : dict[str, float]
-            Filter to apply. Keys are the column names, values are the values to filter for.
+        Args:
+            df (pd.DataFrame): Stencil dataframe.
+            filter (dict[str, float]): Filter to apply. Keys are the column names, values are the values to filter for.
 
-        Returns
-        -------
-        pd.DataFrame
+        Returns:
             Filtered dataframe.
         """
         return df.loc[(df[list(filter)] == pd.Series(filter)).all(axis=1)]
@@ -145,9 +126,7 @@ class MultiTaylor:
     def _offsets(self) -> tuple[np.ndarray, tuple[str]]:
         """Transforms the available data points in the dataframe into stencil offsets.
 
-        Returns
-        -------
-        tuple[np.ndarray, tuple[str]]
+        Returns:
             Offsets for the stencil and list of variable names in matching order.
         """
         variables = [_ for _ in self._filtered.columns if _ not in self._outputs]
@@ -155,17 +134,15 @@ class MultiTaylor:
         offsets = self._filtered[variables].values - center
         return offsets, tuple(variables)
 
-    def to_constant_grad_and_hess(self, output: str):
+    def to_constant_grad_and_hess(
+        self, output: str
+    ) -> tuple[float, np.ndarray, np.ndarray, list[str]]:
         """Exports the Taylor expansion for a given output as constant, gradient, and Hessian.
 
-        Parameters
-        ----------
-        output : str
-            The output variable for which this analysis is done.
+        Args:
+            output (str): The output variable for which this analysis is done.
 
-        Returns
-        -------
-        tuple[float, np.ndarray, np.ndarray, list[str]]
+        Returns:
             Constant, gradient, Hessian, and ordered list of variable names.
         """
         args = list(sorted(self._center.keys()))
@@ -199,19 +176,13 @@ class MultiTaylor:
     ):
         """Builds all monomials and ensures that the stencil is applicable.
 
-        Parameters
-        ----------
-        term : str
-            String-based term representation.
-        shifted : tuple[np.ndarray, tuple[str]]:
-            Cached version of self._offset()
+        Args:
+            term (str): String-based term representation.
+            shifted (tuple[np.ndarray, tuple[str]]): Cached version of self._offset().
 
-        Raises
-        ------
-        ValueError
-            Could not build stencil.
-        ValueError
-            Not enough points in the stencil for a given order.
+        Raises:
+            ValueError: Could not build stencil.
+            ValueError: Not enough points in the stencil for a given order.
         """
         offsets, ordering = shifted
         term_counter = collections.Counter(term)
@@ -359,14 +330,10 @@ class MultiTaylor:
     def _all_terms_up_to(self, order: int) -> tuple[tuple[str]]:
         """For all remaining input columns, find all possible terms entering a Taylor expansion.
 
-        Parameters
-        ----------
-        order : int
-            The maximum order of the expansion.
+        Args:
+            order (int): The maximum order of the expansion.
 
-        Returns
-        -------
-        tuple[tuple[str]]
+        Returns:
             Series of terms up to the given order, as a tuple of variable names.
         """
         terms = []
@@ -379,28 +346,20 @@ class MultiTaylor:
     def build_model(self, orders: int, additional_terms: list[tuple[str]] = []):
         """Sets up the model for a specific expansion order or list of terms.
 
-        Parameters
-        ----------
-        orders : int
-            All terms are included in the expansion up to this order.
-        additional_terms : list[tuple[str]]
-            The terms to ADDITIONALLY include, i.e. list of tuples of column names.
+        Args:
+            orders (int): All terms are included in the expansion up to this order.
+            additional_terms (list[tuple[str]]): The terms to ADDITIONALLY include, i.e. list of tuples of column names.
 
-            To only include d/dx, give [('x',)]
-            To only include d^2/dx^2, give [('x', 'x')]
-            To only include d^2/dxdy, give [('x', 'y')]
-            To include all three, give [('x',), ('x', 'x'), ('x', 'y')]
+                To only include d/dx, give [('x',)].
+                To only include d^2/dx^2, give [('x', 'x')].
+                To only include d^2/dxdy, give [('x', 'y')].
+                To include all three, give [('x',), ('x', 'x'), ('x', 'y')].
 
-        Raises
-        ------
-        NotImplementedError
-            Center needs to be given in dataframe.
-        ValueError
-            Center is not unique.
-        ValueError
-            Duplicate points in the dataset.
-        ValueError
-            Invalid column names for additonal terms.
+        Raises:
+            NotImplementedError: Center needs to be given in dataframe.
+            ValueError: Center is not unique.
+            ValueError: Duplicate points in the dataset.
+            ValueError: Invalid column names for additonal terms.
         """
         # check center: there can be only one
         center_rows = self._dict_filter(self._dataframe, self._center)
@@ -438,9 +397,7 @@ class MultiTaylor:
     def query(self, **kwargs: float) -> float:
         """Evaluate the Taylor expansion at a given point.
 
-        Returns
-        -------
-        float
+        Returns:
             Value from all terms.
         """
         ret = {}
@@ -456,14 +413,10 @@ class MultiTaylor:
     ) -> dict[tuple[str, int], float]:
         """Breaks down the Taylor expansion into its monomials.
 
-        Parameters
-        ----------
-        output : str
-            The output variable for which this analysis is done.
+        Args:
+            output (str): The output variable for which this analysis is done.
 
-        Returns
-        -------
-        dict[tuple[str, int], float]
+        Returns:
             Keys are the variable names and the exponents, values are the contributions from each monomial.
         """
         ret = {}
@@ -479,18 +432,12 @@ class MultiTaylor:
     ) -> dict[str, float]:
         """Optimizes the target value over the the input variables within bounds.
 
-        Parameters
-        ----------
-        maximize : bool
-            Whether to maximize.
-        target : str
-            Column name to optimize.
-        bounds : dict[str, tuple[float, float]]
-            Keys are the variable names, values are the bounds.
+        Args:
+            maximize (bool): Whether to maximize.
+            target (str): Column name to optimize.
+            bounds (dict[str, tuple[float, float]]): Keys are the variable names, values are the bounds.
 
-        Returns
-        -------
-        dict[str, float]
+        Returns:
             Best point found. Keys are the variable names, values are the positions.
         """
         ordering = bounds.keys()
@@ -515,16 +462,11 @@ class MultiTaylor:
     ) -> dict[str, float]:
         """See _optimize.
 
-        Parameters
-        ----------
-        target : str
-            Column name to minimize.
-        bounds : dict[str, tuple[float, float]]
-            Bounds for the search space.
+        Args:
+            target (str): Column name to minimize.
+            bounds (dict[str, tuple[float, float]]): Bounds for the search space.
 
-        Returns
-        -------
-        dict[str, float]
+        Returns:
             Optimal position found.
         """
         return self._optimize(False, target, bounds)
@@ -534,16 +476,11 @@ class MultiTaylor:
     ) -> dict[str, float]:
         """See _optimize.
 
-        Parameters
-        ----------
-        target : str
-            Column name to maximize.
-        bounds : dict[str, tuple[float, float]]
-            Bounds for the search space.
+        Args:
+            target (str): Column name to maximize.
+            bounds (dict[str, tuple[float, float]]): Bounds for the search space.
 
-        Returns
-        -------
-        dict[str, float]
+        Returns:
             Optimal position found.
         """
         return self._optimize(True, target, bounds)
@@ -781,17 +718,30 @@ class Anygrad:
             )
 
     class Property(enum.Enum):
+        """Quantum chemical observable to differentiate."""
+
         ENERGY = "energy"
+        """Total electronic energy."""
         HOMO = "homo"
+        """Highest occupied molecular orbital energy."""
 
     class Variable(enum.Enum):
+        """Variable with respect to which the derivative is taken."""
+
         POSITION = "R"
+        """Nuclear position."""
         NUCLEAR_CHARGE = "Z"
+        """Nuclear charge."""
 
     class Method(enum.Enum):
+        """Numerical strategy used to obtain a derivative."""
+
         COUPLED_PERTURBED = "CP"
+        """Coupled-perturbed equations (analytic)."""
         FINITE_DIFFERENCES = "FD"
+        """Numerical finite differences."""
         AUTOMATIC_DIFFERENTIATION = "AD"
+        """Automatic differentiation."""
 
     def __init__(self, calculator, target: "Anygrad.Property"):
         self._calculator = calculator
@@ -806,12 +756,10 @@ class Anygrad:
         )
 
     @staticmethod
-    def supported_methods():
+    def supported_methods() -> dict:
         """Returns all supported combinations of properties, derivatives, level of theory, and methods.
 
-        Returns
-        -------
-        dict
+        Returns:
             Nested dictionary with structure: {property: {derivative_kind: {leveloftheory: [methods]}}}
         """
         import inspect

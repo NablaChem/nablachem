@@ -1,4 +1,5 @@
 import click
+import importlib
 import os
 import hashlib
 
@@ -20,7 +21,10 @@ COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax
             like 'energy - baseline' or 'E_high - E_low'. For column names with
             special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
 REPRESENTATION_NAME: Name of the molecular representation to use.
-                 Available representations: {', '.join(available_representations)}
+                 Built-in representations: {', '.join(available_representations)}
+                 Custom representations can be loaded from any importable module using
+                 dotted notation, e.g. 'mymodule.MyRepresenter' or 'pkg.sub.MyRep'.
+                 The class must implement the BaseRepresenter interface (compute/build).
 KERNEL_NAME: Name of the kernel function to use.
          Available kernels: {', '.join(available_kernels)}
 
@@ -109,18 +113,30 @@ def main(
     )
 
     # Get the representation class dynamically
-    rep_class_map = {}
-    for name in available_representations:
-        rep_class_map[name] = getattr(features, name)
+    if "." in representation_name:
+        module_path, class_name = representation_name.rsplit(".", 1)
+        try:
+            mod = importlib.import_module(module_path)
+        except ImportError as e:
+            error("Cannot import representation module", module=module_path, reason=str(e))
+        try:
+            rep_class = getattr(mod, class_name)
+        except AttributeError:
+            error("Class not found in module", module=module_path, class_name=class_name)
+        rep = rep_class()
+    else:
+        rep_class_map = {}
+        for name in available_representations:
+            rep_class_map[name] = getattr(features, name)
 
-    if representation_name not in rep_class_map:
-        error(
-            "Unknown representation",
-            requested=representation_name,
-            available=available_representations,
-        )
+        if representation_name not in rep_class_map:
+            error(
+                "Unknown representation",
+                requested=representation_name,
+                available=available_representations,
+            )
 
-    rep = rep_class_map[representation_name]()
+        rep = rep_class_map[representation_name]()
     rep.build(ds)
     info("Prepared representation", first_entry_shape=ds.representations[0].shape)
 
