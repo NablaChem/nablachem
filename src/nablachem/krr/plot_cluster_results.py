@@ -175,7 +175,7 @@ def load_repr(path):
 
 # %% main figure — all representations on one plot
 
-fig_main, ax_main = plt.subplots(1, 1, figsize=(_panel_w, _panel_h))
+fig_main, ax_main = plt.subplots(1, 1, figsize=(_panel_w, _panel_h * 0.7))
 format_panel(ax_main)
 
 _max_x = 0
@@ -199,15 +199,16 @@ for _path, _label, _color in REPRESENTATIONS:
     _max_x = max(_max_x, nd[0])
 
 ax_main.axhline(0, color="gray", linewidth=0.8, linestyle=":")
-ax_main.axhspan(-10, 0, color="gray", alpha=0.15, zorder=0)
-ax_main.set_ylim(30, -10)
-ax_main.set_xlim(0, _max_x)
-ax_main.set_xlabel("Number of features")
-ax_main.set_ylabel("Relative improvement (RMSE %)")
-ax_main.legend(loc="lower left")
+ax_main.axhspan(-7, 0, color="gray", alpha=0.15, zorder=0)
+ax_main.set_ylim(25, -7)
+ax_main.set_xlim(0, _max_x+10)
+ax_main.set_xlabel("Number of features", fontsize=11)
+ax_main.set_ylabel("Relative improvement (RMSE %)", fontsize=11)
+ax_main.tick_params(axis="both", labelsize=11)
+ax_main.legend(loc="lower left", fontsize=11)
 
 plt.tight_layout()
-_out = "/Users/ali/second_project_data/results/comparison_main.pdf"
+_out = "/Users/ali/second_project_data/results/comparison_local.pdf"
 plt.savefig(_out, bbox_inches="tight")
 print(f"Saved {_out}")
 plt.show()
