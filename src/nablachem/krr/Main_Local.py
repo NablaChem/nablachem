@@ -1,16 +1,22 @@
-# %% library imports
-import time
+#!/usr/bin/env python3
+import warnings
 import jax
 import optax
 import numpy as np
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from scipy import linalg as _scipy_linalg
+import psutil, os
 
 jax.config.update("jax_enable_x64", True)
 
-# %%
+
+def _ram(label=""):
+    proc = psutil.Process(os.getpid())
+    used = proc.memory_info().rss / 1e9
+    total = psutil.virtual_memory().total / 1e9
+    print(f"[RAM] {label}: {used:.2f} GB used / {total:.1f} GB total", flush=True)
 
 
 def make_local_data_controller(
@@ -22,6 +28,7 @@ def make_local_data_controller(
     rep="cMBDFLocal",
     label_scale=1.0,
     kernel="elemental",
+    mace_model_path="medium",
 ):
     import numpy as np
     from nablachem.krr import krr
@@ -47,28 +54,24 @@ def make_local_data_controller(
             weights,
             Z_train,
             Z_holdout,
-            withtest=False,
             approx=True,
         ):
             self._X_train = X_train
             self._X_holdout = X_holdout
             self._weights = weights
-            self._withtest = withtest
+
+            mask = weights != 0
 
             self._train_counts = np.array([rep.shape[0] for rep in X_train])
             self._X_train = np.concatenate(X_train, axis=0)
-            self._X_train *= self._weights
+            self._X_train = self._X_train[:, mask] * weights[mask]
 
             self._holdout_counts = np.array([rep.shape[0] for rep in X_holdout])
             self._X_holdout = np.concatenate(X_holdout, axis=0)
-            self._X_holdout *= self._weights
+            self._X_holdout = self._X_holdout[:, mask] * weights[mask]
 
             train_nuclear_charges = np.concatenate(Z_train)
             holdout_nuclear_charges = np.concatenate(Z_holdout)
-
-            if not self._withtest:
-                self._X_holdout = None
-                holdout_nuclear_charges = None
 
             kwargs = dict(approx=approx)
             if kernel == "elemental":
@@ -90,20 +93,18 @@ def make_local_data_controller(
             )
 
         def ktest(self, sigma):
-            if self._withtest:
-                batches = []
-                batch = 0
-                while True:
-                    K = self._kernel_matrix.compute_test_kernel_matrix(
-                        sigma, len(self._train_counts), batch
-                    )
-                    if K is None:
-                        break
-                    batches.append(K)
-                    batch += 1
-                return np.vstack(batches)
+            batches = []
+            batch = 0
+            while True:
+                K = self._kernel_matrix.compute_test_kernel_matrix(
+                    sigma, len(self._train_counts), batch
+                )
+                if K is None:
+                    break
+                batches.append(K)
+                batch += 1
+            return np.vstack(batches)
 
-    # ----- build once -----
     ds = dataset.DataSet(path, prop, limit=limit, select=None)
     local_reps = {
         "MBDFLocal": features.MBDFLocal,
@@ -114,8 +115,11 @@ def make_local_data_controller(
     }
     if rep not in local_reps:
         raise ValueError(f"rep must be one of {list(local_reps.keys())}")
-    rep = local_reps[rep]()
+    rep_kwargs = {"model_path": mace_model_path} if rep.startswith("MACE") else {}
+    rep = local_reps[rep](**rep_kwargs)
+    _ram(f"before rep.build limit={limit}")
     rep.build([ds])
+    _ram(f"after rep.build limit={limit}")
 
     X = np.array(ds.representations, dtype="object")
     Z = np.array(ds.nuclear_charges, dtype="object")
@@ -133,9 +137,9 @@ def make_local_data_controller(
 
     if n_pool == 0:
         raise ValueError("No training data left after reserving holdout.")
-    if chunk_size > n_pool:
+    if chunk_size >= n_pool:
         raise ValueError(
-            f"chunk_size={chunk_size} cannot exceed training pool size={n_pool}"
+            f"chunk_size={chunk_size} must be less than training pool size={n_pool}"
         )
 
     X_holdout = X[holdout_idx]
@@ -143,7 +147,6 @@ def make_local_data_controller(
     y_test_raw = y[holdout_idx].copy()
     A_holdout = element_counts[holdout_idx]
 
-    # ----- chunk state -----
     pos = 0
     current_train_idx = None
 
@@ -186,9 +189,9 @@ def make_local_data_controller(
         return current_train_idx
 
     current_cache = None
-    cache_key = None  # (train_idx tuple, withtest, weights bytes)
+    cache_key = None
     labels_cache = None
-    labels_cache_key = None  # train_idx tuple
+    labels_cache_key = None
 
     def get_labels():
         nonlocal labels_cache, labels_cache_key
@@ -208,26 +211,26 @@ def make_local_data_controller(
         labels_cache_key = key
         return labels_cache
 
-    def get_mlo(weights, withtest, approx=True):
+    def get_mlo(weights, approx=True):
         train_idx = get_chunk()
         w = np.asarray(weights)
         return LocalMatrixOnly(
-            X[train_idx], X_holdout, w, Z[train_idx], Z_holdout, withtest, approx=approx
+            X[train_idx], X_holdout, w, Z[train_idx], Z_holdout, approx=approx
         )
 
-    def get_current_data(weights, withtest):
+    def get_current_data(weights):
         nonlocal current_cache, cache_key
         train_idx = get_chunk()
 
         w = np.asarray(weights)
-        key = (tuple(train_idx.tolist()), bool(withtest), w.tobytes())
+        key = (tuple(train_idx.tolist()), w.tobytes())
 
         if current_cache is not None and cache_key == key:
             _, y_train, y_test, mlo = current_cache
             return y_train, y_test, mlo
 
         y_train, y_test = get_labels()
-        mlo = get_mlo(w, withtest)
+        mlo = get_mlo(w)
 
         current_cache = (train_idx, y_train, y_test, mlo)
         cache_key = key
@@ -240,123 +243,221 @@ def make_local_data_controller(
         "get_labels": get_labels,
         "get_mlo": get_mlo,
         "get_current_data": get_current_data,
+        "n_features": X[0].shape[-1],
     }
 
 
-def estimate_local_model_error(y_train, y_test, mlo, sigma=None, seed=0, xTB=False):
+def _grid_search_hyperparams(mlo, y_train, n_workers=11):
+    """Grid search for best (sigma, lambda) via shuffled cross-validation.
 
-    if xTB == False:
-        sigmas_grid = 1.5 ** np.arange(-10, 20)
-    else:
-        sigmas_grid = [
-            2,
-        ]
-        test_rmse = np.nan
-        test_mae = np.nan
+    Returns (best_sigma, best_lam, best_val_rmse). Returns (None, None, nan)
+    if no valid hyperparameter combination is found.
+    """
+    n = len(y_train)
+    factors, lam_grid = mlo.get_hyperparameter_grid(n)
+    length_heuristic = mlo._kernel_matrix.length_scale(n)
+    validation = mlo.validation_size(n)
+    shufs = 50
 
-    lam = 1e-7
-    rng = np.random.default_rng(seed)
+    y = y_train - np.mean(y_train)
 
-    if sigma is not None:
-        best_sigma = float(sigma)
-        best_rmse = np.nan
-    else:
-        # 1-split validation inside the chunk
-        n = len(y_train)
-        perm = rng.permutation(n)
-        n_val = max(1, int(round(0.2 * n)))
-        val_idx = perm[:n_val]
-        tr_idx = perm[n_val:]
+    tqdm.write(
+        f"[hyperparam] grid search: {len(factors)} sigmas x {len(lam_grid)} lambdas"
+        f"  n={n}  workers={n_workers}",
+        end="\n",
+    )
 
-        y_tr = y_train[tr_idx]
-        y_val = y_train[val_idx]
+    def _eval_factor(factor):
+        sigma = length_heuristic * factor
+        K = mlo.ktrain(sigma)
+        # kernel centering
+        row_mean = K.mean(axis=1, keepdims=True)
+        col_mean = K.mean(axis=0, keepdims=True)
+        K_mean = K.mean()
+        K = K - row_mean - col_mean + K_mean
 
-        best_sigma = None
-        best_rmse = np.inf
+        eigvals, Q = np.linalg.eigh(K)
+        cond = eigvals[-1] / eigvals[1] if eigvals[1] > 0 else np.inf
+        if cond > 1e15:
+            tqdm.write(
+                f"  [sigma={sigma:.3g}] skipped (ill-conditioned, cond={cond:.1e})"
+            )
+            return []
 
-        for s in sigmas_grid:
-            K_full = mlo.ktrain(sigma=float(s))
-            K_tr_tr = K_full[np.ix_(tr_idx, tr_idx)]
-            K_val_tr = K_full[np.ix_(val_idx, tr_idx)]
+        use_schur = cond < 5e8 and n > 128
 
-            alpha = np.linalg.solve(K_tr_tr + lam * np.eye(len(tr_idx)), y_tr)
-            pred_val = K_val_tr @ alpha
-            rmse_val = np.sqrt(np.mean((pred_val - y_val) ** 2))
+        factor_results = []
+        idx = np.arange(n)  # thread-local copy — no shared mutable state
+        rng = np.random.default_rng()  # thread-local RNG
 
-            if rmse_val < best_rmse:
-                best_rmse = rmse_val
-                best_sigma = float(s)
+        for lam in lam_grid:
+            if use_schur:
+                Kinv = (Q * (1.0 / (eigvals + lam))) @ Q.T
 
-    # retrain on full chunk, evaluate on fixed holdout
-    K_train = mlo.ktrain(sigma=best_sigma)
-    if xTB == False:
-        K_test = mlo.ktest(sigma=best_sigma)
+            split_rmse = []
+            for _ in range(shufs):
+                rng.shuffle(idx)
+                y_s = y[idx]
 
-        alpha = np.linalg.solve(K_train + lam * np.eye(K_train.shape[0]), y_train)
-        pred = K_test @ alpha
+                if use_schur:
+                    Ks = Kinv[np.ix_(idx, idx)]
+                    E = Ks[:-validation, :-validation]
+                    H = Ks[-validation:, -validation:]
+                    F = Ks[:-validation, -validation:]
+                    G = Ks[-validation:, :-validation]
+                    alpha = E @ y_s[:-validation] - F @ (
+                        np.linalg.inv(H) @ (G @ y_s[:-validation])
+                    )
+                else:
+                    K_s = K[np.ix_(idx, idx)]
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", _scipy_linalg.LinAlgWarning)
+                            alpha = _scipy_linalg.solve(
+                                K_s[:-validation, :-validation]
+                                + lam * np.eye(n - validation),
+                                y_s[:-validation],
+                                assume_a="pos",
+                            )
+                    except Exception:
+                        continue
 
-        test_rmse = np.sqrt(np.mean((pred - y_test) ** 2))
-        test_mae = np.mean(np.abs(pred - y_test))
+                pred = K[np.ix_(idx[-validation:], idx[:-validation])] @ alpha
+                split_rmse.append(np.sqrt(((pred - y_s[-validation:]) ** 2).mean()))
 
-    return {
-        "best_sigma": best_sigma,
-        "val_rmse": best_rmse,
-        "test_rmse": test_rmse,
-        "test_mae": test_mae,
+                if len(split_rmse) > 5:
+                    one = np.median(split_rmse[::2])
+                    two = np.median(split_rmse[1::2])
+                    if abs(one - two) / np.median(split_rmse) < 5e-2:
+                        break
+
+            if len(split_rmse) < 5:
+                continue
+            avg = np.median(split_rmse)
+            factor_results.append((sigma, lam, avg))
+
+        if factor_results:
+            best = min(factor_results, key=lambda x: x[2])
+            tqdm.write(
+                f"  [sigma={sigma:.3g}] done — best lam={best[1]:.1e}  rmse={best[2]:.4f}"
+                f"  (schur={use_schur})"
+            )
+        return factor_results
+
+    best_sigma, best_lam, best_rmse = None, None, np.inf
+
+    with ThreadPoolExecutor(max_workers=n_workers) as ex:
+        pbar = tqdm(
+            ex.map(_eval_factor, factors),
+            total=len(factors),
+            desc="hyperparam",
+        )
+        for factor_results in pbar:
+            for sigma, lam, avg in factor_results:
+                if avg < best_rmse:
+                    best_rmse, best_sigma, best_lam = avg, sigma, lam
+                    pbar.set_postfix(
+                        sigma=f"{best_sigma:.3g}",
+                        lam=f"{best_lam:.1e}",
+                        rmse=f"{best_rmse:.4f}",
+                    )
+
+    tqdm.write(
+        f"[hyperparam] best: sigma={best_sigma:.3g}  lam={best_lam:.1e}"
+        f"  val_rmse={best_rmse:.4f}"
+    )
+    return best_sigma, best_lam, best_rmse
+
+
+def _solve_and_predict(mlo, y_train, y_test, sigma, lam):
+    """Fit KRR with given (sigma, lam) and return (test_rmse, test_mae).
+
+    Uses kernel centering consistent with the hyperparameter search.
+    Returns (nan, nan) on numerical failure.
+    """
+    K_train = mlo.ktrain(sigma)
+    col_mean = K_train.mean(axis=0, keepdims=True)
+    K_mean = K_train.mean()
+    K_train_c = K_train - K_train.mean(axis=1, keepdims=True) - col_mean + K_mean
+
+    shift = np.mean(y_train)
+    y = y_train - shift
+    try:
+        alpha = np.linalg.solve(K_train_c + lam * np.eye(len(y)), y)
+    except np.linalg.LinAlgError:
+        return np.nan, np.nan
+
+    K_test = mlo.ktest(sigma)
+    K_test_c = K_test - K_test.mean(axis=1, keepdims=True) - col_mean + K_mean
+    pred = K_test_c @ alpha + shift
+
+    test_rmse = np.sqrt(np.mean((pred - y_test) ** 2))
+    test_mae = np.mean(np.abs(pred - y_test))
+    return test_rmse, test_mae
+
+
+def estimate_local_model_error(
+    y_train, y_test, mlo, xTB=False, xtb_cache=None, n_workers=11
+):
+    """Estimate KRR test error.
+
+    xTB=False: run full hyperparameter grid search then evaluate on y_test.
+    xTB=True:  use pre-cached (sigma, lam) from xtb_cache and evaluate on y_test.
+    """
+    _nan = {
+        "best_sigma": np.nan,
+        "best_lam": np.nan,
+        "val_rmse": np.nan,
+        "test_rmse": np.nan,
+        "test_mae": np.nan,
     }
 
-
-# %%
-
-
-def _pick_best_workers_for(ctrl, weights, candidates=(2, 3, 4)):
-    delta = 2
-    y_train, y_test = ctrl["get_labels"]()
-    mlo = ctrl["get_mlo"](weights, False, approx=False)
-    value = estimate_local_model_error(y_train, y_test, mlo, xTB=True)["val_rmse"]
-
-    def _probe(i):
-        weights_delta = weights.at[i].multiply(delta)
-        mlo_delta = ctrl["get_mlo"](weights_delta, False, approx=False)
-        E = estimate_local_model_error(y_train, y_test, mlo_delta, xTB=True)
-        return i, (E["val_rmse"] - value) / delta
-
-    nonzero = [i for i in range(len(weights)) if weights[i] != 0]
-    probe = nonzero[: max(4, len(nonzero) // 5)]
-    return _pick_best_workers(_probe, probe, candidates)
-
-
-def _pick_best_workers(fn, probe_indices, candidates=(4, 6, 8)):
-    best, best_t = candidates[0], float("inf")
-    for n in candidates:
-        t0 = time.perf_counter()
-        with ThreadPoolExecutor(max_workers=n) as ex:
-            list(ex.map(fn, probe_indices))
-        t = time.perf_counter() - t0
-        print(f"workers={n}: {t:.2f}s")
-        if t < best_t:
-            best, best_t = n, t
-    return best
+    if xTB:
+        sigma, lam = xtb_cache[0]
+        test_rmse, test_mae = _solve_and_predict(mlo, y_train, y_test, sigma, lam)
+        return {
+            "best_sigma": sigma,
+            "best_lam": lam,
+            "val_rmse": np.nan,
+            "test_rmse": test_rmse,
+            "test_mae": test_mae,
+        }
+    else:
+        sigma, lam, val_rmse = _grid_search_hyperparams(
+            mlo, y_train, n_workers=n_workers
+        )
+        if sigma is None:
+            return _nan
+        test_rmse, test_mae = _solve_and_predict(mlo, y_train, y_test, sigma, lam)
+        return {
+            "best_sigma": sigma,
+            "best_lam": lam,
+            "val_rmse": val_rmse,
+            "test_rmse": test_rmse,
+            "test_mae": test_mae,
+        }
 
 
-def _value_and_grad(ctrl, weights, n_workers=4):
-    delta = 2
-
+def _value_and_grad(ctrl, weights, n_workers=11, xtb_cache=None):
     y_train, y_test = ctrl["get_labels"]()
 
-    mlo = ctrl["get_mlo"](weights, False, approx=False)
-    E_high = estimate_local_model_error(y_train, y_test, mlo, xTB=True)
-    value = E_high["val_rmse"]
+    mlo = ctrl["get_mlo"](weights, approx=False)
+    E_high = estimate_local_model_error(
+        y_train, y_test, mlo, xTB=True, xtb_cache=xtb_cache
+    )
+    value = E_high["test_rmse"]
 
     grad = np.zeros_like(weights)
 
     def _compute_grad_i(i):
         if weights[i] == 0:
             return i, 0.0
-        weights_delta = weights.at[i].multiply(delta)
-        mlo_delta = ctrl["get_mlo"](weights_delta, False, approx=False)
-        E = estimate_local_model_error(y_train, y_test, mlo_delta, xTB=True)
-        return i, (E["val_rmse"] - value) / delta
+        eps = abs(float(weights[i])) * 1e-2
+        mlo_fwd = ctrl["get_mlo"](weights.at[i].add(eps), approx=False)
+        E_fwd = estimate_local_model_error(
+            y_train, y_test, mlo_fwd, xTB=True, xtb_cache=xtb_cache
+        )
+        return i, (E_fwd["test_rmse"] - value) / eps
 
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         pbar = tqdm(
@@ -374,67 +475,85 @@ def _value_and_grad(ctrl, weights, n_workers=4):
 class Selector:
     def __init__(
         self,
-        batch_size: int,
         learning_rate: float,
         steps: int,
         n_runs: int = 5,
+        hq_chunk_size: int = 256,
+        lq_chunk_size: int = 256,
+        rep: str = "cMBDFLocal",
+        kernel: str = "elemental",
+        n_workers: int = None,
+        mace_model_path: str = "medium",
     ):
         self.lr = learning_rate
-        self.batch_size = batch_size
         self.steps = steps
         self.n_runs = n_runs
-        self.value_log = []
-        self.rmse_steps = []
-        self.weight_log = []
-        self.better_val_errors = []
-        self.better_test_errors = []
+        self.hq_chunk_size = hq_chunk_size
+        self.lq_chunk_size = lq_chunk_size
+        self.rep = rep
+        self.kernel = kernel
+        self.n_workers = n_workers
+        self.mace_model_path = mace_model_path
 
-    def _run_once(self, n_workers):
-        path = "/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz"
-
-        params = jnp.ones(40)
-        optimizer = optax.adam(self.lr)
-        opt_state = optimizer.init(params)
+    def _run_once(self, n_workers, path, seed=0):
+        np.random.seed(seed)
 
         ctrl = make_local_data_controller(
             path,
             "Etot",
-            holdout_size=512,
-            chunk_size=512,
-            limit=512 + 512,
-            rep="cMBDFLocal",
+            holdout_size=self.hq_chunk_size,
+            chunk_size=self.hq_chunk_size,
+            limit=self.hq_chunk_size * 10 + self.hq_chunk_size,
+            rep=self.rep,
             label_scale=627.509474,
-            kernel="elemental",
+            kernel=self.kernel,
+            mace_model_path=self.mace_model_path,
         )
         ctrl["next_chunk"]()
+
+        params = jnp.ones(ctrl["n_features"])
+        optimizer = optax.adam(self.lr)
+        opt_state = optimizer.init(params)
 
         ctrl_xTB = make_local_data_controller(
             path,
             "xtb_E_total",
-            holdout_size=1,
-            chunk_size=640,
-            limit=(640 * self.steps),
-            rep="cMBDFLocal",
+            holdout_size=self.lq_chunk_size,
+            chunk_size=self.lq_chunk_size,
+            limit=self.lq_chunk_size * (2 * self.steps + 4),
+            rep=self.rep,
             label_scale=627.509474,
-            kernel="elemental",
+            kernel=self.kernel,
+            mace_model_path=self.mace_model_path,
         )
+
+        # One-time hyperparameter search on 4× training data before the main loop.
+        # Result is cached and reused for all gradient steps; no test eval here.
+        xtb_cache = [None]
+        ctrl_xTB["set_chunk"](np.arange(self.lq_chunk_size))
+        y_init, _ = ctrl_xTB["get_labels"]()
+        mlo_init = ctrl_xTB["get_mlo"](jnp.ones(ctrl_xTB["n_features"]), approx=False)
+        sigma_init, lam_init, _ = _grid_search_hyperparams(
+            mlo_init, y_init, n_workers=n_workers
+        )
+        xtb_cache[0] = (sigma_init, lam_init)
         ctrl_xTB["next_chunk"]()
 
         test_errors, val_errors, weight_log, value_log, rmse_steps = [], [], [], [], []
 
         zero_threshold = 0.0
-        plateau_window = 15
+        plateau_window = 10
         _window_count = 0
-        _prev_active_dims = None
+        _prev_active_dims = len(params)
         active_dims = len(params)
 
         pbar = tqdm(range(self.steps), desc="compress", unit="step", dynamic_ncols=True)
         for step in pbar:
 
-            if step % 3 == 0:
-                y_train, y_test, mlo = ctrl["get_current_data"](params, True)
+            if step % 5 == 0:
+                y_train, y_test, mlo = ctrl["get_current_data"](params)
                 E_high = estimate_local_model_error(
-                    y_train, y_test, mlo, sigma=None, xTB=False
+                    y_train, y_test, mlo, n_workers=n_workers
                 )
                 active_dims = int((np.array(params) > 0.001).sum())
                 rmse_steps.append(step)
@@ -453,17 +572,19 @@ class Selector:
                 )
 
             ctrl_xTB["next_chunk"]()
-            v, g = _value_and_grad(ctrl_xTB, jnp.array(params), n_workers=n_workers)
+            v, g = _value_and_grad(
+                ctrl_xTB, jnp.array(params), n_workers=n_workers, xtb_cache=xtb_cache
+            )
 
             _window_count += 1
             if _window_count == plateau_window:
                 if (
                     _prev_active_dims is not None
-                    and abs(active_dims - _prev_active_dims) <= 2
+                    and abs(active_dims - _prev_active_dims) <= 3
                 ):
                     nonzero = np.array(params)[np.array(params) > 0]
                     if len(nonzero) > 0:
-                        zero_threshold = float(np.percentile(nonzero, 1))
+                        zero_threshold = float(np.percentile(nonzero, 0.1))
                         tqdm.write(
                             f"  [plateau] step {step} — active dims change"
                             f" {abs(active_dims - _prev_active_dims)} <= 3"
@@ -478,26 +599,14 @@ class Selector:
             if zero_threshold > 0:
                 params = params.at[params < zero_threshold].set(0)
 
-            weight_log.append(params)
+            weight_log.append(np.array(params))
             value_log.append(v)
 
         return test_errors, val_errors, weight_log, value_log, rmse_steps
 
-    def compress(self):
-        path = "/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz"
-
-        ctrl_xTB_probe = make_local_data_controller(
-            path,
-            "xtb_E_total",
-            holdout_size=1,
-            chunk_size=512,
-            limit=512 * 10,
-            rep="cMBDFLocal",
-            label_scale=627.509474,
-            kernel="elemental",
-        )
-        ctrl_xTB_probe["next_chunk"]()
-        n_workers = _pick_best_workers_for(ctrl_xTB_probe, jnp.ones(40))
+    def compress(self, path, output_path):
+        n_workers = self.n_workers
+        print(f"Workers        : {n_workers}")
 
         all_test_errors, all_val_errors, all_weight_logs, all_value_logs = (
             [],
@@ -507,9 +616,16 @@ class Selector:
         )
         rmse_steps = None
 
+        seeds = [
+            5,
+        ]
         for run in range(self.n_runs):
-            print(f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}\n{'='*40}")
-            t_err, v_err, w_log, val_log, steps = self._run_once(n_workers)
+            print(
+                f"\n{'='*40}\n  Run {run + 1}/{self.n_runs}  (seed={seeds[run]})\n{'='*40}"
+            )
+            t_err, v_err, w_log, val_log, steps = self._run_once(
+                n_workers, path, seed=seeds[run]
+            )
             all_test_errors.append(np.array(t_err))
             all_val_errors.append(np.array(v_err))
             all_weight_logs.append(w_log)
@@ -517,149 +633,97 @@ class Selector:
             if rmse_steps is None:
                 rmse_steps = steps
 
-        self.rmse_steps = rmse_steps
-        self.all_test_errors = all_test_errors
-        self.all_val_errors = all_val_errors
-        self.all_weight_logs = all_weight_logs
-        self.all_value_logs = all_value_logs
+        results = {
+            "rmse_steps": np.array(rmse_steps),
+            "test_errors": np.array(all_test_errors),
+            "val_errors": np.array(all_val_errors),
+            "value_log": np.array(all_value_logs),
+            "weight_log": np.array(
+                [
+                    [
+                        np.array(all_weight_logs[r][i])
+                        for i in range(len(all_weight_logs[0]))
+                    ]
+                    for r in range(self.n_runs)
+                ]
+            ),
+        }
 
-        return (all_test_errors, all_val_errors, all_weight_logs)
-
-    def plot_combined(self, dataset_name="", representer_name=""):
-        steps = np.array(self.rmse_steps)
-        test = np.array(self.better_test_errors)
-        val = np.array(self.better_val_errors)
-        weight_arr = np.array([np.array(w) for w in self.weight_log])
-        instant = np.array(self.value_log)
-        running_avg = np.cumsum(instant) / (np.arange(len(instant)) + 1)
-        n_dims = [(np.array(x) > 0.001).sum() for x in self.weight_log]
-
-        fig = plt.figure(figsize=(18, 10))
-        gs = fig.add_gridspec(3, 2, width_ratios=[2, 1], hspace=0.45, wspace=0.3)
-        ax_main = fig.add_subplot(gs[:, 0])
-        ax_w = fig.add_subplot(gs[0, 1])
-        ax_v = fig.add_subplot(gs[1, 1])
-        ax_d = fig.add_subplot(gs[2, 1])
-
-        header = " | ".join(filter(None, [dataset_name, representer_name]))
-        if header:
-            fig.suptitle(header, fontsize=14, fontweight="bold")
-
-        ref_test = test[0]
-        ref_val = val[0]
-        improvement_test = (ref_test - test) / ref_test * 100
-        improvement_val = (ref_val - val) / ref_val * 100
-
-        ax_main.plot(
-            steps,
-            improvement_test,
-            marker="o",
-            color="C0",
-            label=f"Test RMSE  ({self.n_runs} runs avg)",
+        np.savez(
+            f"{output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_{seeds[0]}",
+            **results,
         )
-        ax_main.plot(
-            steps,
-            improvement_val,
-            marker="o",
-            color="C0",
-            linestyle="--",
-            alpha=0.5,
-            label=f"Val RMSE  ({self.n_runs} runs avg)",
+        print(
+            f"\nResults saved to {output_path}_{self.rep}_{self.kernel}_{self.hq_chunk_size}_{seeds[0]}.npz"
         )
-        for x, y in zip(steps, improvement_test):
-            ax_main.annotate(
-                f"{y:.1f}%",
-                xy=(x, y),
-                xytext=(0, 8),
-                textcoords="offset points",
-                ha="center",
-                fontsize=9,
-                color="C0",
-            )
-        ax_main.set_xlabel("Compression Step", fontsize=12)
-        ax_main.set_ylabel("RMSE Improvement (%)", fontsize=12)
-        ax_main.set_ylim(25, 0)
-        ax_main.set_title("High Quality RMSE vs Compression Steps", fontsize=12)
-        ax_main.grid(True, alpha=0.4)
-        ax_main.legend(
-            fontsize=9,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.98),
-            ncol=2,
-            framealpha=0.9,
-            borderaxespad=0,
-        )
-
-        ax_w.plot(weight_arr, alpha=0.2, linewidth=0.5, color="steelblue")
-        ax_w.set_title("Feature Weights")
-        ax_w.set_ylabel("Weight")
-        ax_w.set_xlabel("Step")
-        ax_w.grid(True, alpha=0.3)
-
-        ax_v.semilogy(running_avg, color="C1", linewidth=1.5, label="running avg")
-        ax_v.set_title("Low Quality Val Error")
-        ax_v.set_ylabel("RMSE (log scale)")
-        ax_v.set_xlabel("Step")
-        ax_v.legend(fontsize=8)
-        ax_v.grid(True, alpha=0.3)
-
-        ax_d.semilogy(n_dims, color="C2")
-        ax_d.set_title("Active Dimensions")
-        ax_d.set_ylabel("Count (log scale)")
-        ax_d.set_xlabel("Step")
-        ax_d.grid(True, alpha=0.3)
-
-        plt.tight_layout()
-        plt.show()
+        return results
 
 
-s = Selector(
-    batch_size=512,
-    learning_rate=0.05,
-    steps=43,
-    n_runs=5,
-)
+if __name__ == "__main__":
+    import argparse
+    import os
+    import psutil
 
-test_errors, val_errors, weight_log = s.compress()
-s.plot_combined(dataset_name="QM9", representer_name="cMBDFLocal")
+    mem = psutil.virtual_memory()
+    print(f"CPUs available : {os.cpu_count()}")
+    print(f"RAM total      : {mem.total / 1e9:.1f} GB")
+    print(f"RAM available  : {mem.available / 1e9:.1f} GB")
+    try:
+        import subprocess
 
+        gpu_info = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total,memory.free",
+                "--format=csv,noheader",
+            ],
+            text=True,
+        ).strip()
+        print(f"GPU            : {gpu_info}")
+    except Exception:
+        print("GPU            : none / nvidia-smi not available")
+    print()
 
-# %% Plot — re-run this cell freely without re-computing
-
-steps = np.array(s.rmse_steps)
-test = np.median(s.all_test_errors, axis=0)
-val = np.median(s.all_val_errors, axis=0)
-
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-
-ref = test[0]
-improvement = (ref - test) / ref * 100
-ax.plot(steps, improvement, marker="o", color="C0", label="cMBDFLocal")
-for i, (x, y) in enumerate(zip(steps, improvement)):
-    ax.annotate(
-        f"{y:.1f}%",
-        xy=(x, y),
-        xytext=(0, 8),
-        textcoords="offset points",
-        ha="center",
-        fontsize=7,
-        color="C0",
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default="/Users/ali/xTB_data/QM9_with_xtb.jsonl.gz")
+    parser.add_argument("--output", default="results")
+    parser.add_argument("--steps", type=int, default=101)
+    parser.add_argument("--n-runs", type=int, default=1)
+    parser.add_argument("--lr", type=float, default=0.01)
+    parser.add_argument("--hq-chunk-size", type=int, default=256)
+    parser.add_argument("--lq-chunk-size", type=int, default=256)
+    parser.add_argument(
+        "--rep",
+        default="cMBDFLocal",
+        choices=["MBDFLocal", "cMBDFLocal", "SLATMLocal", "MACELocal", "FCHL19Local"],
     )
+    parser.add_argument(
+        "--kernel",
+        default="elemental",
+        choices=["elemental", "local"],
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers. If omitted, auto-detected.",
+    )
+    parser.add_argument(
+        "--mace-model",
+        default="medium",
+        help="MACE model name or path to a local .model file (required on nodes without internet).",
+    )
+    args = parser.parse_args()
 
-ax.set_title("QM9", fontsize=13)
-ax.set_xlabel("Compression Step", fontsize=11)
-ax.set_ylabel("RMSE Improvement (%)", fontsize=11)
-ax.set_ylim(30, -10)
-ax.legend(fontsize=9)
-ax.grid(True, alpha=0.4)
-
-fig.suptitle(
-    "High-Quality RMSE vs Compression Steps — QM9 | cMBDFLocal",
-    fontsize=14,
-    fontweight="bold",
-)
-plt.tight_layout()
-plt.show()
-
-
-# %%
+    s = Selector(
+        learning_rate=args.lr,
+        steps=args.steps,
+        n_runs=args.n_runs,
+        hq_chunk_size=args.hq_chunk_size,
+        lq_chunk_size=args.lq_chunk_size,
+        rep=args.rep,
+        kernel=args.kernel,
+        n_workers=args.workers,
+        mace_model_path=args.mace_model,
+    )
+    s.compress(path=args.data, output_path=args.output)
