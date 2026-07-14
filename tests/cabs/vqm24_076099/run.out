@@ -1,0 +1,745 @@
+
+    -----------------------------------------------------------------------
+          Psi4: An Open-Source Ab Initio Electronic Structure Package
+                               Psi4 1.10 release
+
+                         Git: Rev {} zzzzzzz 
+
+
+    D. G. A. Smith, L. A. Burns, A. C. Simmonett, R. M. Parrish,
+    M. C. Schieber, R. Galvelis, P. Kraus, H. Kruse, R. Di Remigio,
+    A. Alenaizan, A. M. James, S. Lehtola, J. P. Misiewicz, M. Scheurer,
+    R. A. Shaw, J. B. Schriber, Y. Xie, Z. L. Glick, D. A. Sirianni,
+    J. S. O'Brien, J. M. Waldrop, A. Kumar, E. G. Hohenstein,
+    B. P. Pritchard, B. R. Brooks, H. F. Schaefer III, A. Yu. Sokolov,
+    K. Patkowski, A. E. DePrince III, U. Bozkaya, R. A. King,
+    F. A. Evangelista, J. M. Turney, T. D. Crawford, C. D. Sherrill,
+    J. Chem. Phys. 152(18) 184108 (2020). https://doi.org/10.1063/5.0006002
+
+                            Additional Code Authors
+    E. T. Seidl, C. L. Janssen, E. F. Valeev, M. L. Leininger,
+    J. F. Gonthier, R. M. Richard, H. R. McAlexander, M. Saitow, X. Wang,
+    P. Verma, M. H. Lechner, A. Jiang, S. Behnle, A. G. Heide,
+    M. F. Herbst, D. L. Poole, T. Győri, E. C. Mitchell, J. P. Pederson,
+    and A. M. Wallace
+
+             Previous Authors, Complete List of Code Contributors,
+                       and Citations for Specific Modules
+    https://github.com/psi4/psi4/blob/master/codemeta.json
+    https://github.com/psi4/psi4/graphs/contributors
+    https://psicode.org/psi4manual/master/introduction.html#citing-psifour
+
+    -----------------------------------------------------------------------
+
+
+    Psi4 started on: Tuesday, 14 July 2026 03:09PM
+
+    Process ID: 17912
+    Host:       rainmaker.local
+    PSIDATADIR: /opt/miniconda3/envs/regular/share/psi4
+    Memory:     500.0 MiB
+    Threads:    1
+    Addons:     a̶d̶c̶c̶, a̶m̶b̶i̶t̶, bse, c̶c̶t̶3̶, c̶f̶o̶u̶r̶, c̶h̶e̶m̶p̶s̶2̶, c̶p̶p̶e̶, d̶d̶x̶, dftd3,
+                d̶f̶t̶d̶4̶, dkh, ecpint, einsums, f̶o̶r̶t̶e̶, g̶a̶u̶x̶c̶, gcp, g̶d̶m̶a̶,
+                geometric, g̶p̶u̶_̶d̶f̶c̶c̶, i̶n̶t̶e̶g̶r̶a̶t̶o̶r̶x̶x̶, i̶p̶i̶, l̶i̶b̶e̶f̶p̶,
+                m̶d̶i̶, m̶p̶2̶d̶, m̶r̶c̶c̶, ooo, o̶p̶e̶n̶f̶e̶r̶m̶i̶o̶n̶p̶s̶i̶4̶, pcmsolver,
+                p̶s̶i̶4̶f̶o̶c̶k̶c̶i̶, p̶s̶i̶x̶a̶s̶, r̶e̶s̶p̶, s̶i̶m̶i̶n̶t̶, s̶n̶s̶m̶p̶2̶,
+                v̶2̶r̶d̶m̶_̶c̶a̶s̶s̶c̶f̶
+
+  ==> Input File <==
+
+--------------------------------------------------------------------------
+molecule mol {
+0 1
+C	2.3069682507	-0.2173012761	0.2361446162
+C	1.1174075635	-0.1161240747	-0.3563418962
+C	0.0475976068	0.8699232918	0.0162947438
+C	-1.2425970409	0.2094426744	0.5359895046
+N	-1.9349798505	-0.6876180084	-0.3798941308
+H	3.0396094012	-0.9655790615	-0.0756503882
+H	2.5945994641	0.4503047215	1.0548105931
+H	0.8804072075	-0.8059306889	-1.1765663529
+H	-0.2043465657	1.4840916209	-0.8686796817
+H	0.4346129241	1.5631410378	0.7820179426
+H	-1.0115346942	-0.3571836361	1.4536608923
+H	-1.9478171987	1.0032789941	0.8342485723
+H	-1.3415763173	-1.4862398908	-0.6021926322
+H	-2.1034690457	-0.2136647545	-1.2680523380
+symmetry c1
+}
+
+set {
+  basis         pcseg-0
+  cabs_basis    ../pcseg-cabs
+  freeze_core   True
+  mp2_type      conv
+  f12_beta      1.0
+  cabs_singles  True
+}
+
+energy('mp2-f12')
+--------------------------------------------------------------------------
+
+Scratch directory: /tmp/
+    SCF Algorithm Type (re)set to PK.
+   => Libint2 <=
+
+    Primary   basis highest AM E, G, H:  7, 6, 3
+    Auxiliary basis highest AM E, G, H:  7, 7, 4
+    Onebody   basis highest AM E, G, H:  -, -, -
+    Solid Harmonics ordering:            Gaussian
+
+*** tstart() called on rainmaker.local
+*** at Tue Jul 14 15:09:31 2026
+
+   => Loading Basis Set <=
+
+    Name: PCSEG-0
+    Role: ORBITAL
+    Keyword: BASIS
+    atoms 1-4  entry C          line    71 file /opt/miniconda3/envs/regular/share/psi4/basis/pcseg-0.gbs 
+    atoms 5    entry N          line    87 file /opt/miniconda3/envs/regular/share/psi4/basis/pcseg-0.gbs 
+    atoms 6-14 entry H          line    13 file /opt/miniconda3/envs/regular/share/psi4/basis/pcseg-0.gbs 
+
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RHF Reference
+                        1 Threads,    500 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         C            2.306968250695    -0.217301276087     0.236144616222    12.000000000000
+         C            1.117407563495    -0.116124074687    -0.356341896178    12.000000000000
+         C            0.047597606795     0.869923291813     0.016294743822    12.000000000000
+         C           -1.242597040905     0.209442674413     0.535989504622    12.000000000000
+         N           -1.934979850505    -0.687618008387    -0.379894130778    14.003074004430
+         H            3.039609401195    -0.965579061487    -0.075650388178     1.007825032230
+         H            2.594599464095     0.450304721513     1.054810593122     1.007825032230
+         H            0.880407207495    -0.805930688887    -1.176566352878     1.007825032230
+         H           -0.204346565705     1.484091620913    -0.868679681678     1.007825032230
+         H            0.434612924095     1.563141037813     0.782017942622     1.007825032230
+         H           -1.011534694205    -0.357183636087     1.453660892322     1.007825032230
+         H           -1.947817198705     1.003278994113     0.834248572322     1.007825032230
+         H           -1.341576317305    -1.486239890787    -0.602192632178     1.007825032230
+         H           -2.103469045705    -0.213664754487    -1.268052337978     1.007825032230
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      0.39566  B =      0.08839  C =      0.08055 [cm^-1]
+  Rotational constants: A =  11861.57918  B =   2649.71862  C =   2414.90618 [MHz]
+  Nuclear repulsion =  172.883450475955499
+
+  Charge       = 0
+  Multiplicity = 1
+  Electrons    = 40
+  Nalpha       = 20
+  Nbeta        = 20
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is PK.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is SAD.
+  Energy threshold   = 1.00e-08
+  Density threshold  = 1.00e-08
+  Integral threshold = 1.00e-12
+
+  ==> Primary Basis <==
+
+  Basis Set: PCSEG-0
+    Blend: PCSEG-0
+    Number of shells: 43
+    Number of basis functions: 63
+    Number of Cartesian functions: 63
+    Spherical Harmonics?: true
+    Max angular momentum: 1
+
+  ==> Integral Setup <==
+
+  Using in-core PK algorithm.
+   Calculation information:
+      Number of atoms:                  14
+      Number of AO shells:              43
+      Number of primitives:             72
+      Number of atomic orbitals:        63
+      Number of basis functions:        63
+
+      Integral cutoff                 1.00e-12
+      Number of threads:                 1
+
+  Performing in-core PK
+  Using 4066272 doubles for integral storage.
+  We computed 405816 shell quartets total.
+  Whereas there are 447931 unique shell quartets.
+
+  ==> DiskJK: Disk-Based J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                  Yes
+    wK tasked:                  No
+    Memory [MiB]:              375
+    Schwarz Cutoff:          1E-12
+
+    OpenMP threads:              1
+
+  Minimum eigenvalue in the overlap matrix is 4.3615889647E-03.
+  Reciprocal condition number of the overlap matrix is 7.7375395605E-04.
+    Using symmetric orthogonalization.
+
+  ==> Pre-Iterations <==
+
+  SCF Guess: Superposition of Atomic Densities via on-the-fly atomic UHF (no occupation information).
+
+   -------------------------
+    Irrep   Nso     Nmo    
+   -------------------------
+     A         63      63 
+   -------------------------
+    Total      63      63
+   -------------------------
+
+  ==> Iterations <==
+
+                        Total Energy        Delta E     RMS |[F,P]|
+
+   @RHF iter SAD:  -205.38068023455156   -2.05381e+02   0.00000e+00 
+   @RHF iter   1:  -200.89801192155102    4.48267e+00   5.34736e-02 DIIS/ADIIS
+   @RHF iter   2:  -194.56553373417719    6.33248e+00   7.00837e-02 DIIS/ADIIS
+   @RHF iter   3:  -210.05938334410951   -1.54938e+01   1.53621e-02 DIIS/ADIIS
+   @RHF iter   4:  -210.47342236920920   -4.14039e-01   4.54187e-03 DIIS/ADIIS
+   @RHF iter   5:  -210.51320018093148   -3.97778e-02   8.35120e-04 DIIS/ADIIS
+   @RHF iter   6:  -210.51472147696660   -1.52130e-03   3.29885e-04 DIIS/ADIIS
+   @RHF iter   7:  -210.51498163235101   -2.60155e-04   5.00497e-05 DIIS
+   @RHF iter   8:  -210.51499221297334   -1.05806e-05   1.00304e-05 DIIS
+   @RHF iter   9:  -210.51499279759136   -5.84618e-07   3.95738e-06 DIIS
+   @RHF iter  10:  -210.51499286300717   -6.54158e-08   1.46795e-06 DIIS
+   @RHF iter  11:  -210.51499287391377   -1.09066e-08   3.63364e-07 DIIS
+   @RHF iter  12:  -210.51499287448837   -5.74602e-10   7.57735e-08 DIIS
+   @RHF iter  13:  -210.51499287450804   -1.96678e-11   1.78830e-08 DIIS
+   @RHF iter  14:  -210.51499287451020   -2.16005e-12   4.25383e-09 DIIS
+  Energy and wave function converged.
+
+
+  ==> Post-Iterations <==
+
+    Orbital Energies [Eh]
+    ---------------------
+
+    Doubly Occupied:                                                      
+
+       1A    -15.536996     2A    -11.259565     3A    -11.244728  
+       4A    -11.238768     5A    -11.232812     6A     -1.187656  
+       7A     -1.078052     8A     -0.973493     9A     -0.846062  
+      10A     -0.756301    11A     -0.677821    12A     -0.648978  
+      13A     -0.612054    14A     -0.588583    15A     -0.555192  
+      16A     -0.541673    17A     -0.497636    18A     -0.475632  
+      19A     -0.395450    20A     -0.362462  
+
+    Virtual:                                                              
+
+      21A      0.158032    22A      0.204992    23A      0.216580  
+      24A      0.241601    25A      0.249749    26A      0.266383  
+      27A      0.289128    28A      0.302039    29A      0.316517  
+      30A      0.341144    31A      0.427862    32A      0.452310  
+      33A      0.500159    34A      0.588163    35A      0.684106  
+      36A      0.796066    37A      0.813106    38A      0.872073  
+      39A      0.882849    40A      0.911387    41A      0.977686  
+      42A      1.027107    43A      1.047804    44A      1.067408  
+      45A      1.072979    46A      1.104161    47A      1.124430  
+      48A      1.132855    49A      1.161990    50A      1.174915  
+      51A      1.182779    52A      1.221183    53A      1.231912  
+      54A      1.244841    55A      1.301291    56A      1.336819  
+      57A      1.374633    58A      1.404481    59A      1.522895  
+      60A      1.681425    61A      1.698919    62A      1.769555  
+      63A      1.907099  
+
+    Final Occupation by Irrep:
+              A 
+    DOCC [    20 ]
+    NA   [    20 ]
+    NB   [    20 ]
+
+  @RHF Final Energy:  -210.51499287451020
+
+   => Energetics <=
+
+    Nuclear Repulsion Energy =            172.8834504759554989
+    One-Electron Energy =                -625.3770597757879841
+    Two-Electron Energy =                 241.9786164253222864
+    Total Energy =                       -210.5149928745101988
+
+Computation Completed
+
+
+Properties will be evaluated at   0.000000,   0.000000,   0.000000 [a0]
+
+Properties computed using the SCF density matrix
+
+
+ Multipole Moments:
+
+ ------------------------------------------------------------------------------------
+     Multipole            Electronic (a.u.)      Nuclear  (a.u.)        Total (a.u.)
+ ------------------------------------------------------------------------------------
+
+ L = 1.  Multiply by 2.5417464519 to convert [e a0] to [Debye]
+ Dipole X            :          0.2384074            0.3248146            0.5632221
+ Dipole Y            :         -0.3705975            0.6321814            0.2615839
+ Dipole Z            :         -0.3788519            0.1263461           -0.2525058
+ Magnitude           :                                                    0.6703763
+
+ ------------------------------------------------------------------------------------
+
+*** tstop() called on rainmaker.local at Tue Jul 14 15:09:32 2026
+Module time:
+	user time   =       0.48 seconds =       0.01 minutes
+	system time =       0.04 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
+Total time:
+	user time   =       0.48 seconds =       0.01 minutes
+	system time =       0.04 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
+ MINTS: Wrapper to libmints.
+   by Justin Turney
+
+   Calculation information:
+      Number of threads:                 1
+      Number of atoms:                  14
+      Number of AO shells:              43
+      Number of SO shells:              43
+      Number of primitives:             72
+      Number of atomic orbitals:        63
+      Number of basis functions:        63
+
+      Number of irreps:                  1
+      Integral cutoff                 1.00e-12
+      Number of functions per irrep: [  63 ]
+
+ OEINTS: Overlap, kinetic, potential, dipole, and quadrupole integrals
+         stored in file 35.
+
+      Computing two-electron integrals...done
+      Computed 1852355 non-zero two-electron integrals.
+        Stored in file 33.
+
+
+*** tstart() called on rainmaker.local
+*** at Tue Jul 14 15:09:32 2026
+
+
+
+  Module OCC Options:
+  ----------------------------------------------------------------------------
+  ACTIVE                        => (empty)          
+  BASIS_RELATIVISTIC            => (empty)          
+  BENCH                         => (empty)          
+  CACHELEVEL                    => (empty)          
+  CCL_ENERGY                    => (empty)          
+  CC_MAXITER                    => (empty)          
+  CC_TYPE                       => (empty)          
+  CEPA_OS_SCALE                 => (empty)          
+  CEPA_SOS_SCALE                => (empty)          
+  CEPA_SS_SCALE                 => (empty)          
+  CEPA_TYPE                     => (empty)          
+  CI_TYPE                       => (empty)          
+  CUBEPROP_BASIS_FUNCTIONS      => (empty)          
+  CUBEPROP_FILEPATH             => (empty)          
+  CUBEPROP_ISOCONTOUR_THRESHOLD => (empty)          
+  CUBEPROP_ORBITALS             => (empty)          
+  CUBEPROP_TASKS                => (empty)          
+  CUBIC_BASIS_TOLERANCE         => (empty)          
+  CUBIC_BLOCK_MAX_POINTS        => (empty)          
+  CUBIC_GRID_OVERAGE            => (empty)          
+  CUBIC_GRID_SPACING            => (empty)          
+  CUTOFF                        => (empty)          
+  DDX                           => (empty)          
+  DEBUG                         => (empty)          
+  DERTYPE                       => (empty)          
+  DF_BASIS_CC                   => (empty)          
+  DIE_IF_NOT_CONVERGED          => (empty)          
+  DIIS_MAX_VECS                 => (empty)          
+  DIIS_MIN_VECS                 => (empty)          
+  DKH_ORDER                     => (empty)          
+  DOCC                          => (empty)          
+  DO_DIIS                       => (empty)          
+  DO_LEVEL_SHIFT                => (empty)          
+  DO_SCS                        => (empty)          
+  DO_SOS                        => (empty)          
+  E3_SCALE                      => (empty)          
+  EA_POLES                      => (empty)          
+  EKT_EA                        => (empty)          
+  EKT_IP                        => (empty)          
+  EP_EA_POLES                   => (empty)          
+  EP_IP_POLES                   => (empty)          
+  EP_MAXITER                    => (empty)          
+  EXTERNAL_POTENTIAL_SYMMETRY   => (empty)          
+  E_CONVERGENCE                 => 1e-06           !
+  FREEZE_CORE                   => TRUE            !
+  FREEZE_CORE_POLICY            => (empty)          
+  FROZEN_DOCC                   => (empty)          
+  FROZEN_UOCC                   => (empty)          
+  INTEGRAL_PACKAGE              => (empty)          
+  IP_POLES                      => (empty)          
+  LEVEL_SHIFT                   => (empty)          
+  LITERAL_CFOUR                 => (empty)          
+  LS_THC_BASIS_TOLERANCE        => (empty)          
+  LS_THC_DF                     => (empty)          
+  LS_THC_PRUNING_SCHEME         => (empty)          
+  LS_THC_RADIAL_POINTS          => (empty)          
+  LS_THC_SPHERICAL_POINTS       => (empty)          
+  LS_THC_S_EPSILON              => (empty)          
+  LS_THC_WEIGHTS_TOLERANCE      => (empty)          
+  MAT_NUM_COLUMN_PRINT          => (empty)          
+  MAX_MOGRAD_CONVERGENCE        => (empty)          
+  MAX_RADIAL_MOMENT             => (empty)          
+  MBIS_D_CONVERGENCE            => (empty)          
+  MBIS_MAXITER                  => (empty)          
+  MBIS_PRUNING_SCHEME           => (empty)          
+  MBIS_RADIAL_POINTS            => (empty)          
+  MBIS_SPHERICAL_POINTS         => (empty)          
+  MOGRAD_DAMPING                => (empty)          
+  MOLDEN_WITH_VIRTUAL           => (empty)          
+  MO_MAXITER                    => (empty)          
+  MO_READ                       => (empty)          
+  MO_STEP_MAX                   => (empty)          
+  MO_WRITE                      => (empty)          
+  MP2_OS_SCALE                  => (empty)          
+  MP2_SOS_SCALE                 => (empty)          
+  MP2_SOS_SCALE2                => (empty)          
+  MP2_SS_SCALE                  => (empty)          
+  MP2_TYPE                      => CONV            !
+  MP_TYPE                       => (empty)          
+  NAT_ORBS                      => (empty)          
+  NUM_FROZEN_DOCC               => (empty)          
+  NUM_FROZEN_UOCC               => (empty)          
+  NUM_GPUS                      => (empty)          
+  OCC_ORBS_PRINT                => (empty)          
+  OEPROP                        => (empty)          
+  OPT_METHOD                    => (empty)          
+  ORBITAL_OPTIMIZER_PACKAGE     => (empty)          
+  ORB_OPT                       => FALSE           !
+  ORB_RESP_SOLVER               => (empty)          
+  ORTH_TYPE                     => (empty)          
+  OS_SCALE                      => (empty)          
+  PARENT_SYMMETRY               => (empty)          
+  PCG_BETA_TYPE                 => (empty)          
+  PCG_CONVERGENCE               => (empty)          
+  PCG_MAXITER                   => (empty)          
+  PCM                           => (empty)          
+  PE                            => (empty)          
+  PRINT                         => (empty)          
+  PRINT_NOONS                   => (empty)          
+  PROPERTIES                    => (empty)          
+  PROPERTIES_ORIGIN             => (empty)          
+  PUREAM                        => (empty)          
+  QC_MODULE                     => (empty)          
+  RAS1                          => (empty)          
+  RAS2                          => (empty)          
+  RAS3                          => (empty)          
+  RAS4                          => (empty)          
+  RELATIVISTIC                  => (empty)          
+  RELAXED                       => (empty)          
+  REMP_A                        => (empty)          
+  RESTRICTED_DOCC               => (empty)          
+  RESTRICTED_UOCC               => (empty)          
+  RMS_MOGRAD_CONVERGENCE        => (empty)          
+  R_CONVERGENCE                 => (empty)          
+  SCF_TYPE                      => PK              !
+  SCREENING                     => (empty)          
+  SCS_TYPE                      => (empty)          
+  SOCC                          => (empty)          
+  SOS_TYPE                      => (empty)          
+  SPIN_SCALE_TYPE               => NONE            !
+  SS_SCALE                      => (empty)          
+  SYMMETRIZE                    => (empty)          
+  TPDM_ABCD_TYPE                => (empty)          
+  WFN                           => (empty)          
+  WFN_TYPE                      => OMP2            !
+  WRITER_FILE_LABEL             => (empty)          
+
+
+ ============================================================================== 
+ ============================================================================== 
+ ============================================================================== 
+
+                             MP2   
+                    Program Written by Ugur Bozkaya,
+              Additional Contributions by J. P. Misiewicz
+
+ ============================================================================== 
+ ============================================================================== 
+ ============================================================================== 
+
+	MO spaces per irreps... 
+
+	IRREP   FC    OCC   VIR  FV 
+	==============================
+	   A     5    15    43    0
+	==============================
+
+	Memory is    524 MB 
+	Cost of iabc is      8 MB 
+	Cost of abcd is     24 MB 
+	Switching to the incore algorithm for iabc..
+	Switching to the incore algorithm for abcd..
+
+	Computing MP2 energy using SCF MOs (Canonical MP2)... 
+	============================================================================== 
+	Nuclear Repulsion Energy (a.u.)    :   172.88345047595550
+	SCF Energy (a.u.)                  :  -210.51499287451020
+	REF Energy (a.u.)                  :  -210.51499287451020
+	Alpha-Alpha Contribution (a.u.)    :    -0.05307842340805
+	Alpha-Beta Contribution (a.u.)     :    -0.36829271965372
+	Beta-Beta Contribution (a.u.)      :    -0.05307842340805
+	Scaled_SS Correlation Energy (a.u.):    -0.03538561560537
+	Scaled_OS Correlation Energy (a.u.):    -0.44195126358446
+	SCS-MP2 Total Energy (a.u.)        :  -210.99232975370003
+	SOS-MP2 Total Energy (a.u.)        :  -210.95694413809466
+	SCSN-MP2 Total Energy (a.u.)       :  -210.70182892490652
+	SCS-MP2-VDW Total Energy (a.u.)    :  -211.03948597907504
+	SOS-PI-MP2 Total Energy (a.u.)     :  -211.03060268202540
+	MP2 Correlation Energy (a.u.)      :    -0.47444956646982
+	MP2 Total Energy (a.u.)            :  -210.98944244098001
+	============================================================================== 
+
+
+*** tstop() called on rainmaker.local at Tue Jul 14 15:09:32 2026
+Module time:
+	user time   =       0.08 seconds =       0.00 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          0 seconds =       0.00 minutes
+Total time:
+	user time   =       0.73 seconds =       0.01 minutes
+	system time =       0.08 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
+
+*** tstart() called on rainmaker.local
+*** at Tue Jul 14 15:09:32 2026
+
+
+  //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
+  //              MP2-F12              //
+  //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<//
+
+
+ -----------------------------------------------------------
+                        MP2-F12/3C(FIX)                     
+                     Explicitly Correlated                  
+               2nd Order Moeller-Plesset Theory             
+                RMP2 Wavefunction,  1 Threads              
+
+                        Erica Mitchell                      
+ -----------------------------------------------------------
+
+ Using CONV INCORE algorithm 
+
+ ===> Forming the OBS and CABS <===
+
+  Orbital Basis Set (OBS)
+  Basis Set: PCSEG-0
+    Blend: PCSEG-0
+    Number of shells: 43
+    Number of basis functions: 63
+    Number of Cartesian functions: 63
+    Spherical Harmonics?: true
+    Max angular momentum: 1
+
+  Complementary Auxiliary Basis Set (CABS)
+    Orthogonalizing basis for space RIBS.
+    0 linear dependencies will be 'removed'.
+    Projecting out 'ALL' from 'RIBS' to obtain space 'CABS'
+    0 linear dependencies will be 'removed'.
+        Orbital space before projecting out:    (n = 1): 390  
+        Orbital space after projecting out:     (n = 1): 327  
+
+  Basis Set: CABS
+    Blend: PCSEG-0 + ../PCSEG-CABS
+    Number of shells: 150
+    Number of basis functions: 390
+    Number of Cartesian functions: 455
+    Spherical Harmonics?: true
+    Max angular momentum: 3
+
+  Frozen Core Orbitals:   5 
+
+  ----------------------------------------
+      NOCC   NOBS   NCABS    NRI   NAUX   
+  ----------------------------------------
+        20     63     327    390      0   
+  ----------------------------------------
+
+ ===> Forming the Integrals <===
+ No screening will be used to compute integrals
+   Fock Matrix
+   One-Electron Integrals
+     Forming J
+     Forming K
+
+ ===> Forming the F12 Intermediate Tensors <===
+   V Intermediate
+   X Intermediate
+   C Intermediate
+   B Intermediate
+
+ ===> Computing F12/3C(FIX) Energy Correction <===
+  
+  i   j  |     E_F12(Singlet)     E_F12(Triplet)            E_F12 
+ ----------------------------------------------------------------------
+  6   6  |    -0.004728714527     0.000000000000      -0.004728714527 
+  6   7  |    -0.001326778980    -0.000113959780      -0.001440738760 
+  6   8  |    -0.001930721923    -0.000318405826      -0.002249127748 
+  6   9  |    -0.002604578822    -0.000627307732      -0.003231886555 
+  6  10  |    -0.000831249318    -0.000246078193      -0.001077327510 
+  6  11  |    -0.004975129442    -0.001354839728      -0.006329969171 
+  6  12  |    -0.002140948543    -0.000618658678      -0.002759607221 
+  6  13  |    -0.003336386416    -0.000786471956      -0.004122858373 
+  6  14  |    -0.004567642955    -0.001275357511      -0.005843000467 
+  6  15  |    -0.002937991876    -0.000882308300      -0.003820300176 
+  6  16  |    -0.003128339106    -0.000928955805      -0.004057294911 
+  6  17  |    -0.002295926231    -0.000782869590      -0.003078795821 
+  6  18  |    -0.001676339971    -0.000695826945      -0.002372166916 
+  6  19  |    -0.004841218418    -0.001771852237      -0.006613070655 
+  6  20  |    -0.002082801401    -0.000859471807      -0.002942273208 
+  7   7  |    -0.003110953256     0.000000000000      -0.003110953256 
+  7   8  |    -0.003746032717    -0.000315175895      -0.004061208612 
+  7   9  |    -0.002264464096    -0.000413496211      -0.002677960307 
+  7  10  |    -0.002642199211    -0.000726230884      -0.003368430095 
+  7  11  |    -0.001883082029    -0.000541487868      -0.002424569896 
+  7  12  |    -0.003768641733    -0.000816112774      -0.004584754507 
+  7  13  |    -0.003107414345    -0.000850679293      -0.003958093637 
+  7  14  |    -0.002443005862    -0.000699078225      -0.003142084087 
+  7  15  |    -0.003388359834    -0.000939815624      -0.004328175458 
+  7  16  |    -0.002095125600    -0.000713846798      -0.002808972398 
+  7  17  |    -0.002201379868    -0.000781293457      -0.002982673325 
+  7  18  |    -0.003140985212    -0.000903187991      -0.004044173203 
+  7  19  |    -0.002614214391    -0.000959784159      -0.003573998550 
+  7  20  |    -0.003715099539    -0.001462452582      -0.005177552121 
+  8   8  |    -0.002492768315     0.000000000000      -0.002492768315 
+  8   9  |    -0.002561105205    -0.000483112674      -0.003044217879 
+  8  10  |    -0.002318620449    -0.000663554063      -0.002982174512 
+  8  11  |    -0.002445426584    -0.000851147964      -0.003296574549 
+  8  12  |    -0.003160431583    -0.000977687879      -0.004138119462 
+  8  13  |    -0.003469872114    -0.000895575956      -0.004365448070 
+  8  14  |    -0.003398865748    -0.000865851382      -0.004264717130 
+  8  15  |    -0.003647380178    -0.001015958777      -0.004663338955 
+  8  16  |    -0.003016616238    -0.000880220617      -0.003896836855 
+  8  17  |    -0.002772842000    -0.000994204988      -0.003767046988 
+  8  18  |    -0.002537144054    -0.001123951076      -0.003661095130 
+  8  19  |    -0.002355564026    -0.001067873458      -0.003423437484 
+  8  20  |    -0.003484748277    -0.001298701813      -0.004783450090 
+  9   9  |    -0.002692517775     0.000000000000      -0.002692517775 
+  9  10  |    -0.002267826334    -0.000499086769      -0.002766913103 
+  9  11  |    -0.003180365697    -0.001206627538      -0.004386993235 
+  9  12  |    -0.002538519594    -0.000942486251      -0.003481005845 
+  9  13  |    -0.003246208142    -0.000891704208      -0.004137912350 
+  9  14  |    -0.003170426621    -0.001266270039      -0.004436696660 
+  9  15  |    -0.003486749209    -0.001089698419      -0.004576447628 
+  9  16  |    -0.003490077294    -0.000962737734      -0.004452815028 
+  9  17  |    -0.003828719094    -0.001069513396      -0.004898232490 
+  9  18  |    -0.004217592353    -0.001058545049      -0.005276137403 
+  9  19  |    -0.001871760439    -0.001441693055      -0.003313453494 
+  9  20  |    -0.001953782181    -0.001292358556      -0.003246140737 
+ 10  10  |    -0.003643161160     0.000000000000      -0.003643161160 
+ 10  11  |    -0.001983774816    -0.000592854260      -0.002576629076 
+ 10  12  |    -0.003237437639    -0.001013116108      -0.004250553747 
+ 10  13  |    -0.003724183973    -0.000918486072      -0.004642670044 
+ 10  14  |    -0.002233419515    -0.000767725150      -0.003001144664 
+ 10  15  |    -0.003543722013    -0.001031926799      -0.004575648811 
+ 10  16  |    -0.002782525528    -0.000904731898      -0.003687257425 
+ 10  17  |    -0.003664216249    -0.000802036499      -0.004466252748 
+ 10  18  |    -0.003713990302    -0.000995083925      -0.004709074227 
+ 10  19  |    -0.001603125050    -0.001204308803      -0.002807433853 
+ 10  20  |    -0.002504775629    -0.001816876793      -0.004321652423 
+ 11  11  |    -0.003427137648     0.000000000000      -0.003427137648 
+ 11  12  |    -0.003154427406    -0.000648574077      -0.003803001483 
+ 11  13  |    -0.002529237322    -0.001749695317      -0.004278932639 
+ 11  14  |    -0.003754075068    -0.001956549297      -0.005710624365 
+ 11  15  |    -0.002419307610    -0.001995987129      -0.004415294739 
+ 11  16  |    -0.003880023378    -0.001023520900      -0.004903544278 
+ 11  17  |    -0.003551195668    -0.001189681307      -0.004740876975 
+ 11  18  |    -0.003754369832    -0.000790804150      -0.004545173982 
+ 11  19  |    -0.002779012824    -0.002943376406      -0.005722389229 
+ 11  20  |    -0.001820007401    -0.001931818911      -0.003751826312 
+ 12  12  |    -0.003844603581     0.000000000000      -0.003844603581 
+ 12  13  |    -0.002131085957    -0.001964893316      -0.004095979273 
+ 12  14  |    -0.002165792557    -0.001456013371      -0.003621805928 
+ 12  15  |    -0.003594422571    -0.001269234800      -0.004863657371 
+ 12  16  |    -0.004233156832    -0.001062881144      -0.005296037977 
+ 12  17  |    -0.002194728147    -0.001039844176      -0.003234572323 
+ 12  18  |    -0.003238050583    -0.001381044760      -0.004619095343 
+ 12  19  |    -0.002598561923    -0.002121814773      -0.004720376696 
+ 12  20  |    -0.002882905550    -0.002707669118      -0.005590574667 
+ 13  13  |    -0.003412676444     0.000000000000      -0.003412676444 
+ 13  14  |    -0.002873094298    -0.002113447956      -0.004986542254 
+ 13  15  |    -0.003362602805    -0.001805410438      -0.005168013243 
+ 13  16  |    -0.004158878687    -0.001242457480      -0.005401336167 
+ 13  17  |    -0.003518892846    -0.001265257413      -0.004784150259 
+ 13  18  |    -0.003530819602    -0.001304481101      -0.004835300703 
+ 13  19  |    -0.002334965229    -0.002582806652      -0.004917771880 
+ 13  20  |    -0.002255864340    -0.002623363089      -0.004879227429 
+ 14  14  |    -0.004528737095     0.000000000000      -0.004528737095 
+ 14  15  |    -0.002719877480    -0.002079249394      -0.004799126875 
+ 14  16  |    -0.002315986152    -0.002043820732      -0.004359806884 
+ 14  17  |    -0.003646495368    -0.001949218606      -0.005595713974 
+ 14  18  |    -0.002506071351    -0.001812149241      -0.004318220592 
+ 14  19  |    -0.003597151744    -0.002667954238      -0.006265105982 
+ 14  20  |    -0.003144769846    -0.001520502544      -0.004665272390 
+ 15  15  |    -0.003716088058     0.000000000000      -0.003716088058 
+ 15  16  |    -0.002487715050    -0.001867592671      -0.004355307721 
+ 15  17  |    -0.003205495103    -0.001679637855      -0.004885132958 
+ 15  18  |    -0.002871691848    -0.002277588355      -0.005149280203 
+ 15  19  |    -0.003529989927    -0.001619202527      -0.005149192454 
+ 15  20  |    -0.003393742201    -0.002197353355      -0.005591095556 
+ 16  16  |    -0.003271299551     0.000000000000      -0.003271299551 
+ 16  17  |    -0.002622669046    -0.001347986183      -0.003970655230 
+ 16  18  |    -0.004042005693    -0.000847773597      -0.004889779290 
+ 16  19  |    -0.002470354260    -0.002273360475      -0.004743714735 
+ 16  20  |    -0.002119920130    -0.002266053000      -0.004385973130 
+ 17  17  |    -0.003791789901     0.000000000000      -0.003791789901 
+ 17  18  |    -0.003477384008    -0.001544688509      -0.005022072518 
+ 17  19  |    -0.001696259589    -0.001590877270      -0.003287136859 
+ 17  20  |    -0.001734062976    -0.001637996037      -0.003372059013 
+ 18  18  |    -0.003428404581     0.000000000000      -0.003428404581 
+ 18  19  |    -0.001680856565    -0.001666541407      -0.003347397972 
+ 18  20  |    -0.002005910397    -0.002214361141      -0.004220271538 
+ 19  19  |    -0.007079567025     0.000000000000      -0.007079567025 
+ 19  20  |    -0.008242793054    -0.000333491672      -0.008576284726 
+ 20  20  |    -0.004792755876     0.000000000000      -0.004792755876 
+
+ ===> MP2-F12/3C(FIX) Energies <===
+
+     RHF Reference Energy:              -210.514992874510 
+     CABS Singles Correction:            -0.286772322152 
+     CABS-corrected Reference Energy:   -210.801765196662 
+     MP2 Correlation Energy:             -0.474449566470 
+     F12/3C(FIX) Correction Energy:      -0.499164466689 
+     MP2-F12/3C(FIX) Correlation Energy: -0.973614033158 
+  Total MP2-F12/3C(FIX) Energy:         -211.775379229820 
+
+*** tstop() called on rainmaker.local at Tue Jul 14 15:11:10 2026
+Module time:
+	user time   =      88.38 seconds =       1.47 minutes
+	system time =       6.14 seconds =       0.10 minutes
+	total time  =         98 seconds =       1.63 minutes
+Total time:
+	user time   =      89.11 seconds =       1.49 minutes
+	system time =       6.22 seconds =       0.10 minutes
+	total time  =         99 seconds =       1.65 minutes
+
+    Psi4 stopped on: Tuesday, 14 July 2026 03:11PM
+    Psi4 wall time for execution: 0:01:38.86
+
+*** Psi4 exiting successfully. Buy a developer a beer!

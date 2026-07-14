@@ -45,6 +45,10 @@ def _load_cabs_cases(names):
     return cases
 
 
+def _vqm_case_names():
+    return sorted(p.name for p in CABS_DIR.glob("vqm*"))
+
+
 # Reference values from Psi4 1.10 DF-MP2-F12 (pcseg-0 / pcseg-cabs)
 # Geometries in Angstrom, energies in Hartree
 @pytest.mark.parametrize(
@@ -52,6 +56,21 @@ def _load_cabs_cases(names):
     _load_cabs_cases(["H2O", "CO", "N2"]),
 )
 def test_cabs_singles_rhf(atomspec, ref_hf, ref_singles):
+    e_hf, e_singles = CABS_singles_RHF(atomspec, OBS_BASIS, CABS_GBS, density_fit=False)
+    assert (
+        abs(e_hf - ref_hf) < 1e-8
+    ), f"E_HF mismatch: got {e_hf:.12f}, ref {ref_hf:.12f}, diff {e_hf - ref_hf:.2e}"
+    assert (
+        abs(e_singles - ref_singles) < 5e-5
+    ), f"E_singles mismatch: got {e_singles:.12f}, ref {ref_singles:.12f}, diff {e_singles - ref_singles:.2e}"
+
+
+@pytest.mark.expensive
+@pytest.mark.parametrize(
+    "atomspec,ref_hf,ref_singles",
+    _load_cabs_cases(_vqm_case_names()),
+)
+def test_cabs_singles_rhf_vqm(atomspec, ref_hf, ref_singles):
     e_hf, e_singles = CABS_singles_RHF(atomspec, OBS_BASIS, CABS_GBS, density_fit=False)
     assert (
         abs(e_hf - ref_hf) < 1e-8
