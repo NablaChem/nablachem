@@ -20,7 +20,12 @@ class AutoKRR:
         detrend_atomic: bool = True,
         detrend_pairs: str | None = None,
         elemental: bool = False,
+        alchemical_weights: dict | None = None,
+        seed: int = -1,
     ) -> None:
+        if seed >= 0:
+            np.random.seed(seed)
+            utils.info("Random seed set", seed=seed)
         self._archive = {}
         self._archive["hyperopt"] = []
         self.dataset = dataset
@@ -28,15 +33,24 @@ class AutoKRR:
         self._detrend_atomic = detrend_atomic
         self._detrend_pairs = detrend_pairs
         self._elemental = elemental
+        self._alchemical_weights = alchemical_weights
 
-        self._create_holdout_split(elemental)
+        self._create_holdout_split(elemental, alchemical=alchemical_weights is not None)
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
         if self._local:
-            if self._elemental:
+            if self._alchemical_weights is not None:
+                self._kernel_matrix = matrix.AlchemicalKernelMatrix(
+                    self._X_train,
+                    self._train_counts,
+                    kernel_func,
+                    nuclear_charges=self._train_nuclear_charges,
+                    weights=self._alchemical_weights,
+                )
+            elif self._elemental:
                 self._kernel_matrix = matrix.ElementalKernelMatrix(
                     self._X_train,
                     self._train_counts,
@@ -52,6 +66,8 @@ class AutoKRR:
         else:
             if self._elemental:
                 utils.error("--elemental is not supported for global representations")
+            if self._alchemical_weights is not None:
+                utils.error("--alchemical is not supported for global representations")
             self._kernel_matrix = matrix.GlobalKernelMatrix(self._X_train, kernel_func)
 
         last_rmse = None
@@ -63,6 +79,14 @@ class AutoKRR:
             best_parameters, best_val_rmse, best_val_mae = (
                 self._optimize_hyperparameters(ntrain, length_heuristic)
             )
+            if best_parameters is None:
+                utils.warning(
+                    "No valid model found for training size; "
+                    "all length scales were ill-conditioned. "
+                    "Stopping learning curve here.",
+                    ntrain=ntrain,
+                )
+                break
             best_cases[ntrain] = best_parameters
 
             improvement = {}
@@ -135,7 +159,7 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
-    def _create_holdout_split(self, elemental: bool = False):
+    def _create_holdout_split(self, elemental: bool = False, alchemical: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
         max_training_size = max(self._training_sizes)
@@ -161,7 +185,7 @@ class AutoKRR:
         if self._local:
             self._train_counts = np.array([rep.shape[0] for rep in X_train])
             self._X_train = np.concatenate(X_train, axis=0)
-            if elemental:
+            if elemental or alchemical:
                 charges_all = self.dataset.nuclear_charges
                 self._train_nuclear_charges = np.concatenate(
                     charges_all[:max_training_size]
@@ -470,7 +494,7 @@ class AutoKRR:
                 X_batch = np.concatenate(reps, axis=0)
                 nc_batch = (
                     np.concatenate([mol.get_atomic_numbers() for mol in mols])
-                    if self._elemental
+                    if self._elemental or self._alchemical_weights is not None
                     else None
                 )
             else:

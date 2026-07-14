@@ -299,6 +299,131 @@ class LocalKernelMatrix(_LocalKernelMatrix):
         super().__init__(*args, **kwargs)
 
 
+class AlchemicalKernelMatrix(_LocalKernelMatrix):
+    """Local kernel with per-element-pair multiplicative weights.
+
+    weights: dict {(Z1, Z2): float} with Z1 <= Z2, values already abs-ed.
+    All pairs that appear in the data must be present — missing keys fail at
+    matrix build time (KeyError → fail late by design).
+    """
+
+    def __init__(self, X, train_counts, kernel_func, nuclear_charges, weights):
+        self._alch_charges = np.asarray(nuclear_charges, dtype=float)
+        # Build a dense lookup table indexed by nuclear charge for fast access.
+        max_Z = max(max(k) for k in weights) + 1
+        self._wtable = np.zeros((max_Z, max_Z))
+        for (z1, z2), w in weights.items():
+            self._wtable[z1, z2] = w
+            self._wtable[z2, z1] = w
+        super().__init__(X, train_counts, kernel_func, elemental=False)
+
+    def _W(self, z_row, z_col):
+        return self._wtable[z_row.astype(int)[:, None], z_col.astype(int)[None, :]]
+
+    def compute_train_kernel_matrix(self, sigma, ntrain):
+        counts_A = np.asarray(self._train_counts[:ntrain])
+        natoms = int(counts_A.sum())
+        X_A = self._X[:natoms]
+        z_A = self._alch_charges[:natoms]
+
+        batches, atom_off = self._pack_batches(counts_A)
+        nbatches = len(batches) - 1
+        K = np.zeros((ntrain, ntrain))
+
+        for P in range(nbatches):
+            iP0, iP1 = int(batches[P]), int(batches[P + 1])
+            aP0, aP1 = int(atom_off[iP0]), int(atom_off[iP1])
+            X_P = X_A[aP0:aP1]
+            z_P = z_A[aP0:aP1]
+            counts_P = counts_A[iP0:iP1]
+
+            D2 = self._dist_squared(X_P)
+            K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_P, z_P)
+            K[iP0:iP1, iP0:iP1] = self.aggregate_atomic_kernel(K_atom, counts_P, counts_P)
+
+            for Q in range(P + 1, nbatches):
+                iQ0, iQ1 = int(batches[Q]), int(batches[Q + 1])
+                aQ0, aQ1 = int(atom_off[iQ0]), int(atom_off[iQ1])
+                X_Q = X_A[aQ0:aQ1]
+                z_Q = z_A[aQ0:aQ1]
+                counts_Q = counts_A[iQ0:iQ1]
+
+                D2 = self._dist_squared(X_Q, X_P)
+                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_P, z_Q)
+                K_block = self.aggregate_atomic_kernel(K_atom, counts_P, counts_Q)
+                K[iP0:iP1, iQ0:iQ1] = K_block
+                K[iQ0:iQ1, iP0:iP1] = K_block.T
+
+        d_train_sqrt = np.sqrt(np.diag(K))
+        K /= np.outer(d_train_sqrt, d_train_sqrt)
+        self._d_train_cache[(sigma, ntrain)] = d_train_sqrt
+        return K
+
+    def compute_test_kernel_matrix(self, sigma, ntrain, X_batch, counts_batch, nc_batch=None):
+        counts_A = np.asarray(self._train_counts[:ntrain])
+        natoms_A = int(counts_A.sum())
+        X_A = self._X[:natoms_A]
+        z_A = self._alch_charges[:natoms_A]
+
+        counts_B = np.asarray(counts_batch)
+        n_test_mols = len(counts_B)
+        X_B = np.asarray(X_batch)
+        z_B = np.asarray(nc_batch, dtype=float)
+
+        batches_A, atom_off_A = self._pack_batches(counts_A)
+        batches_B, atom_off_B = self._pack_batches(counts_B)
+
+        K_test = np.zeros((n_test_mols, ntrain))
+
+        for P in range(len(batches_B) - 1):
+            iP0, iP1 = int(batches_B[P]), int(batches_B[P + 1])
+            aP0, aP1 = int(atom_off_B[iP0]), int(atom_off_B[iP1])
+            X_BP = X_B[aP0:aP1]
+            z_BP = z_B[aP0:aP1]
+            counts_BP = counts_B[iP0:iP1]
+
+            for Q in range(len(batches_A) - 1):
+                iQ0, iQ1 = int(batches_A[Q]), int(batches_A[Q + 1])
+                aQ0, aQ1 = int(atom_off_A[iQ0]), int(atom_off_A[iQ1])
+                X_AQ = X_A[aQ0:aQ1]
+                z_AQ = z_A[aQ0:aQ1]
+                counts_AQ = counts_A[iQ0:iQ1]
+
+                D2 = self._dist_squared(X_AQ, X_BP)
+                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_BP, z_AQ)
+                K_test[iP0:iP1, iQ0:iQ1] = self.aggregate_atomic_kernel(
+                    K_atom, counts_BP, counts_AQ
+                )
+
+        cache_key = (sigma, ntrain)
+        if cache_key not in self._d_train_cache:
+            d_train = np.empty(ntrain)
+            atom_start = 0
+            for i, count in enumerate(counts_A):
+                count = int(count)
+                z_i = z_A[atom_start : atom_start + count]
+                atoms_i = X_A[atom_start : atom_start + count]
+                d2 = self._dist_squared(atoms_i)
+                d_train[i] = (self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)).sum()
+                atom_start += count
+            self._d_train_cache[cache_key] = np.sqrt(d_train)
+        d_train_sqrt = self._d_train_cache[cache_key]
+
+        d_test = np.empty(n_test_mols)
+        atom_start = 0
+        for i, count in enumerate(counts_B):
+            count = int(count)
+            z_i = z_B[atom_start : atom_start + count]
+            atoms_i = X_B[atom_start : atom_start + count]
+            d2 = self._dist_squared(atoms_i)
+            d_test[i] = (self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)).sum()
+            atom_start += count
+        d_test_sqrt = np.sqrt(d_test)
+
+        K_test /= np.outer(d_test_sqrt, d_train_sqrt)
+        return K_test
+
+
 class GlobalKernelMatrix(KernelMatrix):
     """Kernel matrix for global (molecule-based) representations"""
 
