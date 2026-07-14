@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -5,32 +6,50 @@ from pyscf import gto
 
 from nablachem.cabs import CABS_singles_RHF, resolve_basis
 
-CABS_GBS = str(Path(__file__).parent / "cabs" / "pcseg-cabs.gbs")
+CABS_DIR = Path(__file__).parent / "cabs"
+CABS_GBS = str(CABS_DIR / "pcseg-cabs.gbs")
 OBS_BASIS = "pcseg-0"
+
+
+def _parse_atomspec(run_inp):
+    """Extract a PySCF-style atomspec from a Psi4 run.inp's `molecule mol {...}` block."""
+    text = Path(run_inp).read_text()
+    body = re.search(r"molecule mol \{(.*?)\}", text, re.S).group(1)
+    atom_lines = []
+    for line in body.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("symmetry") or re.match(r"^-?\d+\s+\d+$", line):
+            continue
+        atom_lines.append(" ".join(line.split()))
+    return "; ".join(atom_lines)
+
+
+def _parse_ref_energies(run_out):
+    """Extract RHF reference energy and CABS singles correction from a Psi4 run.out."""
+    text = Path(run_out).read_text()
+    ref_hf = float(re.search(r"RHF Reference Energy:\s*(-?\d+\.\d+)", text).group(1))
+    ref_singles = float(
+        re.search(r"CABS Singles Correction:\s*(-?\d+\.\d+)", text).group(1)
+    )
+    return ref_hf, ref_singles
+
+
+def _load_cabs_cases(names):
+    """Build parametrize cases (atomspec, ref_hf, ref_singles) from cabs/<name>/run.{inp,out}."""
+    cases = []
+    for name in names:
+        case_dir = CABS_DIR / name
+        atomspec = _parse_atomspec(case_dir / "run.inp")
+        ref_hf, ref_singles = _parse_ref_energies(case_dir / "run.out")
+        cases.append(pytest.param(atomspec, ref_hf, ref_singles, id=name))
+    return cases
 
 
 # Reference values from Psi4 1.10 DF-MP2-F12 (pcseg-0 / pcseg-cabs)
 # Geometries in Angstrom, energies in Hartree
 @pytest.mark.parametrize(
     "atomspec,ref_hf,ref_singles",
-    [
-        (
-            "O 0 0 0.117176; H 0 0.757329 -0.468706; H 0 -0.757329 -0.468706",
-            -75.774254726349,
-            -0.122825268378,
-        ),
-        (
-            "O 0 0 0; C 0 0 1.1",
-            -112.384028820127,
-            -0.197290223267,
-        ),
-        (
-            "N 0 0 0; N 0 0 1.1",
-            -108.594545355417,
-            -0.192662990417,
-        ),
-    ],
-    ids=["H2O", "CO", "N2"],
+    _load_cabs_cases(["H2O", "CO", "N2"]),
 )
 def test_cabs_singles_rhf(atomspec, ref_hf, ref_singles):
     e_hf, e_singles = CABS_singles_RHF(atomspec, OBS_BASIS, CABS_GBS, density_fit=False)
@@ -84,22 +103,10 @@ def test_dz_wrong_shape():
 
 
 def test_larger():
-    benzene = """C        0.303     -1.351      0.000                 
-C        1.322     -0.413      0.000                 
-C        1.019      0.938      0.000                 
-C       -0.303      1.351      0.000                 
-C       -1.322      0.414      0.000                 
-C       -1.019     -0.938      0.000                 
-H        0.539     -2.405      0.000                 
-H        2.353     -0.737      0.000                 
-H        1.813      1.670      0.000                 
-H       -0.538      2.405      0.000                 
-H       -2.353      0.736      0.000                 
-H       -1.814     -1.669      0.000                    
-"""
+    case_dir = CABS_DIR / "benzene"
+    benzene = _parse_atomspec(case_dir / "run.inp")
+    ref_hf, ref_singles = _parse_ref_energies(case_dir / "run.out")
     e_hf, e_singles = CABS_singles_RHF(benzene, OBS_BASIS, CABS_GBS, density_fit=True)
-    ref_singles = -0.299603647496
-    ref_hf = -230.070214467341
     assert (
         abs(e_hf - ref_hf) < 1e-8
     ), f"E_HF mismatch: got {e_hf:.12f}, ref {ref_hf:.12f}, diff {e_hf - ref_hf:.2e}"
