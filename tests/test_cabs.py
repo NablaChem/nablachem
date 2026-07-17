@@ -58,10 +58,10 @@ def _vqm_case_names():
 def test_cabs_singles_rhf(atomspec, ref_hf, ref_singles):
     e_hf, e_singles = CABS_singles_RHF(atomspec, OBS_BASIS, CABS_GBS, density_fit=False)
     assert (
-        abs(e_hf - ref_hf) < 1e-8
+        abs(e_hf - ref_hf) < 9e-11
     ), f"E_HF mismatch: got {e_hf:.12f}, ref {ref_hf:.12f}, diff {e_hf - ref_hf:.2e}"
     assert (
-        abs(e_singles - ref_singles) < 5e-5
+        abs(e_singles - ref_singles) < 3e-9
     ), f"E_singles mismatch: got {e_singles:.12f}, ref {ref_singles:.12f}, diff {e_singles - ref_singles:.2e}"
 
 
@@ -73,10 +73,10 @@ def test_cabs_singles_rhf(atomspec, ref_hf, ref_singles):
 def test_cabs_singles_rhf_vqm(atomspec, ref_hf, ref_singles):
     e_hf, e_singles = CABS_singles_RHF(atomspec, OBS_BASIS, CABS_GBS, density_fit=False)
     assert (
-        abs(e_hf - ref_hf) < 1e-8
+        abs(e_hf - ref_hf) < 3e-10
     ), f"E_HF mismatch: got {e_hf:.12f}, ref {ref_hf:.12f}, diff {e_hf - ref_hf:.2e}"
     assert (
-        abs(e_singles - ref_singles) < 5e-5
+        abs(e_singles - ref_singles) < 5e-7
     ), f"E_singles mismatch: got {e_singles:.12f}, ref {ref_singles:.12f}, diff {e_singles - ref_singles:.2e}"
 
 
@@ -104,12 +104,12 @@ def test_dz_alchemy_co_to_n2():
     ref_cabs = {"N1": cabs["O"], "N2": cabs["C"]}
     e_hf_ref, e_singles_ref = CABS_singles_RHF(ref_atom, ref_obs, ref_cabs)
 
-    assert abs(e_hf_dz - e_hf_ref) < 1e-8, (
+    assert abs(e_hf_dz - e_hf_ref) < 4e-13, (
         f"E_HF mismatch: dZ {e_hf_dz:.12f} vs ref {e_hf_ref:.12f}, "
         f"diff {e_hf_dz - e_hf_ref:.2e}"
     )
     # derived from SCF eigenvalues on both sides, so limited by SCF conv noise
-    assert abs(e_singles_dz - e_singles_ref) < 1e-6, (
+    assert abs(e_singles_dz - e_singles_ref) < 2e-8, (
         f"E_singles mismatch: dZ {e_singles_dz:.12f} vs ref {e_singles_ref:.12f}, "
         f"diff {e_singles_dz - e_singles_ref:.2e}"
     )
@@ -127,8 +127,8 @@ def test_larger():
     ref_hf, ref_singles = _parse_ref_energies(case_dir / "run.out")
     e_hf, e_singles = CABS_singles_RHF(benzene, OBS_BASIS, CABS_GBS, density_fit=True)
     assert (
-        abs(e_hf - ref_hf) < 1e-8
+        abs(e_hf - ref_hf) < 2e-10
     ), f"E_HF mismatch: got {e_hf:.12f}, ref {ref_hf:.12f}, diff {e_hf - ref_hf:.2e}"
     assert (
-        abs(e_singles - ref_singles) < 5e-4
+        abs(e_singles - ref_singles) < 9e-5
     ), f"E_singles mismatch: got {e_singles:.12f}, ref {ref_singles:.12f}, diff {e_singles - ref_singles:.2e}"
