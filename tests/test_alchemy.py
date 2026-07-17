@@ -8,6 +8,12 @@ import pandas as pd
 import numpy as np
 
 
+def mark_finite_diff_expensive(*values, method):
+    """pytest.param wrapper that marks FINITE_DIFFERENCES cases as expensive."""
+    marks = pytest.mark.expensive if method == Anygrad.Method.FINITE_DIFFERENCES else ()
+    return pytest.param(*values, method, marks=marks)
+
+
 def test_1d():
     for i in range(100):
         np.random.seed(i)
@@ -162,7 +168,7 @@ def test_analytical_gradients():
 @pytest.mark.parametrize(
     "letter,method",
     [
-        (letter, method)
+        mark_finite_diff_expensive(letter, method=method)
         for letter in "RZ"
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,
@@ -195,7 +201,7 @@ def test_anygrad_HF_first(letter, method):
 @pytest.mark.parametrize(
     "letter,method",
     [
-        (letter, method)
+        mark_finite_diff_expensive(letter, method=method)
         for letter in "RZ"
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,
@@ -228,7 +234,7 @@ def test_anygrad_homo_HF_first(letter, method):
 @pytest.mark.parametrize(
     "letters,method",
     [
-        (letters, method)
+        mark_finite_diff_expensive(letters, method=method)
         for letters in "RR RZ ZZ ZR".split()
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,
@@ -321,6 +327,7 @@ def test_anygrad_HF_second(letters, method):
     assert np.allclose(actual_hess, expected_hess, atol=1e-7)
 
 
+@pytest.mark.expensive
 @pytest.mark.parametrize(
     "letters,method",
     [
@@ -421,7 +428,7 @@ def test_anygrad_homo_HF_second(letters, method):
 @pytest.mark.parametrize(
     "letter,method",
     [
-        (letter, method)
+        mark_finite_diff_expensive(letter, method=method)
         for letter in "RZ"
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,
@@ -484,7 +491,7 @@ def test_hessian_case():
 @pytest.mark.parametrize(
     "letters,method",
     [
-        (letters, method)
+        mark_finite_diff_expensive(letters, method=method)
         for letters in "RR ZZ RZ".split()
         for method in (
             Anygrad.Method.COUPLED_PERTURBED,

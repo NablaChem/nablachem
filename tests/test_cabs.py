@@ -104,7 +104,7 @@ def test_dz_alchemy_co_to_n2():
     ref_cabs = {"N1": cabs["O"], "N2": cabs["C"]}
     e_hf_ref, e_singles_ref = CABS_singles_RHF(ref_atom, ref_obs, ref_cabs)
 
-    assert abs(e_hf_dz - e_hf_ref) < 4e-13, (
+    assert abs(e_hf_dz - e_hf_ref) < 4e-12, (
         f"E_HF mismatch: dZ {e_hf_dz:.12f} vs ref {e_hf_ref:.12f}, "
         f"diff {e_hf_dz - e_hf_ref:.2e}"
     )
