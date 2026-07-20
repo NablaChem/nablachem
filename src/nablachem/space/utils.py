@@ -241,14 +241,10 @@ def _is_pure(label: tuple[int]) -> bool:
 
     A pure degree sequence has no two colors ("elements") with same valency.
 
-    Parameters
-    ----------
-    label : tuple[int]
-        (degree, natoms, degree, natoms)
+    Args:
+        label (tuple[int]): (degree, natoms, degree, natoms)
 
-    Returns
-    -------
-    bool
+    Returns:
         Whether the sequence is pure.
     """
     valences = label[::2]
@@ -260,14 +256,10 @@ def _is_pure(label: tuple[int]) -> bool:
 def _to_pure(label: tuple[int]) -> tuple[int]:
     """Finds the corresponding pure colored degree sequence from a (potentially) non-pure one.
 
-    Parameters
-    ----------
-    label : tuple[int]
-        (degree, natoms, degree, natoms)
+    Args:
+        label (tuple[int]): (degree, natoms, degree, natoms)
 
-    Returns
-    -------
-    tuple[int]
+    Returns:
         (degree, natoms, degree, natoms)
     """
 
@@ -315,20 +307,13 @@ class SearchSpace:
         Optimized for performance, so yields tuples. Use list_cases() for a more
         user-friendly interface.
 
-        Parameters
-        ----------
-        natoms : int
-            Number of atoms in the molecule.
-        degree_sequences_only : bool, optional
-            Flag to switch to degree sequence enumeration, by default False
-        pure_sequences_only : bool, optional
-            Skips sequences where atoms of one valence belong to more than one element label. Implies degree_sequences_only.
-        progress : bool, optional
-            Whether to show a progress bar, by default True
+        Args:
+            natoms (int): Number of atoms in the molecule.
+            degree_sequences_only (bool, optional): Flag to switch to degree sequence enumeration, by default False.
+            pure_sequences_only (bool, optional): Skips sequences where atoms of one valence belong to more than one element label. Implies degree_sequences_only.
+            progress (bool, optional): Whether to show a progress bar, by default True.
 
-        Yields
-        ------
-        Iterator[tuple[str, int, int]] | Iterator[tuple[int, int]]
+        Yields:
             Either tuples of (element, valence, count) or (valence, count). Guaranteed to be sorted by (valence, count).
         """
         valences = sorted(set([_.valence for _ in self._atom_types]))
@@ -422,17 +407,13 @@ class SearchSpace:
         return [e.label for e in self._atom_types if e.valence == valence]
 
     @staticmethod
-    def covered_search_space(kind: str):
-        """Returns the pre-defined chemical spaces from the original publication
+    def covered_search_space(kind: str) -> "SearchSpace":
+        """Returns the pre-defined chemical spaces from the original publication.
 
-        Parameters
-        ----------
-        kind : str
-            Label, either A or B.
+        Args:
+            kind (str): Label, either A or B.
 
-        Returns
-        -------
-        SearchSpace
+        Returns:
             The chosen space.
         """
         if kind not in ["A", "B"]:

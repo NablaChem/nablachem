@@ -1,4 +1,6 @@
 import click
+import importlib
+import json
 import os
 import hashlib
 
@@ -20,7 +22,10 @@ COLUMN_NAME: Property expression to predict using pandas DataFrame.eval() syntax
             like 'energy - baseline' or 'E_high - E_low'. For column names with
             special characters (dashes, spaces), use backticks like `E-high` - `E-low`.
 REPRESENTATION_NAME: Name of the molecular representation to use.
-                 Available representations: {', '.join(available_representations)}
+                 Built-in representations: {', '.join(available_representations)}
+                 Custom representations can be loaded from any importable module using
+                 dotted notation, e.g. 'mymodule.MyRepresenter' or 'pkg.sub.MyRep'.
+                 The class must implement the BaseRepresenter interface (compute/build).
 KERNEL_NAME: Name of the kernel function to use.
          Available kernels: {', '.join(available_kernels)}
 
@@ -71,7 +76,19 @@ and the remaining molecules used as holdout/test data.
     help="Mask cross-element atom pairs in local kernel (requires local representation)",
 )
 @click.option(
+    "--alchemical",
+    default=None,
+    type=click.Path(exists=True),
+    help="JSON file with per-element-pair weights {\"Z1,Z2\": float} (Z1<=Z2). Requires local representation.",
+)
+@click.option(
     "--archive", default="archive.json", help="Output file for KRR archive data"
+)
+@click.option(
+    "--seed",
+    default=-1,
+    type=int,
+    help="Random seed for numpy. Use -1 (default) for non-deterministic runs, or a non-negative integer for reproducible shuffles.",
 )
 def main(
     jsonl_path,
@@ -85,8 +102,10 @@ def main(
     detrend_atomic,
     detrend_pairs,
     elemental,
+    alchemical,
     holdout_residuals,
     archive,
+    seed,
 ):
     if os.path.exists(archive):
         warning(f"Archive file {archive} will be overwritten.")
@@ -106,23 +125,51 @@ def main(
         column_name,
         limit=limit,
         select=select,
+        seed=seed,
     )
 
     # Get the representation class dynamically
-    rep_class_map = {}
-    for name in available_representations:
-        rep_class_map[name] = getattr(features, name)
+    if "." in representation_name:
+        module_path, class_name = representation_name.rsplit(".", 1)
+        try:
+            mod = importlib.import_module(module_path)
+        except ImportError as e:
+            error("Cannot import representation module", module=module_path, reason=str(e))
+        try:
+            rep_class = getattr(mod, class_name)
+        except AttributeError:
+            error("Class not found in module", module=module_path, class_name=class_name)
+        rep = rep_class()
+    else:
+        rep_class_map = {}
+        for name in available_representations:
+            rep_class_map[name] = getattr(features, name)
 
-    if representation_name not in rep_class_map:
-        error(
-            "Unknown representation",
-            requested=representation_name,
-            available=available_representations,
-        )
+        if representation_name not in rep_class_map:
+            error(
+                "Unknown representation",
+                requested=representation_name,
+                available=available_representations,
+            )
 
-    rep = rep_class_map[representation_name]()
+        rep = rep_class_map[representation_name]()
     rep.build(ds)
     info("Prepared representation", first_entry_shape=ds.representations[0].shape)
+
+    # Load alchemical weights if requested
+    alchemical_weights = None
+    if alchemical is not None:
+        with open(alchemical) as f:
+            raw = json.load(f)
+        alchemical_weights = {}
+        for key, val in raw.items():
+            parts = key.split(",")
+            if len(parts) != 2:
+                error("Alchemical weight key must be 'Z1,Z2'", key=key)
+            z1, z2 = int(parts[0]), int(parts[1])
+            if z1 > z2:
+                error("Alchemical weight keys must satisfy Z1 <= Z2", key=key, z1=z1, z2=z2)
+            alchemical_weights[(z1, z2)] = abs(float(val))
 
     # Validate kernel name
     if kernel_name not in available_kernels:
@@ -143,6 +190,8 @@ def main(
         detrend_pairs=detrend_pairs,
         kernel_func=kernel_func,
         elemental=elemental,
+        alchemical_weights=alchemical_weights,
+        seed=seed,
     )
     metadata = {
         "representation": representation_name,
@@ -150,11 +199,13 @@ def main(
         "detrend_atomic": detrend_atomic,
         "detrend_pairs": detrend_pairs,
         "elemental": elemental,
+        "alchemical": alchemical,
         "file_hash": hash,
         "file_path": jsonl_path,
         "column_name": column_name,
         "limit": limit,
         "select": select,
+        "seed": seed,
     }
     autokrr.store_archive(archive, metadata)
 

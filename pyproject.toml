@@ -40,6 +40,12 @@ mace-torch = "^0.3.15"
 pytest = "^9.0.2"
 pytest-testmon = "^2.2.0"
 
+[tool.pytest.ini_options]
+markers = [
+    "expensive: slow/costly tests, excluded by default (run with `make testall`)",
+]
+addopts = "-m 'not expensive'"
+
 [tool.poetry.scripts]
 nc-krr = "nablachem.krr.cli:main"
 nc-krr-vis = "nablachem.krr.vis:_launch"

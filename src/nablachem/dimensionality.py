@@ -63,7 +63,7 @@ class Estimator:
             x (np.ndarray): Displacement vector.
 
         Returns:
-            float: Value of the Taylor approximation.
+            Value of the Taylor approximation.
         """
         sub_arrays = [x[i::4] for i in range(4)]
         reordered_array = np.concatenate(
@@ -85,7 +85,7 @@ class Estimator:
             h (np.ndarray): Energy Hessian.
 
         Returns:
-            list[list[float]]: Bounds (positive and negative) for each eigenvector direction.
+            Bounds (positive and negative) for each eigenvector direction.
         """
         k = len(mod_vec)
         KT = 4.75e-4
@@ -105,16 +105,17 @@ class Estimator:
             bounds.append(q)
         return bounds
 
-    def getID(self):
+    def getID(self) -> dict:
         """
         Compute the intrinsic dimensionality (ID) by incrementally selecting eigenvectors
         that minimize the property estimation error.
 
         Returns:
-            dict: Dictionary with the following keys:
-                - "ID" (list of int): List of dimensionality values (after degeneracy correction).
-                - "Error" (list of float): Corresponding estimation errors.
-                - "natoms" (int): Number of atoms (N).
+            Dictionary with the following keys:
+
+            - "ID" (list of int): List of dimensionality values (after degeneracy correction).
+            - "Error" (list of float): Corresponding estimation errors.
+            - "natoms" (int): Number of atoms (N).
         """
         Estimated_ID = []
         Estimated_degeneracy = [0]
@@ -215,7 +216,7 @@ class Estimator:
             kept (list[int]): Indices of retained eigenmodes.
 
         Returns:
-            float: Approximate estimated error.
+            Approximate estimated error.
         """
         k = len(mod_values)
         delta_Q = 0
@@ -257,7 +258,7 @@ class Estimator:
             s (float): Scaling factor for selected coordinate group.
 
         Returns:
-            np.ndarray: Scaled Hessian matrix.
+            Scaled Hessian matrix.
         """
         svec = np.ones(self._n)
         svec[self._scaling_groups] = s
@@ -276,7 +277,7 @@ class Estimator:
             mod_vec (np.ndarray): Eigenvectors.
 
         Returns:
-            int: Maximum observed degeneracy.
+            Maximum observed degeneracy.
         """
         mod_values_copy = mod_values.copy()
         degeneracy_l = []
@@ -293,7 +294,7 @@ class Estimator:
             degeneracy_l.append(degeneracy)
         return max(degeneracy_l)
 
-    def _gradient_check(self, removed_indices: list[int], mod_values, mod_vec):
+    def _gradient_check(self, removed_indices: list[int], mod_values, mod_vec) -> float:
         """
         Estimates the alignment between the remaining eigenvectors and the property gradient.
 
@@ -303,7 +304,7 @@ class Estimator:
             mod_vec (np.ndarray): Array of eigenvectors.
 
         Returns:
-            float: Total projection of the normalized gradient onto the selected eigenvectors.
+            Total projection of the normalized gradient onto the selected eigenvectors.
         """
         mod_values_copy = mod_values.copy()
         mod_vec_copy = mod_vec.copy()
@@ -321,7 +322,7 @@ class Estimator:
             )
         return projected_gradient
 
-    def _data_imputation(self, data):
+    def _data_imputation(self, data) -> list[dict]:
         """
         Performs linear forward-fill imputation on missing error values to complete error curves.
 
@@ -333,7 +334,7 @@ class Estimator:
             data (list[dict]): List of result records, each with 'ID', 'Error', and 'natoms' fields.
 
         Returns:
-            list[dict]: List of records with full ID range and imputed error values.
+            List of records with full ID range and imputed error values.
         """
         min_error_data = []
         for i in range(len(data)):

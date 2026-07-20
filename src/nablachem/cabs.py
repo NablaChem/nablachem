@@ -61,8 +61,16 @@ def form_basissets(mol, obs_basis, cabs_basis):
     missing = elements - set(cabs_dict)
     if missing:
         raise ValueError(f"CABS basis missing entries for elements: {sorted(missing)}")
+
+    def _obs_shells(elem):
+        # obs_basis may be a plain basis name (same for every atom) or a per-atom
+        # {label: shells} dict, enabling asymmetric basis assignments.
+        if isinstance(obs_basis, dict):
+            return obs_basis[elem]
+        return gto.basis.load(obs_basis, elem)
+
     combined_basis = {
-        elem: gto.basis.load(obs_basis, elem) + cabs_dict[elem] for elem in elements
+        elem: _obs_shells(elem) + cabs_dict[elem] for elem in elements
     }
     mol_ri = mol.copy()
     mol_ri.basis = combined_basis
@@ -99,7 +107,7 @@ def form_basissets(mol, obs_basis, cabs_basis):
     return mol_ri, C_cabs_ao
 
 
-def form_fock(mf, mol_ri, C_cabs_ao, density_fit=False):
+def form_fock(mf, mol_ri, C_cabs_ao, density_fit=False, dZ=None):
     mol = mf.mol
     C_obs = mf.mo_coeff
     nobs = C_obs.shape[1]
@@ -110,12 +118,26 @@ def form_fock(mf, mol_ri, C_cabs_ao, density_fit=False):
     F_ao = mf.get_fock()
 
     T_oc = gto.intor_cross("int1e_kin", mol, mol_ri)
+    # 0.5 corrects int1e_nuc double-counting nuclei across the combined mol/mol_ri
+    # environment (see tests/checks); the geometries are identical.
     V_oc = gto.intor_cross("int1e_nuc", mol, mol_ri) * 0.5
     H_oc = T_oc + V_oc
 
     T_cc = mol_ri.intor("int1e_kin")
     V_cc = mol_ri.intor("int1e_nuc")
     H_cc = T_cc + V_cc
+
+    if dZ is not None:
+        # Alchemical shift of the external potential in the CABS blocks. int1e_rinv
+        # is a single-center 1/r operator (no double-counting), so it enters at
+        # full weight, unlike the halved int1e_nuc above.
+        dZ = np.asarray(dZ, dtype=float)
+        coords = mol.atom_coords()  # bohr
+        for i, dZi in enumerate(dZ):
+            with mol.with_rinv_origin(coords[i]):
+                H_oc -= dZi * gto.intor_cross("int1e_rinv", mol, mol_ri)
+            with mol_ri.with_rinv_origin(coords[i]):
+                H_cc -= dZi * mol_ri.intor("int1e_rinv")
 
     F_obs_obs = C_obs.T @ F_ao @ C_obs
     F_obs_cabs = C_obs.T @ H_oc @ C_cabs_ao
@@ -162,7 +184,21 @@ def form_cabs_singles(f, nocc):
     return 2.0 * np.sum(f_iA**2 / denom)
 
 
-def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str, density_fit=False):
+def CABS_singles_RHF(atomspec, obs_basis, cabs_basis, density_fit=False, dZ=None):
+    """CABS singles correction and HF energy for a closed-shell RHF reference.
+
+    Args:
+        atomspec: PySCF atom specification (geometry in Angstrom).
+        obs_basis: Orbital basis, either a basis name or a per-atom
+            ``{label: shells}`` dict for asymmetric assignments.
+        cabs_basis: CABS basis (``.gbs`` path or ``{elem: shells}`` dict).
+        density_fit: Use density fitting for the J/K build.
+        dZ: Optional per-atom nuclear-charge displacement vector. Each nucleus
+            ``i`` is alchemically shifted to charge ``Z_i + dZ[i]`` by adding the
+            fractional external potential to the core Hamiltonian while keeping
+            the basis fixed, consistently across the OBS SCF (``E_HF``) and the
+            CABS blocks of the Fock matrix (``E_singles``).
+    """
     mol = gto.Mole()
     mol.atom = atomspec
     mol.basis = obs_basis
@@ -172,11 +208,40 @@ def CABS_singles_RHF(atomspec, obs_basis: str, cabs_basis: str, density_fit=Fals
 
     mf = scf.RHF(mol)
     mf.verbose = 0
-    mf.kernel()
-    E_hf = mf.e_tot
+
+    if dZ is not None:
+        dZ = np.asarray(dZ, dtype=float)
+        if dZ.shape != (mol.natm,):
+            raise ValueError(
+                f"dZ must have one entry per atom ({mol.natm}), got shape {dZ.shape}"
+            )
+        coords = mol.atom_coords()  # bohr
+
+        # electronic: extend the external potential by the fractional charge
+        h1 = mf.get_hcore()
+        s = np.zeros_like(h1)
+        for i, dZi in enumerate(dZ):
+            with mol.with_rinv_origin(coords[i]):
+                s -= dZi * mol.intor("int1e_rinv")
+        mf.get_hcore = lambda *args, **kwargs: h1 + s
+
+        # nuclear: difference in nucleus-nucleus repulsion relative to the
+        # unperturbed charges (constant shift to the total energy)
+        nn = 0.0
+        for i in range(mol.natm):
+            Z_i = mol.atom_charge(i) + dZ[i]
+            for j in range(i + 1, mol.natm):
+                Z_j = mol.atom_charge(j) + dZ[j]
+                rij = np.linalg.norm(coords[i] - coords[j])
+                missing = Z_i * Z_j - mol.atom_charge(i) * mol.atom_charge(j)
+                nn += missing / rij
+        _kernel = mf.kernel
+        mf.kernel = lambda *args, **kwargs: _kernel(*args, **kwargs) + nn
+
+    E_hf = mf.kernel()
 
     mol_ri, C_cabs_ao = form_basissets(mol, obs_basis, cabs_basis)
-    f, nocc = form_fock(mf, mol_ri, C_cabs_ao, density_fit)
+    f, nocc = form_fock(mf, mol_ri, C_cabs_ao, density_fit, dZ=dZ)
     E_singles = form_cabs_singles(f, nocc)
 
     return E_hf, E_singles

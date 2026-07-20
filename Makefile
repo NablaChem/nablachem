@@ -1,6 +1,9 @@
 test:
 	ulimit -n 1000
-	PYTHONPATH=src pytest -v --testmon
+	KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 PYTHONPATH=src pytest -v --testmon
+testall:
+	ulimit -n 1000
+	KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 PYTHONPATH=src pytest -v --testmon -m ""
 spacedb:
 	python maintenance/space_db.py
 format:

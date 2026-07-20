@@ -1,5 +1,4 @@
 import gzip
-import random
 import re
 from io import StringIO
 
@@ -20,6 +19,7 @@ class DataSet:
         labelname: str,
         limit: int = None,
         select: str = None,
+        seed: int = -1,
     ):
         """Read gzipped or plain JSONL file.
 
@@ -29,7 +29,12 @@ class DataSet:
                       Examples: "energy", "energy - baseline", "E_high - E_low"
             limit: Maximum number of molecules to load (None = no limit)
             select: Optional selection expression for pandas DataFrame.query()
+            seed: Random seed for numpy. Use -1 (default) for non-deterministic
+                  loading, or a non-negative integer for reproducible sampling.
         """
+        if seed >= 0:
+            np.random.seed(seed)
+            info("Random seed set", seed=seed)
         if limit is not None:
             df = DataSet._reservoir_sample(filename, limit, select)
         else:
@@ -255,7 +260,7 @@ class DataSet:
             if len(reservoir) < limit:
                 reservoir.append(item)
             else:
-                j = random.randint(0, n_seen)
+                j = np.random.randint(0, n_seen + 1)
                 if j < limit:
                     reservoir[j] = item
             n_seen += 1

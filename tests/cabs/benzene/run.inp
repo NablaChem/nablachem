@@ -1,0 +1,27 @@
+molecule mol {
+0 1
+C        0.303     -1.351      0.000                 
+C        1.322     -0.413      0.000                 
+C        1.019      0.938      0.000                 
+C       -0.303      1.351      0.000                 
+C       -1.322      0.414      0.000                 
+C       -1.019     -0.938      0.000                 
+H        0.539     -2.405      0.000                 
+H        2.353     -0.737      0.000                 
+H        1.813      1.670      0.000                 
+H       -0.538      2.405      0.000                 
+H       -2.353      0.736      0.000                 
+H       -1.814     -1.669      0.000                 
+symmetry c1
+}
+
+set {
+  basis         pcseg-0
+  cabs_basis    ../pcseg-cabs
+  freeze_core   True
+  mp2_type      conv
+  f12_beta      1.0
+  cabs_singles  True
+}
+
+energy('mp2-f12')
