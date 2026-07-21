@@ -256,12 +256,10 @@ def main(
         )
 
     # Write absolute predictions back into the prediction file.
-    if predict_path is not None and ds.n_predict > 0:
-        trained_sizes = [k for k in autokrr.holdout_predictions if k > 1]
-        if not trained_sizes:
+    if predict_path is not None and autokrr.n_predict > 0:
+        ntrain = autokrr.largest_trained_ntrain
+        if ntrain is None:
             error("No trained model available to predict with")
-        ntrain = max(trained_sizes)
-        n_real = len(autokrr._y_holdout) - autokrr._n_predict
-        predictions = autokrr.holdout_predictions[ntrain][n_real:]
-        info("Writing predictions", ntrain=ntrain, n_predict=ds.n_predict)
+        predictions = autokrr.prediction_tail(ntrain)
+        info("Writing predictions", ntrain=ntrain, n_predict=autokrr.n_predict)
         ds.write_predictions_jsonl(predictions, "property", predict_path)

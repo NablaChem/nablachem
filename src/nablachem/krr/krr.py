@@ -160,15 +160,39 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
+    @property
+    def n_predict(self) -> int:
+        """Number of appended prediction rows at the holdout tail."""
+        return self._n_predict
+
+    @property
+    def n_real_holdout(self) -> int:
+        """Number of real (labeled) holdout rows, excluding prediction rows."""
+        return len(self._y_holdout) - self._n_predict
+
+    @property
+    def largest_trained_ntrain(self) -> int | None:
+        """Largest successfully-trained training size, or None if none trained."""
+        trained = [k for k in self.holdout_predictions if k > 1]
+        return max(trained) if trained else None
+
+    def prediction_tail(self, ntrain: int) -> np.ndarray:
+        """Absolute predictions for the appended prediction rows at this training size."""
+        return self.holdout_predictions[ntrain][self.n_real_holdout :]
+
     def _create_holdout_split(self, elemental: bool = False, alchemical: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
+        # Count appended prediction rows at the holdout tail.
+        self._n_predict = getattr(self.dataset, "n_predict", 0)
+        # Only labeled molecules may be trained on; predict rows have NaN labels.
+        labeled_molecules = total_molecules - self._n_predict
         max_training_size = max(self._training_sizes)
-        if max_training_size >= total_molecules:
+        if max_training_size >= labeled_molecules:
             utils.error(
                 "Max training size too large",
                 max_training_size=max_training_size,
-                total_molecules=total_molecules,
+                total_molecules=labeled_molecules,
             )
 
         X_all = self.dataset.representations
@@ -180,9 +204,6 @@ class AutoKRR:
         self._holdout_representer = X_all
         self._holdout_offset = max_training_size
         self._y_holdout = y_all[max_training_size:]
-
-        # Count appended prediction rows at the holdout tail.
-        self._n_predict = getattr(self.dataset, "n_predict", 0)
 
         self._local = X_train[0].ndim == 2 if X_train else False
 
@@ -526,7 +547,7 @@ class AutoKRR:
                 model_preds[ntrain].append(K_test_centered @ alpha)
 
         # Exclude appended prediction rows from residuals and metrics.
-        n_real = len(self._y_holdout) - self._n_predict
+        n_real = self.n_real_holdout
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)
             y_test = y_tests[ntrain]
@@ -541,14 +562,10 @@ class AutoKRR:
             residuals = y_test_real - pred_real
             self.holdout_residuals[ntrain] = residuals
 
-            if n_real > 0:
-                test_rmse = np.sqrt(((pred_real - y_test_real) ** 2).mean())
-                test_mae = np.abs(pred_real - y_test_real).mean()
-                self.results[ntrain]["test_rmse"] = float(test_rmse)
-                self.results[ntrain]["test_mae"] = float(test_mae)
-            else:
-                self.results[ntrain]["test_rmse"] = float("nan")
-                self.results[ntrain]["test_mae"] = float("nan")
+            test_rmse = np.sqrt(((pred_real - y_test_real) ** 2).mean())
+            test_mae = np.abs(pred_real - y_test_real).mean()
+            self.results[ntrain]["test_rmse"] = float(test_rmse)
+            self.results[ntrain]["test_mae"] = float(test_mae)
 
     def _add_nullmodel(self) -> None:
         """Add nullmodel results where prediction is always the mean of the labels
@@ -569,14 +586,9 @@ class AutoKRR:
         val_mae = np.abs(mean_prediction - y_train).mean()
 
         # Exclude appended prediction rows from holdout metrics.
-        n_real = len(self._y_holdout) - self._n_predict
-        y_holdout_real = y_holdout[:n_real]
-        if n_real > 0:
-            test_rmse = np.sqrt(((mean_prediction - y_holdout_real) ** 2).mean())
-            test_mae = np.abs(mean_prediction - y_holdout_real).mean()
-        else:
-            test_rmse = float("nan")
-            test_mae = float("nan")
+        y_holdout_real = y_holdout[: self.n_real_holdout]
+        test_rmse = np.sqrt(((mean_prediction - y_holdout_real) ** 2).mean())
+        test_mae = np.abs(mean_prediction - y_holdout_real).mean()
 
         utils.info("Nullmodel results", test_rmse=float(test_rmse))
         self.results[1] = {
