@@ -90,6 +90,15 @@ and the remaining molecules used as holdout/test data.
     type=int,
     help="Random seed for numpy. Use -1 (default) for non-deterministic runs, or a non-negative integer for reproducible shuffles.",
 )
+@click.option(
+    "--predict",
+    "predict_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="JSONL file with an 'xyz' column to predict in place. Its molecules are "
+    "appended as an extended holdout and predicted with the largest trained model; "
+    "a 'property' column is written back into the file.",
+)
 def main(
     jsonl_path,
     column_name,
@@ -106,6 +115,7 @@ def main(
     holdout_residuals,
     archive,
     seed,
+    predict_path,
 ):
     if os.path.exists(archive):
         warning(f"Archive file {archive} will be overwritten.")
@@ -120,12 +130,21 @@ def main(
     hash = digest.hexdigest()
     info("Starting", jsonl_path=jsonl_path, file_hash=hash)
 
+    if predict_path is not None:
+        warning(
+            "Prediction molecules are included when building the representation, which "
+            "may implicitly change its shape (e.g. new elements or larger molecules). "
+            "Double-check the reported performance metrics.",
+            predict_path=predict_path,
+        )
+
     ds = DataSet(
         jsonl_path,
         column_name,
         limit=limit,
         select=select,
         seed=seed,
+        predict_path=predict_path,
     )
 
     # Get the representation class dynamically
@@ -235,3 +254,12 @@ def main(
         ds.write_holdout_residuals_jsonl(
             autokrr.holdout_residuals, maxcount, holdout_residuals
         )
+
+    # Write absolute predictions back into the prediction file.
+    if predict_path is not None and autokrr.n_predict > 0:
+        ntrain = autokrr.largest_trained_ntrain
+        if ntrain is None:
+            error("No trained model available to predict with")
+        predictions = autokrr.prediction_tail(ntrain)
+        info("Writing predictions", ntrain=ntrain, n_predict=autokrr.n_predict)
+        ds.write_predictions_jsonl(predictions, "property", predict_path)

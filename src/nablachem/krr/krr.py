@@ -39,6 +39,7 @@ class AutoKRR:
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
+        self.holdout_predictions: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
         if self._local:
@@ -159,15 +160,39 @@ class AutoKRR:
         stored_sections = list(self._archive.keys())
         utils.info("Archive data stored", filename=filename, sections=stored_sections)
 
+    @property
+    def n_predict(self) -> int:
+        """Number of appended prediction rows at the holdout tail."""
+        return self._n_predict
+
+    @property
+    def n_real_holdout(self) -> int:
+        """Number of real (labeled) holdout rows, excluding prediction rows."""
+        return len(self._y_holdout) - self._n_predict
+
+    @property
+    def largest_trained_ntrain(self) -> int | None:
+        """Largest successfully-trained training size, or None if none trained."""
+        trained = [k for k in self.holdout_predictions if k > 1]
+        return max(trained) if trained else None
+
+    def prediction_tail(self, ntrain: int) -> np.ndarray:
+        """Absolute predictions for the appended prediction rows at this training size."""
+        return self.holdout_predictions[ntrain][self.n_real_holdout :]
+
     def _create_holdout_split(self, elemental: bool = False, alchemical: bool = False):
         """Create training/holdout split based on max training size"""
         total_molecules = len(self.dataset)
+        # Count appended prediction rows at the holdout tail.
+        self._n_predict = getattr(self.dataset, "n_predict", 0)
+        # Only labeled molecules may be trained on; predict rows have NaN labels.
+        labeled_molecules = total_molecules - self._n_predict
         max_training_size = max(self._training_sizes)
-        if max_training_size >= total_molecules:
+        if max_training_size >= labeled_molecules:
             utils.error(
                 "Max training size too large",
                 max_training_size=max_training_size,
-                total_molecules=total_molecules,
+                total_molecules=labeled_molecules,
             )
 
         X_all = self.dataset.representations
@@ -440,6 +465,8 @@ class AutoKRR:
         y_tests = {}
         train_col_means = {}
         train_means = {}
+        shifts = {}
+        detrends = {}
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
@@ -447,9 +474,14 @@ class AutoKRR:
             if A_train is not None:
                 coefs = linalg.lstsq(A_train, y_train)[0]
                 y_train -= A_train @ coefs
-                y_test -= self._detrend_matrix(is_train=False) @ coefs
+                detrend_test = self._detrend_matrix(is_train=False) @ coefs
+                y_test -= detrend_test
+            else:
+                detrend_test = 0.0
+            detrends[ntrain] = detrend_test
 
             shift = np.mean(y_train)
+            shifts[ntrain] = shift
             y_train -= shift
             y_test -= shift
 
@@ -514,16 +546,24 @@ class AutoKRR:
                 )
                 model_preds[ntrain].append(K_test_centered @ alpha)
 
+        # Exclude appended prediction rows from residuals and metrics.
+        n_real = self.n_real_holdout
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)
             y_test = y_tests[ntrain]
 
+            # Reconstruct absolute predictions in original units.
+            self.holdout_predictions[ntrain] = pred + shifts[ntrain] + detrends[ntrain]
+
+            pred_real = pred[:n_real]
+            y_test_real = y_test[:n_real]
+
             # Store holdout predictions for residual calculation
-            residuals = y_test - pred
+            residuals = y_test_real - pred_real
             self.holdout_residuals[ntrain] = residuals
 
-            test_rmse = np.sqrt(((pred - y_test) ** 2).mean())
-            test_mae = np.abs(pred - y_test).mean()
+            test_rmse = np.sqrt(((pred_real - y_test_real) ** 2).mean())
+            test_mae = np.abs(pred_real - y_test_real).mean()
             self.results[ntrain]["test_rmse"] = float(test_rmse)
             self.results[ntrain]["test_mae"] = float(test_mae)
 
@@ -545,8 +585,10 @@ class AutoKRR:
         val_rmse = np.sqrt(((mean_prediction - y_train) ** 2).mean())
         val_mae = np.abs(mean_prediction - y_train).mean()
 
-        test_rmse = np.sqrt(((mean_prediction - y_holdout) ** 2).mean())
-        test_mae = np.abs(mean_prediction - y_holdout).mean()
+        # Exclude appended prediction rows from holdout metrics.
+        y_holdout_real = y_holdout[: self.n_real_holdout]
+        test_rmse = np.sqrt(((mean_prediction - y_holdout_real) ** 2).mean())
+        test_mae = np.abs(mean_prediction - y_holdout_real).mean()
 
         utils.info("Nullmodel results", test_rmse=float(test_rmse))
         self.results[1] = {
