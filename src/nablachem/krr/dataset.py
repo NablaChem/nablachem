@@ -20,6 +20,7 @@ class DataSet:
         limit: int = None,
         select: str = None,
         seed: int = -1,
+        predict_path: str = None,
     ):
         """Read gzipped or plain JSONL file.
 
@@ -31,7 +32,11 @@ class DataSet:
             select: Optional selection expression for pandas DataFrame.query()
             seed: Random seed for numpy. Use -1 (default) for non-deterministic
                   loading, or a non-negative integer for reproducible sampling.
+            predict_path: Optional JSONL file appended to the dataset tail (unshuffled,
+                  NaN labels) so the holdout machinery predicts it.
         """
+        self.n_predict = 0
+        self.predict_records = None
         if seed >= 0:
             np.random.seed(seed)
             info("Random seed set", seed=seed)
@@ -128,6 +133,9 @@ class DataSet:
 
         self.molecules = molecules
         del df
+
+        if predict_path is not None:
+            self._append_prediction_set(predict_path)
 
     def __len__(self):
         return len(self.molecules)
@@ -353,8 +361,15 @@ class DataSet:
         # Skip nullmodel (training size 1)
         training_sizes = sorted([k for k in holdout_residuals.keys() if k > 1])
 
+        # Cap iteration to the real holdout; skip appended prediction rows.
+        n_residuals = (
+            len(holdout_residuals[training_sizes[0]]) if training_sizes else 0
+        )
+
         with gzip.open(output_path, "wt") as f:
-            for i, mol in enumerate(self.molecules[holdout_start_idx:]):
+            for i, mol in enumerate(
+                self.molecules[holdout_start_idx : holdout_start_idx + n_residuals]
+            ):
                 # Convert molecule to xyz string
                 xyz_buffer = StringIO()
                 ase.io.write(xyz_buffer, mol, format="xyz")
@@ -366,3 +381,101 @@ class DataSet:
                     record[f"N{ntrain}"] = float(holdout_residuals[ntrain][i])
 
                 f.write(json.dumps(record) + "\n")
+
+    def _append_prediction_set(self, predict_path: str) -> None:
+        """Append a prediction JSONL file to the tail of the dataset with NaN labels."""
+        try:
+            predict_df = pd.read_json(predict_path, lines=True)
+        except Exception as e:
+            error(
+                "Failed to load prediction JSONL file",
+                filename=predict_path,
+                error_msg=str(e),
+            )
+
+        if len(predict_df) == 0:
+            warning("Prediction file is empty; nothing to predict", filename=predict_path)
+            return
+
+        if "xyz" not in predict_df.columns:
+            error(
+                "Required 'xyz' column not found in prediction dataset",
+                columns=predict_df.columns.tolist(),
+            )
+
+        # Collect elements seen in the main dataset.
+        known_elements = set()
+        for mol in self.molecules:
+            known_elements.update(int(z) for z in mol.get_atomic_numbers())
+
+        predict_molecules = []
+        for idx, xyz_data in enumerate(predict_df["xyz"]):
+            try:
+                predict_molecules.append(ase.io.read(StringIO(xyz_data), format="xyz"))
+            except Exception as e:
+                error(
+                    "Failed to parse XYZ for prediction molecule",
+                    molecule_idx=idx,
+                    error_msg=str(e),
+                )
+
+        unseen_elements = sorted(
+            {
+                int(z)
+                for mol in predict_molecules
+                for z in mol.get_atomic_numbers()
+            }
+            - known_elements
+        )
+        if unseen_elements:
+            warning(
+                "Prediction molecules contain elements unseen in training; their "
+                "detrending contribution is treated as zero",
+                unseen_elements=unseen_elements,
+            )
+
+        self.n_predict = len(predict_molecules)
+        self.predict_records = predict_df.to_dict("records")
+        self.molecules = self.molecules + predict_molecules
+        self.labels = np.concatenate(
+            [self.labels, np.full(self.n_predict, np.nan, dtype=float)]
+        )
+        info(
+            "Appended prediction molecules",
+            filename=predict_path,
+            n_predict=self.n_predict,
+        )
+
+    def write_predictions_jsonl(
+        self,
+        predictions: np.ndarray,
+        column: str,
+        output_path: str,
+    ) -> None:
+        """Write predictions into the prediction file in place (gzip-aware)."""
+        import gzip
+        import json
+
+        if self.predict_records is None:
+            error("No prediction records available to write")
+        if len(predictions) != len(self.predict_records):
+            error(
+                "Prediction count does not match prediction records",
+                n_predictions=len(predictions),
+                n_records=len(self.predict_records),
+            )
+        if self.predict_records and column in self.predict_records[0]:
+            warning("Overwriting existing column in prediction file", column=column)
+
+        opener = gzip.open if output_path.endswith(".gz") else open
+        with opener(output_path, "wt") as f:
+            for record, pred in zip(self.predict_records, predictions):
+                out = dict(record)
+                out[column] = None if np.isnan(pred) else float(pred)
+                f.write(json.dumps(out) + "\n")
+
+        info(
+            "Wrote predictions in place",
+            output_path=output_path,
+            n_written=len(predictions),
+        )

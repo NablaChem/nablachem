@@ -39,6 +39,7 @@ class AutoKRR:
 
         self.results: dict[int, dict[str, float]] = {}
         self.holdout_residuals: dict[int, np.ndarray] = {}
+        self.holdout_predictions: dict[int, np.ndarray] = {}
         self._add_nullmodel()
 
         if self._local:
@@ -179,6 +180,9 @@ class AutoKRR:
         self._holdout_representer = X_all
         self._holdout_offset = max_training_size
         self._y_holdout = y_all[max_training_size:]
+
+        # Count appended prediction rows at the holdout tail.
+        self._n_predict = getattr(self.dataset, "n_predict", 0)
 
         self._local = X_train[0].ndim == 2 if X_train else False
 
@@ -440,6 +444,8 @@ class AutoKRR:
         y_tests = {}
         train_col_means = {}
         train_means = {}
+        shifts = {}
+        detrends = {}
         for ntrain, params in best_cases.items():
             y_train = self._y_train[:ntrain].copy()
             y_test = self._y_holdout.copy()
@@ -447,9 +453,14 @@ class AutoKRR:
             if A_train is not None:
                 coefs = linalg.lstsq(A_train, y_train)[0]
                 y_train -= A_train @ coefs
-                y_test -= self._detrend_matrix(is_train=False) @ coefs
+                detrend_test = self._detrend_matrix(is_train=False) @ coefs
+                y_test -= detrend_test
+            else:
+                detrend_test = 0.0
+            detrends[ntrain] = detrend_test
 
             shift = np.mean(y_train)
+            shifts[ntrain] = shift
             y_train -= shift
             y_test -= shift
 
@@ -514,18 +525,30 @@ class AutoKRR:
                 )
                 model_preds[ntrain].append(K_test_centered @ alpha)
 
+        # Exclude appended prediction rows from residuals and metrics.
+        n_real = len(self._y_holdout) - self._n_predict
         for ntrain, preds in model_preds.items():
             pred = np.concatenate(preds, axis=0)
             y_test = y_tests[ntrain]
 
+            # Reconstruct absolute predictions in original units.
+            self.holdout_predictions[ntrain] = pred + shifts[ntrain] + detrends[ntrain]
+
+            pred_real = pred[:n_real]
+            y_test_real = y_test[:n_real]
+
             # Store holdout predictions for residual calculation
-            residuals = y_test - pred
+            residuals = y_test_real - pred_real
             self.holdout_residuals[ntrain] = residuals
 
-            test_rmse = np.sqrt(((pred - y_test) ** 2).mean())
-            test_mae = np.abs(pred - y_test).mean()
-            self.results[ntrain]["test_rmse"] = float(test_rmse)
-            self.results[ntrain]["test_mae"] = float(test_mae)
+            if n_real > 0:
+                test_rmse = np.sqrt(((pred_real - y_test_real) ** 2).mean())
+                test_mae = np.abs(pred_real - y_test_real).mean()
+                self.results[ntrain]["test_rmse"] = float(test_rmse)
+                self.results[ntrain]["test_mae"] = float(test_mae)
+            else:
+                self.results[ntrain]["test_rmse"] = float("nan")
+                self.results[ntrain]["test_mae"] = float("nan")
 
     def _add_nullmodel(self) -> None:
         """Add nullmodel results where prediction is always the mean of the labels
@@ -545,8 +568,15 @@ class AutoKRR:
         val_rmse = np.sqrt(((mean_prediction - y_train) ** 2).mean())
         val_mae = np.abs(mean_prediction - y_train).mean()
 
-        test_rmse = np.sqrt(((mean_prediction - y_holdout) ** 2).mean())
-        test_mae = np.abs(mean_prediction - y_holdout).mean()
+        # Exclude appended prediction rows from holdout metrics.
+        n_real = len(self._y_holdout) - self._n_predict
+        y_holdout_real = y_holdout[:n_real]
+        if n_real > 0:
+            test_rmse = np.sqrt(((mean_prediction - y_holdout_real) ** 2).mean())
+            test_mae = np.abs(mean_prediction - y_holdout_real).mean()
+        else:
+            test_rmse = float("nan")
+            test_mae = float("nan")
 
         utils.info("Nullmodel results", test_rmse=float(test_rmse))
         self.results[1] = {
