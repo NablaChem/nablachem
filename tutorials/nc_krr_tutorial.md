@@ -209,7 +209,7 @@ x_test = representation.compute(test_data.molecules)
     | `--holdout-residuals` | `None` | File path to export holdout residuals as a JSONL. |
     | `--archive` | `archive.json` | Output JSON file for hyperparameter and learning curve data. |
 
-    **Tip** Type `nc-krr --help`to get a list with the available `kernel_name`s and `representation_name`s.
+    **Tip** Type `nc-krr --help`to get a list with the available `kernel_name`s and `represen.
 
     **Tip** Find the label names by typing something valid e.g. label in the place of the \<column_name\> to see a list hin the error message. You can find the availabel labels here:
     
@@ -219,6 +219,7 @@ x_test = representation.compute(test_data.molecules)
 
     **What this does:** It tells the computer to use the `cli` module to read your data `TM_GSspinPlus.jsonl.gz`, calculate the `FCHL19` global representation, train a model using the `Gaussian` kernel, and save the performance statistics to `my_results.json`.
     
+    ![Example of how your terminal could look like when running nc-krr.](./CLI_example.png)
 
 2. **Visualize Results:** Use the `vis.py` script to launch a web browser dashboard showing your learning curves and hyperparameter heatmaps.
     ```bash
@@ -230,11 +231,14 @@ x_test = representation.compute(test_data.molecules)
 
     **What this does:** It opens a new tab in your web browser. Here, you can interactively click through tabs to see how well the model learned and where the optimal settings are.
 
+    ![Viszualization example of 1 trained model.](./vis-1set.png)
+
 3. **Visualize mean of multiple models**
     To get the mean of different models (same representation, same options) add to the `nc-krr-vis`executable all filepaths to the json files you want to compare. To get these json files look at step 1.
     ```bash
     nc-krr-vis my_results_0.json my_results_1.json my_results_2.json ...
     ```
+    ![Viszualization example of two models.](./vis-compare.png)
 
 ### Label calculations 
 The `nc-krr`module let's you modify the column labels (`column_name`), you want to use for prediction.
