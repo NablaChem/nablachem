@@ -1,0 +1,300 @@
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_ba0a4809.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_52bb1f18.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_7f3dc68f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_69f68593.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_4ec1ec0d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_3ac68a83.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_c3147e47.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_169765e4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_7c445c4a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3dd81422.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_2f94947e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_5ba93f49.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_fb9f60d0.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_ccf868ec.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_353b2905.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_4906e4dd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_574726f0.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_d2e6254f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_7e4eb66e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_0d06c6c1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_03abbc42.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_3c237e46.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_b6d372f8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_f9d807a8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_17488029.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_3cfd3d05.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_3372735d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_1dc12692.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_328ccee0.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_c54d55ea.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_74d50920.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_03c6c94f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_ab058064.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_ae8656b9.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3f7c2873.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_53335ace.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_fccf9224.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_61ee63b4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_8d999ef2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_6dc085fc.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_a37b7a04.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_b9e91123.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_0e345ec0.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_499a6218.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_91748417.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_bce5b179.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_faadf323.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_e6712cca.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_849c46d8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'spin_multiplicity' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_09da3363.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_e98e08d7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_2298d914.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_02289553.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_8c228c4a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_826dc11a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_8791860c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_4a082dc8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_05f8c269.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_f023a954.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_710f3600.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_73b0eb70.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_96c2d05a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_44a2d6ef.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_84be37c5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3f75ab45.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_60833c31.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_564570a5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_1ae87aa7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_c5e611d5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_6b07ae77.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_7291a742.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_d4c9dd5e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_afbbde3c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_1c86db86.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_b2d69102.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_01ec761b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_c4f788dd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_7aa693cd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_ca229435.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3121a173.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_65900091.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_fbecee8d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_19e3014d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_cefb92ca.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_e614109b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_1926a7e2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_7cec954b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_a4e75533.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_21eff079.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_cd712eec.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_e79208a6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_ae21a2b1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_05c713f3.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_1ed7a648.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_99a9f955.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_007398f6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_811be78c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_40c688dd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_3983e741.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'splitting' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_50ea6533.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_b69f768d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_fa41504d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_95cd21cc.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_eff64071.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3ef94a31.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_65cbca9a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_88cb3ce1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_9f987d30.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_746214aa.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_ebd7844b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_ebe4bba3.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_f3379aca.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_088dcec6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_1823fb3f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3584035d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_eb0f363d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_a2062cd1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_c36b277f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_4a51edcd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_0cd280a2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_f5666611.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_ca51abc7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_4fde2e03.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_2405e6fb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_371cc6b6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_ceec4eb4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_ac6670ef.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_d917741a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_bfdc1b02.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_a04f0090.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_6729099a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_8ea28ed5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_8d149426.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_448829bc.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_ca0a1660.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_2f14b825.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_9253f5bf.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_383d5564.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_e4baf553.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_b2bb4d00.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_2f4a80b6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_8c95f010.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_5da6471d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_10d8c6a3.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_d9943b3b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_1a1aabce.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_9627e495.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_5effc86e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_d218a566.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HOMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_29155c08.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_2249ae4c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_e336e485.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_b22eb239.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_7727976b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_cd60cc79.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_2cafe244.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_53afe88f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_ec4199af.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_9509128e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_fc60a609.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_99738f45.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_0eac3b71.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_0a76715c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_f6d33cbb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_1aa88c3f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_50ee3cf1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_fbbedfa6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_0695fd1b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_1aa6fd91.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3e2db9b7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_b01f0aa7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_2b009161.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_6666030a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_623a2ad9.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_17b4fa4b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_1dfd0699.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_06a9171b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_9c3409b8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_42dbbc58.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_682fd180.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_0d653976.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_f76c5eac.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_864b24d6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_907b3e41.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_cc3da511.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_56634a7c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_32268b06.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_dd11867b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_f7dffa82.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_8b3e25d4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_5a64639e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_436f4d09.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_96393815.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_9f00b76c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_e4891cd1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_492962c1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_bf11b892.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_f359439b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_180e18be.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'LUMO_Energy' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_3ef44458.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_73c2dd49.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_6697e6b5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_216e3d9b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_571cdab8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_8edf99c5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_d04d7e82.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_798d9786.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_e3210d94.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_583a3b8d.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_d930f691.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_9e59a301.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_fc273986.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_0dfa44cf.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_560c56c1.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_75f1484f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_32cdbc62.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_cc950ea8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_00960a36.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_4bcceae6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_1811b6f2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_aeffd2cb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_7b377a11.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_c37cb7bb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_b5e9a6a4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_769e342c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_cfd1a7f4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_b27adde3.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_9bff743c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_ee55fefb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_f94bf796.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_116980cf.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_2ab159b5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_7f97a6ca.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_9aaa2501.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_b296de41.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_fb337244.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_0ef1db98.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_aae1251a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_2ce0ffc7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_1021f040.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_176b6ae8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_36429eef.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_f9965b00.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_eddb8f66.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_8fb624e8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_0eb1eb67.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_c5777d7b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_3b1c13d2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_76c34525.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'HL_Gap' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_32b7a809.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Global Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_fecd54ac.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Global Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_2c31b779.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Global Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_6f5b8881.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Global Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_cf58429a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Global Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_e79fa3ac.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACEGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_b46c0158.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACEGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_a4516161.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACEGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_5c2f6f14.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACEGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_990e7429.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACEGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_678efd45.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_782dd6d2.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_0aa5e350.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_89581c4f.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_2f16c880.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_1538a9e3.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_9951e850.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_6153483c.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_66d52c2b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_2cee0fe7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_caaf386e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFGlobal Gaussian --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_41b2f0f4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFGlobal Gaussian --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_b5eaedc4.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFGlobal Gaussian --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_aca7e9fb.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFGlobal Gaussian --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_81d790ef.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFGlobal Gaussian --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_1b457ddc.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Local Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_284ad200.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Local Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_c0be90e7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Local Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_7954ccae.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Local Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_a878ad79.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' FCHL19Local Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_e377815b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACELocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_ee75a625.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACELocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_b75fa28e.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACELocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_8c104fcd.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACELocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_ecdc7043.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MACELocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_df8bcc51.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_08b1f2a8.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_0c1ea632.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_549d65ae.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_72e4014a.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' MBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_38880963.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_fd12c25b.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_ce5aebb6.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_732aeec0.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_d48098f5.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' SLATMLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_611bd3b7.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFLocal Gaussian --no-detrend-atomic --seed 1 --archive Archieve/TM_GSspinPlus/temp_run_7499a6da.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFLocal Gaussian --no-detrend-atomic --seed 2 --archive Archieve/TM_GSspinPlus/temp_run_39a30580.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFLocal Gaussian --no-detrend-atomic --seed 3 --archive Archieve/TM_GSspinPlus/temp_run_b07e3289.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFLocal Gaussian --no-detrend-atomic --seed 4 --archive Archieve/TM_GSspinPlus/temp_run_791523c9.json
+nc-krr Archieve/TM_GSspinPlus.jsonl.gz 'Dipole_M' cMBDFLocal Gaussian --no-detrend-atomic --seed 5 --archive Archieve/TM_GSspinPlus/temp_run_065f8b89.json
