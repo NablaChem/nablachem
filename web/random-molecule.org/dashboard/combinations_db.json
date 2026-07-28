@@ -3,6 +3,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -43,6 +83,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -83,6 +163,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -123,6 +243,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -156,6 +316,46 @@
     "property": "spin_multiplicity",
     "representation": "SLATMGlobal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": false
   },
@@ -203,6 +403,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -236,6 +476,46 @@
     "property": "spin_multiplicity",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -283,6 +563,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -316,6 +636,46 @@
     "property": "spin_multiplicity",
     "representation": "MBDFLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -363,6 +723,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "spin_multiplicity",
     "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "spin_multiplicity",
+    "representation": "cMBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -403,6 +803,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -443,6 +883,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -483,6 +963,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -523,6 +1043,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -556,6 +1116,46 @@
     "property": "splitting",
     "representation": "SLATMGlobal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": false
   },
@@ -603,6 +1203,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -636,6 +1276,46 @@
     "property": "splitting",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -683,6 +1363,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -716,6 +1436,46 @@
     "property": "splitting",
     "representation": "MBDFLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -763,6 +1523,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "splitting",
     "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "splitting",
+    "representation": "cMBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -803,6 +1603,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -843,6 +1683,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -883,6 +1763,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -923,6 +1843,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -956,6 +1916,46 @@
     "property": "HOMO_Energy",
     "representation": "SLATMGlobal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": false
   },
@@ -1003,6 +2003,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1036,6 +2076,46 @@
     "property": "HOMO_Energy",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1083,6 +2163,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1116,6 +2236,46 @@
     "property": "HOMO_Energy",
     "representation": "MBDFLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1163,6 +2323,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HOMO_Energy",
     "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HOMO_Energy",
+    "representation": "cMBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1203,6 +2403,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1243,6 +2483,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1283,6 +2563,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1323,6 +2643,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1356,6 +2716,46 @@
     "property": "LUMO_Energy",
     "representation": "SLATMGlobal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": false
   },
@@ -1403,6 +2803,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1436,6 +2876,46 @@
     "property": "LUMO_Energy",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1483,6 +2963,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1516,6 +3036,46 @@
     "property": "LUMO_Energy",
     "representation": "MBDFLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1563,6 +3123,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "LUMO_Energy",
     "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "LUMO_Energy",
+    "representation": "cMBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1603,6 +3203,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1643,6 +3283,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1683,6 +3363,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1723,6 +3443,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -1756,6 +3516,46 @@
     "property": "HL_Gap",
     "representation": "SLATMGlobal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": false
   },
@@ -1803,6 +3603,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1836,6 +3676,46 @@
     "property": "HL_Gap",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1883,6 +3763,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -1916,6 +3836,46 @@
     "property": "HL_Gap",
     "representation": "MBDFLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -1963,6 +3923,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "HL_Gap",
     "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "HL_Gap",
+    "representation": "cMBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -2003,6 +4003,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Global",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Global",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -2043,6 +4083,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACEGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACEGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -2083,6 +4163,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -2123,6 +4243,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -2163,6 +4323,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFGlobal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": false
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFGlobal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": false
@@ -2203,6 +4403,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Local",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "FCHL19Local",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -2236,6 +4476,46 @@
     "property": "Dipole_M",
     "representation": "FCHL19Local",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MACELocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },
@@ -2283,6 +4563,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "MBDFLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -2323,6 +4643,46 @@
     "dataset": "TM_GSspinPlus",
     "property": "Dipole_M",
     "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMLocal",
+    "kernel": "Exponential",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "SLATMLocal",
     "kernel": "Gaussian",
     "seed": 1,
     "is_local": true
@@ -2356,6 +4716,46 @@
     "property": "Dipole_M",
     "representation": "SLATMLocal",
     "kernel": "Gaussian",
+    "seed": 5,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 1,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 2,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 3,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
+    "seed": 4,
+    "is_local": true
+  },
+  {
+    "dataset": "TM_GSspinPlus",
+    "property": "Dipole_M",
+    "representation": "cMBDFLocal",
+    "kernel": "Exponential",
     "seed": 5,
     "is_local": true
   },

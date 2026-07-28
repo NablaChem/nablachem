@@ -36,33 +36,44 @@
         "WuC4",
         "WuC6"
     ],
-    "datasets": {
-        "TM_GSspinPlus": {
-            "run_labels": [
-                "spin_multiplicity",
-                "splitting",
-                "HOMO_Energy",
-                "LUMO_Energy",
-                "HL_Gap",
-                "Dipole_M"
+    "exclusions": {
+        "general": {
+            "kernels": [
+                "Bump",
+                "GeneralizedCauchy",
+                "InverseMultiquadric",
+                "InverseQuadratic",
+                "Matern32",
+                "Matern52",
+                "MaternGeneral",
+                "Polynomial",
+                "Power",
+                "RationalQuadratic",
+                "Sigmoid",
+                "WendlandK0",
+                "WendlandK1",
+                "WendlandK2",
+                "WendlandK3",
+                "WendlandK4",
+                "WuC2",
+                "WuC4",
+                "WuC6"
             ],
-            "run_kernels": [
-                "Gaussian"
+            "properties": [
+                "smiles",
+                "refcode",
+                "xyz",
+                "total_charge"
             ],
-            "run_global_representations": [
-                "FCHL19Global",
-                "MACEGlobal",
-                "MBDFGlobal",
-                "SLATMGlobal",
-                "cMBDFGlobal"
-            ],
-            "run_local_representations": [
-                "FCHL19Local",
-                "MACELocal",
-                "MBDFLocal",
-                "SLATMLocal",
-                "cMBDFLocal"
-            ]
-        }
+            "representations": []
+        },
+        "combinations": [
+            {
+                "dataset": "example_dataset_name",
+                "kernel": "example_kernel_name",
+                "representation": "example_rep_name",
+                "property": "example_property_name"
+            }
+        ]
     }
 }

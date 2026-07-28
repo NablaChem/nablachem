@@ -78,39 +78,40 @@ def main():
         except Exception as e:
             print(f"Error loading {SETTINGS_FILE}: {e}", file=sys.stderr)
 
+    default_exclusions = {
+        "general": {
+            "kernels": [],
+            "properties": ["smiles", "ref number", "xyz"],
+            "representations": []
+        },
+        "combinations": []
+    }
+
+    exclusions = old_settings.get("exclusions", default_exclusions)
+    if "general" not in exclusions:
+        exclusions["general"] = default_exclusions["general"]
+    for key in ["kernels", "properties", "representations"]:
+        if key not in exclusions["general"]:
+            exclusions["general"][key] = default_exclusions["general"][key]
+    if "combinations" not in exclusions:
+        exclusions["combinations"] = default_exclusions["combinations"]
+
     # Always put references at the top of the file
     settings = {
         "__reference_global_representations__": global_reps,
         "__reference_local_representations__": local_reps,
         "__reference_kernels__": available_kernels,
-        "datasets": old_settings.get("datasets", {})
+        "exclusions": exclusions
     }
 
     settings_changed = False
     
-    # Check if reference lists changed
+    # Check if reference lists or format changed
     if old_settings.get("__reference_global_representations__") != global_reps or \
        old_settings.get("__reference_local_representations__") != local_reps or \
-       old_settings.get("__reference_kernels__") != available_kernels:
+       old_settings.get("__reference_kernels__") != available_kernels or \
+       "datasets" in old_settings:
         settings_changed = True
-
-    for ds_name, ds_info in datasets.items():
-        if ds_name not in settings["datasets"]:
-            settings["datasets"][ds_name] = {
-                "run_labels": ds_info["properties"],
-                "run_global_representations": global_reps,
-                "run_local_representations": local_reps,
-                "run_kernels": available_kernels
-            }
-            settings_changed = True
-        else:
-            # Upgrade old format to new format if needed
-            ds_settings = settings["datasets"][ds_name]
-            if "run_representations" in ds_settings:
-                old_reps = ds_settings.pop("run_representations")
-                ds_settings["run_global_representations"] = [r for r in old_reps if "Local" not in r]
-                ds_settings["run_local_representations"] = [r for r in old_reps if "Local" in r]
-                settings_changed = True
 
     # Always write out the file to enforce the key ordering
     with open(SETTINGS_FILE, 'w') as f:
@@ -124,21 +125,41 @@ def main():
 
     # 4. Generate all combinations based on settings
     all_combinations = []
-    for ds_name, ds_info in datasets.items():
-        ds_settings = settings["datasets"].get(ds_name, {})
-        labels_to_run = ds_settings.get("run_labels", [])
-        global_reps_to_run = ds_settings.get("run_global_representations", [])
-        local_reps_to_run = ds_settings.get("run_local_representations", [])
-        kernels_to_run = ds_settings.get("run_kernels", [])
+    
+    gen_ex = settings["exclusions"]["general"]
+    excluded_kernels = set(gen_ex.get("kernels", []))
+    excluded_props = set(gen_ex.get("properties", []))
+    excluded_reps = set(gen_ex.get("representations", []))
+    combo_ex = settings["exclusions"].get("combinations", [])
+    
+    def is_combination_excluded(ds, prop, rep, kern):
+        for ex in combo_ex:
+            match = True
+            if "dataset" in ex and ex["dataset"] != ds: match = False
+            if "property" in ex and ex["property"] != prop: match = False
+            if "representation" in ex and ex["representation"] != rep: match = False
+            if "kernel" in ex and ex["kernel"] != kern: match = False
+            if match:
+                return True
+        return False
 
-        for prop in labels_to_run:
-            if prop not in ds_info["properties"]: continue
+    for ds_name, ds_info in datasets.items():
+        all_props = ds_info["properties"]
+
+        for prop in all_props:
+            if prop in excluded_props: continue
             
-            # Combine global and local into a tuple with a boolean flag for 'is_local'
-            reps_to_process = [(r, False) for r in global_reps_to_run] + [(r, True) for r in local_reps_to_run]
+            reps_to_process = [(r, False) for r in global_reps] + [(r, True) for r in local_reps]
             
             for rep, is_local in reps_to_process:
-                for kernel in kernels_to_run:
+                if rep in excluded_reps: continue
+                
+                for kernel in available_kernels:
+                    if kernel in excluded_kernels: continue
+                    
+                    if is_combination_excluded(ds_name, prop, rep, kernel):
+                        continue
+                        
                     for seed in SEEDS:
                         combo = {
                             "dataset": ds_name,

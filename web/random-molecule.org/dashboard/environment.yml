@@ -1,0 +1,13 @@
+name: dashboard-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - streamlit
+  - plotly
+  - numpy<2.5
+  - pandas
+  - pip
+  - pip:
+    - nablachem
