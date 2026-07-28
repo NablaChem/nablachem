@@ -10,7 +10,6 @@ from nablachem.krr import features, kernels
 ARCHIVE_DIR = "Archieve"
 COMBINATIONS_DB = "combinations_db.json"
 RESULTS_DB = "results_db.json"
-SEEDS = [1, 2, 3, 4, 5]
 
 def get_file_hash(filepath):
     sha256_hash = hashlib.sha256()
@@ -160,16 +159,14 @@ def main():
                     if is_combination_excluded(ds_name, prop, rep, kernel):
                         continue
                         
-                    for seed in SEEDS:
-                        combo = {
-                            "dataset": ds_name,
-                            "property": prop,
-                            "representation": rep,
-                            "kernel": kernel,
-                            "seed": seed,
-                            "is_local": is_local
-                        }
-                        all_combinations.append(combo)
+                    combo = {
+                        "dataset": ds_name,
+                        "property": prop,
+                        "representation": rep,
+                        "kernel": kernel,
+                        "is_local": is_local
+                    }
+                    all_combinations.append(combo)
     
     with open(COMBINATIONS_DB, 'w') as f:
         json.dump(all_combinations, f, indent=2)
@@ -200,15 +197,13 @@ def main():
                     rep = metadata.get("representation")
                     kernel = metadata.get("kernel")
                     prop = metadata.get("column_name")
-                    seed = metadata.get("seed")
                     
-                    if rep and kernel and prop and seed is not None:
+                    if rep and kernel and prop:
                         completed_runs.append({
                             "dataset": ds_name,
                             "property": prop,
                             "representation": rep,
                             "kernel": kernel,
-                            "seed": seed,
                             "hash": file_hash,
                             "file": rf
                         })
@@ -219,16 +214,19 @@ def main():
         json.dump(completed_runs, f, indent=2)
 
     # 5. Diff combinations vs completed runs
-    # Create a set of tuples for fast lookup of completed runs
-    completed_set = set()
+    # Create a dict for fast lookup of completed runs count
+    completed_counts = {}
     for run in completed_runs:
-        combo_tuple = (run["dataset"], run["property"], run["representation"], run["kernel"], run["seed"])
-        completed_set.add(combo_tuple)
+        combo_tuple = (run["dataset"], run["property"], run["representation"], run["kernel"])
+        completed_counts[combo_tuple] = completed_counts.get(combo_tuple, 0) + 1
 
     missing_commands = []
     for combo in all_combinations:
-        combo_tuple = (combo["dataset"], combo["property"], combo["representation"], combo["kernel"], combo["seed"])
-        if combo_tuple not in completed_set:
+        combo_tuple = (combo["dataset"], combo["property"], combo["representation"], combo["kernel"])
+        existing_runs = completed_counts.get(combo_tuple, 0)
+        runs_needed = max(0, 5 - existing_runs)
+        
+        for _ in range(runs_needed):
             dataset_file = datasets[combo["dataset"]]["file"]
             dataset_dir = datasets[combo["dataset"]]["dir"]
             
@@ -238,7 +236,7 @@ def main():
             
             # Add --no-detrend-atomic flag for local representations
             detrend_flag = "--no-detrend-atomic " if combo.get("is_local", False) else ""
-            cmd = f"nc-krr {dataset_file} '{combo['property']}' {combo['representation']} {combo['kernel']} {detrend_flag}--seed {combo['seed']} --archive {temp_filepath}"
+            cmd = f"nc-krr {dataset_file} '{combo['property']}' {combo['representation']} {combo['kernel']} {detrend_flag}--archive {temp_filepath}"
             missing_commands.append(cmd)
 
     # 6. Output missing commands
