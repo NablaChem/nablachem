@@ -4,6 +4,7 @@ import pathlib
 import re
 
 import ase
+import numpy as np
 import pytest
 
 from nablachem.krr.dataset import DataSet
@@ -459,3 +460,142 @@ def test_reservoir_approximate_uniformity(jsonl_file):
         assert expected * 0.5 <= count <= expected * 1.5, (
             f"idx {idx}: count {count}, expected ~{expected:.0f}"
         )
+
+
+# --- charge and spin multiplicity ---
+
+
+def _write_jsonl(path, records):
+    with open(path, "w") as f:
+        for r in records:
+            f.write(json.dumps(r) + "\n")
+    return str(path)
+
+
+@pytest.fixture
+def charged_jsonl(tmp_path):
+    # `energy` mirrors `charge` so that a shuffle which broke the
+    # molecule<->charge pairing shows up as an elementwise mismatch
+    records = [
+        {"xyz": XYZ_H2O, "charge": q, "spin_multiplicity": abs(q) + 1, "energy": q}
+        for q in (-2, -1, 0, 1, 2)
+    ]
+    return _write_jsonl(tmp_path / "charged.jsonl", records)
+
+
+def test_charge_attached_to_mol_info(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert all("charge" in mol.info for mol in ds.molecules)
+
+
+def test_spin_attached_to_mol_info(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert all("spin_multiplicity" in mol.info for mol in ds.molecules)
+
+
+def test_total_charges_values(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert sorted(ds.total_charges) == [-2, -1, 0, 1, 2]
+
+
+def test_spin_multiplicities_values(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert sorted(ds.spin_multiplicities) == [1, 2, 2, 3, 3]
+
+
+def test_total_charges_is_integer_dtype(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert np.issubdtype(ds.total_charges.dtype, np.integer)
+
+
+def test_spin_multiplicities_is_integer_dtype(charged_jsonl):
+    ds = DataSet(charged_jsonl, "energy")
+    assert np.issubdtype(ds.spin_multiplicities.dtype, np.integer)
+
+
+def test_charges_stay_aligned_through_internal_shuffle(charged_jsonl):
+    # DataSet shuffles the dataframe before building molecules; labels carry
+    # the same value as charge, so equality proves the pairing survived
+    ds = DataSet(charged_jsonl, "energy")
+    assert list(ds.total_charges) == [int(v) for v in ds.labels]
+
+
+def test_charges_stay_aligned_through_reservoir_sampling(tmp_path):
+    records = [
+        {"xyz": XYZ_H2O, "charge": i % 3 - 1, "energy": i} for i in range(N_TOTAL)
+    ]
+    path = _write_jsonl(tmp_path / "many.jsonl", records)
+    ds = DataSet(path, "energy", limit=10)
+    assert len(ds) == 10
+    assert list(ds.total_charges) == [int(v) % 3 - 1 for v in ds.labels]
+
+
+def test_integer_valued_floats_are_coerced(tmp_path):
+    # JSON numbers arrive as float64; charges must still land as python ints
+    path = _write_jsonl(
+        tmp_path / "floats.jsonl",
+        [
+            {"xyz": XYZ_H2O, "charge": -1.0, "energy": 1.0},
+            {"xyz": XYZ_CO2, "charge": 0.0, "energy": 2.0},
+        ],
+    )
+    ds = DataSet(path, "energy")
+    assert sorted(ds.total_charges) == [-1, 0]
+    assert all(isinstance(mol.info["charge"], int) for mol in ds.molecules)
+
+
+def test_missing_charge_column_defaults_to_neutral(jsonl_file):
+    ds = DataSet(jsonl_file, "energy")
+    assert list(ds.total_charges) == [0] * N_TOTAL
+
+
+def test_missing_spin_column_defaults_to_singlet(jsonl_file):
+    ds = DataSet(jsonl_file, "energy")
+    assert list(ds.spin_multiplicities) == [1] * N_TOTAL
+
+
+def test_charge_column_without_spin_column(tmp_path):
+    path = _write_jsonl(
+        tmp_path / "chargeonly.jsonl", [{"xyz": XYZ_H2O, "charge": 1, "energy": 1.0}]
+    )
+    ds = DataSet(path, "energy")
+    assert list(ds.total_charges) == [1]
+    assert list(ds.spin_multiplicities) == [1]
+
+
+def _capture_warnings(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "nablachem.krr.dataset.warning", lambda msg, **kw: calls.append(kw)
+    )
+    return calls
+
+
+def test_missing_charge_column_warns_once(jsonl_file, monkeypatch):
+    calls = _capture_warnings(monkeypatch)
+    ds = DataSet(jsonl_file, "energy")
+    calls.clear()
+    ds.total_charges
+    ds.total_charges
+    ds.total_charges
+    assert len(calls) == 1
+    assert calls[0]["column"] == "charge"
+
+
+def test_missing_spin_column_warns_once(jsonl_file, monkeypatch):
+    calls = _capture_warnings(monkeypatch)
+    ds = DataSet(jsonl_file, "energy")
+    calls.clear()
+    ds.spin_multiplicities
+    ds.spin_multiplicities
+    assert len(calls) == 1
+    assert calls[0]["column"] == "spin_multiplicity"
+
+
+def test_present_columns_do_not_warn(charged_jsonl, monkeypatch):
+    calls = _capture_warnings(monkeypatch)
+    ds = DataSet(charged_jsonl, "energy")
+    calls.clear()
+    ds.total_charges
+    ds.spin_multiplicities
+    assert calls == []

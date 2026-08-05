@@ -122,6 +122,23 @@ class DataSet:
                 )
 
         self.molecules = molecules
+
+        self._has_charge = "charge" in df.columns
+        if self._has_charge:
+            for mol, charge in zip(self.molecules, df["charge"]):
+                mol.info["charge"] = int(charge)
+            info("Attached total charges", nonneutral=int((df["charge"] != 0).sum()))
+
+        self._has_spin = "spin_multiplicity" in df.columns
+        if self._has_spin:
+            for mol, mult in zip(self.molecules, df["spin_multiplicity"]):
+                mol.info["spin_multiplicity"] = int(mult)
+            info(
+                "Attached spin multiplicities",
+                open_shell=int((df["spin_multiplicity"] != 1).sum()),
+            )
+
+        self._warned_defaults = set()
         del df
 
     def __len__(self):
@@ -130,6 +147,33 @@ class DataSet:
     @property
     def nuclear_charges(self) -> list[np.ndarray]:
         return [mol.get_atomic_numbers() for mol in self.molecules]
+
+    @property
+    def total_charges(self) -> np.ndarray:
+        """Total molecular charge per molecule, in dataset order."""
+        if not self._has_charge:
+            self._warn_assumed("charge", assumed="neutral")
+        return np.array(
+            [mol.info.get("charge", 0) for mol in self.molecules], dtype=int
+        )
+
+    @property
+    def spin_multiplicities(self) -> np.ndarray:
+        """Spin multiplicity (2S+1) per molecule, in dataset order."""
+        if not self._has_spin:
+            self._warn_assumed("spin_multiplicity", assumed="singlet")
+        return np.array(
+            [mol.info.get("spin_multiplicity", 1) for mol in self.molecules], dtype=int
+        )
+
+    def _warn_assumed(self, column: str, assumed: str) -> None:
+        """Warn once per column that a default was substituted."""
+        if column in self._warned_defaults:
+            return
+        self._warned_defaults.add(column)
+        warning(
+            "Column not in dataset, assuming default", column=column, assumed=assumed
+        )
 
     def get_element_counts(self):
         """Return element count matrix for all molecules in the dataset.
