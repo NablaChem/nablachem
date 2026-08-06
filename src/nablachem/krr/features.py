@@ -134,9 +134,25 @@ class SLATMGlobal(_SLATM):
         super().__init__(local=False)
 
 
+_OMOL_INFO_KEYS = {
+    "total_charge": "charge",
+    "total_spin": "spin_multiplicity",
+    "external_field": "external_field",
+}
+
+
 class _MACE(BaseRepresenter):
-    def __init__(self, local: bool):
+    def __init__(
+        self,
+        local: bool,
+        loader: str = "mace_mp",
+        model: str = "medium",
+        info_keys: dict = None,
+    ):
         self._local = local
+        self._loader = loader
+        self._model_name = model
+        self._info_keys = info_keys
         self._model = None
 
     def _prepare(self, molecules: list) -> None:
@@ -146,11 +162,14 @@ class _MACE(BaseRepresenter):
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                from mace.calculators import mace_mp
+                from mace import calculators
 
                 with contextlib.redirect_stdout(None):
-                    self._model = mace_mp(
-                        model="medium", device="", default_dtype="float64"
+                    self._model = getattr(calculators, self._loader)(
+                        model=self._model_name,
+                        device="",
+                        default_dtype="float64",
+                        info_keys=self._info_keys,
                     )
 
     def compute(self, molecules: list) -> list:
@@ -162,14 +181,44 @@ class _MACE(BaseRepresenter):
             ]
 
 
-class MACEGlobal(_MACE):
+class MACEMPGlobal(_MACE):
     def __init__(self):
-        super().__init__(local=False)
+        super().__init__(local=False, loader="mace_mp", model="medium")
 
 
-class MACELocal(_MACE):
+class MACEMPLocal(_MACE):
     def __init__(self):
-        super().__init__(local=True)
+        super().__init__(local=True, loader="mace_mp", model="medium")
+
+
+class MACEOFFGlobal(_MACE):
+    def __init__(self):
+        super().__init__(local=False, loader="mace_off", model="medium")
+
+
+class MACEOFFLocal(_MACE):
+    def __init__(self):
+        super().__init__(local=True, loader="mace_off", model="medium")
+
+
+class MACEOMolGlobal(_MACE):
+    def __init__(self):
+        super().__init__(
+            local=False,
+            loader="mace_omol",
+            model="extra_large",
+            info_keys=_OMOL_INFO_KEYS,
+        )
+
+
+class MACEOMolLocal(_MACE):
+    def __init__(self):
+        super().__init__(
+            local=True,
+            loader="mace_omol",
+            model="extra_large",
+            info_keys=_OMOL_INFO_KEYS,
+        )
 
 
 class _FCHL19(BaseRepresenter):
