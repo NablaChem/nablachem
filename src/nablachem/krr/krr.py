@@ -10,6 +10,9 @@ from .dataset import DataSet
 from . import kernels
 
 
+DETRENDING_TERMS = ("atomic", "pairs", "charge", "spin")
+
+
 class AutoKRR:
     def __init__(
         self,
@@ -17,7 +20,7 @@ class AutoKRR:
         mincount: int,
         maxcount: int,
         kernel_func: kernels.Kernel,
-        detrend_atomic: bool = True,
+        detrending: tuple[str, ...] = ("atomic",),
         detrend_pairs: str | None = None,
         elemental: bool = False,
         alchemical_weights: dict | None = None,
@@ -30,7 +33,9 @@ class AutoKRR:
         self._archive["hyperopt"] = []
         self.dataset = dataset
         self._training_sizes = utils.get_training_sizes(mincount, maxcount)
-        self._detrend_atomic = detrend_atomic
+        self._detrending = set(detrending)
+        if detrend_pairs:
+            self._detrending.add("pairs")
         self._detrend_pairs = detrend_pairs
         self._elemental = elemental
         self._alchemical_weights = alchemical_weights
@@ -218,17 +223,49 @@ class AutoKRR:
         else:
             self._X_train = np.stack(X_train, axis=0)
 
-        if self._detrend_atomic:
-            element_counts, self._elements_Z = self.dataset.get_element_counts()
-            self._elements_train = element_counts[:max_training_size]
-            self._elements_holdout = element_counts[max_training_size:]
+        self._build_detrend_blocks(max_training_size)
 
-        if self._detrend_pairs:
-            pair_features, self._pairs_labels = self.dataset.get_pairwise_features(
+    def _build_detrend_blocks(self, max_training_size: int) -> None:
+        """Assemble the requested detrending blocks once, in a fixed order."""
+        blocks = []
+
+        def add(name, columns, labels):
+            blocks.append(
+                (name, columns[:max_training_size], columns[max_training_size:], labels)
+            )
+
+        if "atomic" in self._detrending:
+            counts, elements_Z = self.dataset.get_element_counts()
+            add("atomic", counts, [utils.Z_to_element_symbol(Z) for Z in elements_Z])
+
+        if "pairs" in self._detrending:
+            pairs, pairs_labels = self.dataset.get_pairwise_features(
                 self._detrend_pairs
             )
-            self._pairs_train = pair_features[:max_training_size]
-            self._pairs_holdout = pair_features[max_training_size:]
+            add("pairs", pairs, list(pairs_labels))
+
+        if "charge" in self._detrending:
+            add(
+                *self._categorical_block(
+                    "charge", self.dataset.total_charges, lambda q: f"q{q:+d}"
+                )
+            )
+
+        if "spin" in self._detrending:
+            add(
+                *self._categorical_block(
+                    "spin", self.dataset.spin_multiplicities, lambda m: f"M{m}"
+                )
+            )
+
+        self._detrend_blocks = blocks
+
+    @staticmethod
+    def _categorical_block(name: str, values: np.ndarray, label_fmt):
+        """One column per observed state, holding 1 in the molecule's own state."""
+        states = np.unique(values)
+        columns = np.column_stack([(values == s).astype(float) for s in states])
+        return name, columns, [label_fmt(int(s)) for s in states]
 
     def _detrend_matrix(
         self, is_train: bool, n: int | None = None
@@ -243,16 +280,14 @@ class AutoKRR:
             Design matrix of shape (n_molecules, n_features), or None if no
             detrending is active.
         """
-        parts = []
-        if self._detrend_atomic:
-            A = self._elements_train[:n] if is_train else self._elements_holdout
-            parts.append(A)
-        if self._detrend_pairs:
-            P = self._pairs_train[:n] if is_train else self._pairs_holdout
-            parts.append(P)
-        if not parts:
+        if not self._detrend_blocks:
             return None
-        return np.hstack(parts)
+        return np.hstack(
+            [
+                train[:n] if is_train else holdout
+                for _, train, holdout, _ in self._detrend_blocks
+            ]
+        )
 
     def get_hyperparameter_grid(self, ntrain: int):
         factors = 2.0 ** np.arange(-1, 20)
@@ -416,19 +451,14 @@ class AutoKRR:
         A = self._detrend_matrix(is_train=True, n=ntrain)
         if A is not None:
             coefs = linalg.lstsq(A, y)[0]
-            if self._detrend_atomic:
-                n_atomic = len(self._elements_Z)
-                mapping = {
-                    utils.Z_to_element_symbol(Z): float(c)
-                    for Z, c in zip(self._elements_Z, coefs[:n_atomic])
-                }
-                utils.info("Atomic detrending coefficients", **mapping)
-            if self._detrend_pairs:
-                n_atomic = len(self._elements_Z) if self._detrend_atomic else 0
-                for label, coef in zip(self._pairs_labels, coefs[n_atomic:]):
-                    utils.info(
-                        "Pairwise detrending coefficient", label=label, coef=float(coef)
-                    )
+            offset = 0
+            for name, train, _, labels in self._detrend_blocks:
+                block = coefs[offset : offset + train.shape[1]]
+                offset += train.shape[1]
+                utils.info(
+                    f"{name.capitalize()} detrending coefficients",
+                    **{label: float(c) for label, c in zip(labels, block)},
+                )
             y -= A @ coefs
         y -= np.mean(y)
 

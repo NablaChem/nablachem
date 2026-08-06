@@ -196,7 +196,7 @@ def _run(X, y, n_predict):
         mincount=4,
         maxcount=8,
         kernel_func=kernels.Gaussian(),
-        detrend_atomic=False,
+        detrending=(),
     )
 
 
@@ -239,7 +239,7 @@ def test_training_size_cannot_exceed_labeled_molecules():
             mincount=8,
             maxcount=8,
             kernel_func=kernels.Gaussian(),
-            detrend_atomic=False,
+            detrending=(),
         )
 
 

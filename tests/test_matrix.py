@@ -240,7 +240,7 @@ def test_evaluate_models_uses_per_model_sigma():
         mincount=4,
         maxcount=8,
         kernel_func=kernels.Gaussian(),
-        detrend_atomic=False,
+        detrending=(),
     )
 
     X_train = X[:n_train_max]

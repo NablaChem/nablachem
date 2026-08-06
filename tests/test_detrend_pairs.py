@@ -1,9 +1,12 @@
 import numpy as np
 import pytest
 import ase
+import click
 from scipy import linalg
 
+from nablachem.krr.cli import _parse_detrending
 from nablachem.krr.dataset import DataSet
+from nablachem.krr.krr import DETRENDING_TERMS, AutoKRR
 
 
 def make_dataset(molecules):
@@ -162,3 +165,125 @@ def test_detrend_mixed_signal_leaves_non_gcp_part():
     # residuals should correlate with the noise, not with the gCP feature
     assert np.corrcoef(residuals, noise)[0, 1] > 0.99
     assert np.corrcoef(residuals, features[:, 0])[0, 1] < 0.01
+
+
+# ---------------------------------------------------------------------------
+# --detrending term selection
+# ---------------------------------------------------------------------------
+
+
+def test_detrending_defaults_to_atomic():
+    assert _parse_detrending(None, None, None) == ("atomic",)
+
+
+def test_detrending_accepts_comma_separated_terms():
+    assert _parse_detrending(None, None, "atomic,charge") == ("atomic", "charge")
+
+
+def test_detrending_tolerates_whitespace():
+    assert _parse_detrending(None, None, " atomic , charge ") == ("atomic", "charge")
+
+
+def test_detrending_empty_string_disables_all_terms():
+    assert _parse_detrending(None, None, "") == ()
+
+
+def test_detrending_rejects_unknown_term():
+    with pytest.raises(click.BadParameter, match="charg"):
+        _parse_detrending(None, None, "atomic,charg")
+
+
+def test_all_documented_terms_are_accepted():
+    joined = ",".join(DETRENDING_TERMS)
+    assert _parse_detrending(None, None, joined) == DETRENDING_TERMS
+
+
+# ---------------------------------------------------------------------------
+# categorical (charge / spin) columns
+# ---------------------------------------------------------------------------
+
+
+def test_categorical_block_marks_only_the_molecule_own_state():
+    _, columns, _ = AutoKRR._categorical_block(
+        "charge", np.array([-1, 0, 1]), lambda q: f"q{q:+d}"
+    )
+    assert np.array_equal(columns, np.eye(3))
+
+
+def test_categorical_block_rows_sum_to_one():
+    values = np.array([-1, -1, 0, 1, 1, 1])
+    _, columns, _ = AutoKRR._categorical_block("charge", values, lambda q: f"q{q:+d}")
+    assert np.array_equal(columns.sum(axis=1), np.ones(len(values)))
+
+
+def test_categorical_block_has_one_column_per_observed_state():
+    _, columns, labels = AutoKRR._categorical_block(
+        "spin", np.array([1, 1, 3]), lambda m: f"M{m}"
+    )
+    assert columns.shape == (3, 2)
+    assert labels == ["M1", "M3"]
+
+
+def test_categorical_block_labels_contain_no_equals_sign():
+    # labels are used as logger keys, so an embedded "=" renders as "q=-1=0.9"
+    _, _, labels = AutoKRR._categorical_block(
+        "charge", np.array([-1, 0, 1]), lambda q: f"q{q:+d}"
+    )
+    assert labels == ["q-1", "q+0", "q+1"]
+
+
+# ---------------------------------------------------------------------------
+# joint fit over atomic counts and charge states
+# ---------------------------------------------------------------------------
+
+
+def test_joint_atomic_and_charge_detrending_recovers_both():
+    """Labels = a_H*n_H + a_C*n_C + per-charge offset, fitted in one pass."""
+    n = 12
+    charges = np.array(([-1] * 4 + [0] * 4 + [1] * 4) * 2)
+    n_H = np.array([2.0] * n + [0.0] * n)
+    n_C = np.array([0.0] * n + [2.0] * n)
+    offsets = {-1: 0.9, 0: 0.0, 1: -0.9}
+
+    _, charge_columns, _ = AutoKRR._categorical_block(
+        "charge", charges, lambda q: f"q{q:+d}"
+    )
+    A = np.hstack([np.column_stack([n_H, n_C]), charge_columns])
+    y = 1.0 * n_H + 5.0 * n_C + np.array([offsets[q] for q in charges])
+
+    assert np.allclose(y - A @ linalg.lstsq(A, y)[0], 0.0, atol=1e-9)
+
+
+def test_joint_fit_centres_every_charge_state():
+    """Residuals are orthogonal to each indicator column, so every charge state
+    ends up with zero mean -- this is what collapses a multimodal label
+    distribution before the kernel sees it."""
+    rng = np.random.default_rng(0)
+    charges = rng.choice([-1, 0, 1], size=60)
+    offsets = {-1: 0.9, 0: 0.0, 1: -0.9}
+
+    _, charge_columns, _ = AutoKRR._categorical_block(
+        "charge", charges, lambda q: f"q{q:+d}"
+    )
+    n_H = rng.integers(2, 10, size=len(charges)).astype(float)
+    A = np.hstack([n_H.reshape(-1, 1), charge_columns])
+    y = 0.5 * n_H + np.array([offsets[q] for q in charges]) + rng.normal(0, 0.01, 60)
+
+    residual = y - A @ linalg.lstsq(A, y)[0]
+    for state in np.unique(charges):
+        assert abs(residual[charges == state].mean()) < 1e-9
+
+
+def test_charge_detrending_alone_still_centres_every_state():
+    """With no atomic block there is nothing else to supply an intercept, which
+    is exactly where dropping a reference state would leave one state
+    unrepresentable."""
+    rng = np.random.default_rng(1)
+    charges = rng.choice([-1, 0, 1], size=60)
+    offsets = {-1: 0.9, 0: 0.0, 1: -0.9}
+
+    _, A, _ = AutoKRR._categorical_block("charge", charges, lambda q: f"q{q:+d}")
+    y = np.array([offsets[q] for q in charges])
+
+    residual = y - A @ linalg.lstsq(A, y)[0]
+    assert np.allclose(residual, 0.0, atol=1e-9)
