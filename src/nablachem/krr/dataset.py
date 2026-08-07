@@ -478,6 +478,28 @@ class DataSet:
                 unseen_elements=unseen_elements,
             )
 
+        missing_columns = [
+            column
+            for column, in_dataset in (
+                ("charge", self._has_charge),
+                ("spin_multiplicity", self._has_spin),
+            )
+            if in_dataset and column not in predict_df.columns
+        ]
+        if missing_columns:
+            warning(
+                "Prediction molecules lack columns present in the dataset; they are "
+                "assumed neutral and singlet",
+                missing_columns=missing_columns,
+            )
+
+        if "charge" in predict_df.columns:
+            for mol, charge in zip(predict_molecules, predict_df["charge"]):
+                mol.info["charge"] = int(charge)
+        if "spin_multiplicity" in predict_df.columns:
+            for mol, mult in zip(predict_molecules, predict_df["spin_multiplicity"]):
+                mol.info["spin_multiplicity"] = int(mult)
+
         self.n_predict = len(predict_molecules)
         self.predict_records = predict_df.to_dict("records")
         self.molecules = self.molecules + predict_molecules
