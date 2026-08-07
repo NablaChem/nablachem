@@ -21,7 +21,6 @@ class AutoKRR:
         maxcount: int,
         kernel_func: kernels.Kernel,
         detrending: tuple[str, ...] = ("atomic",),
-        detrend_pairs: str | None = None,
         elemental: bool = False,
         alchemical_weights: dict | None = None,
         seed: int = -1,
@@ -34,9 +33,6 @@ class AutoKRR:
         self.dataset = dataset
         self._training_sizes = utils.get_training_sizes(mincount, maxcount)
         self._detrending = set(detrending)
-        if detrend_pairs:
-            self._detrending.add("pairs")
-        self._detrend_pairs = detrend_pairs
         self._elemental = elemental
         self._alchemical_weights = alchemical_weights
 
@@ -239,9 +235,7 @@ class AutoKRR:
             add("atomic", counts, [utils.Z_to_element_symbol(Z) for Z in elements_Z])
 
         if "pairs" in self._detrending:
-            pairs, pairs_labels = self.dataset.get_pairwise_features(
-                self._detrend_pairs
-            )
+            pairs, pairs_labels = self.dataset.get_pairwise_features("gCP")
             add("pairs", pairs, list(pairs_labels))
 
         if "charge" in self._detrending:

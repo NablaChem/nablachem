@@ -78,18 +78,6 @@ and the remaining molecules used as holdout/test data.
     "[default: atomic]",
 )
 @click.option(
-    "--detrend-atomic/--no-detrend-atomic",
-    "detrend_atomic",
-    default=None,
-    help="Deprecated alias for adding or removing 'atomic' in --detrending.",
-)
-@click.option(
-    "--detrend-pairs",
-    default=None,
-    type=str,
-    help="Pairwise detrending functional form label (e.g. 'gCP'). Disabled by default.",
-)
-@click.option(
     "--holdout-residuals",
     default=None,
     help="Output JSONL file path for holdout residuals",
@@ -133,8 +121,6 @@ def main(
     maxcount,
     select,
     detrending,
-    detrend_atomic,
-    detrend_pairs,
     elemental,
     alchemical,
     holdout_residuals,
@@ -142,14 +128,6 @@ def main(
     seed,
     predict_path,
 ):
-    detrending = set(detrending)
-    if detrend_atomic is not None:
-        warning(
-            "--detrend-atomic/--no-detrend-atomic is deprecated, use --detrending",
-            suggested=f"--detrending {'atomic' if detrend_atomic else ''}".strip(),
-        )
-        detrending.add("atomic") if detrend_atomic else detrending.discard("atomic")
-    detrending = tuple(sorted(detrending))
     info("Detrending terms", terms=list(detrending) or "none")
 
     if os.path.exists(archive):
@@ -241,7 +219,6 @@ def main(
         mincount,
         maxcount,
         detrending=detrending,
-        detrend_pairs=detrend_pairs,
         kernel_func=kernel_func,
         elemental=elemental,
         alchemical_weights=alchemical_weights,
@@ -251,7 +228,6 @@ def main(
         "representation": representation_name,
         "kernel": kernel_name,
         "detrending": list(detrending),
-        "detrend_pairs": detrend_pairs,
         "elemental": elemental,
         "alchemical": alchemical,
         "file_hash": hash,

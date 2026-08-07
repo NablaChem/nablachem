@@ -23,7 +23,6 @@ def validate_metadata(datasets: dict):
         "representation",
         "kernel",
         "detrending",
-        "detrend_pairs",
         "elemental",
         "file_hash",
         "column_name",
