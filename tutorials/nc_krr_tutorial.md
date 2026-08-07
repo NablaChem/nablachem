@@ -203,7 +203,8 @@ x_test = representation.compute(test_data.molecules)
     | `--mincount` | `128` | Minimum number of molecules for the training learning curve. |
     | `--maxcount` | `2048` | Maximum number of training molecules (remainder used as holdout). |
     | `--select` | `None` | Pandas query expression for filtering dataset rows. |
-    | `--detrend-atomic` / `--no-detrend-atomic` | `True` | Toggles atomic count linear detrending `True`means _enabled_, `False` means _disabled_. |
+    | `--detrending` | `atomic` | Comma-separated detrending terms. `atomic` uses element counts, `charge` and `spin` add one column per observed charge state or spin multiplicity, e.g. `--detrending atomic,charge`. Pass an empty string to disable detrending. |
+    | `--detrend-atomic` / `--no-detrend-atomic` | `None` | Deprecated alias that adds or removes `atomic` in `--detrending`. |
     | `--detrend-pairs` | `None` | Applies pairwise detrending (e.g., `gCP`). `True`means _enabled_, `False` means _disabled_. |
     | `--elemental` / `--no-elemental` | `False` | Masks cross-element pairs in local kernels (Local reps only). |
     | `--holdout-residuals` | `None` | File path to export holdout residuals as a JSONL. |
@@ -352,7 +353,7 @@ Here is a sketch of the generated  `_my_file_name_.json`:
     {
         "representation": str,
         "kernel": str,
-        "detrend_atomic": bool,
+        "detrending": list,
         "detrend_pairs": null,
         "elemental": bool,
         "file_hash": str,

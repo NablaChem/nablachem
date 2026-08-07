@@ -22,8 +22,7 @@ def validate_metadata(datasets: dict):
     comparable_fields = [
         "representation",
         "kernel",
-        "detrend_atomic",
-        "detrend_pairs",
+        "detrending",
         "elemental",
         "file_hash",
         "column_name",

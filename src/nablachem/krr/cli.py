@@ -6,9 +6,23 @@ import hashlib
 
 from .utils import info, error, warning
 from .dataset import DataSet
-from .krr import AutoKRR
+from .krr import AutoKRR, DETRENDING_TERMS
 from . import features
 from . import kernels
+
+
+def _parse_detrending(ctx, param, value):
+    """Parse a comma-separated list of detrending terms."""
+    if value is None:
+        return ("atomic",)
+    terms = tuple(term.strip() for term in value.split(",") if term.strip())
+    unknown = [term for term in terms if term not in DETRENDING_TERMS]
+    if unknown:
+        raise click.BadParameter(
+            f"unknown term(s): {', '.join(unknown)}. "
+            f"Choose from: {', '.join(DETRENDING_TERMS)}."
+        )
+    return terms
 
 
 # Generate dynamic docstring with available representations
@@ -55,15 +69,13 @@ and the remaining molecules used as holdout/test data.
     help="Selection expression for filtering dataset rows",
 )
 @click.option(
-    "--detrend-atomic/--no-detrend-atomic",
-    default=True,
-    help="Enable/disable atomic count detrending (default: enabled)",
-)
-@click.option(
-    "--detrend-pairs",
+    "--detrending",
     default=None,
-    type=str,
-    help="Pairwise detrending functional form label (e.g. 'gCP'). Disabled by default.",
+    metavar="TERMS",
+    callback=_parse_detrending,
+    help="Comma-separated detrending terms, e.g. 'atomic,charge'. Available: "
+    f"{', '.join(DETRENDING_TERMS)}. Pass an empty string to disable detrending. "
+    "[default: atomic]",
 )
 @click.option(
     "--holdout-residuals",
@@ -108,8 +120,7 @@ def main(
     mincount,
     maxcount,
     select,
-    detrend_atomic,
-    detrend_pairs,
+    detrending,
     elemental,
     alchemical,
     holdout_residuals,
@@ -117,6 +128,8 @@ def main(
     seed,
     predict_path,
 ):
+    info("Detrending terms", terms=list(detrending) or "none")
+
     if os.path.exists(archive):
         warning(f"Archive file {archive} will be overwritten.")
 
@@ -205,8 +218,7 @@ def main(
         ds,
         mincount,
         maxcount,
-        detrend_atomic=detrend_atomic,
-        detrend_pairs=detrend_pairs,
+        detrending=detrending,
         kernel_func=kernel_func,
         elemental=elemental,
         alchemical_weights=alchemical_weights,
@@ -215,8 +227,7 @@ def main(
     metadata = {
         "representation": representation_name,
         "kernel": kernel_name,
-        "detrend_atomic": detrend_atomic,
-        "detrend_pairs": detrend_pairs,
+        "detrending": list(detrending),
         "elemental": elemental,
         "alchemical": alchemical,
         "file_hash": hash,
