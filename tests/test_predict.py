@@ -99,6 +99,41 @@ def test_predict_empty_file(tmp_path, main_file):
     assert ds.n_predict == 0
 
 
+# --- charge and spin on prediction molecules ---
+
+
+@pytest.fixture
+def charged_main_file(tmp_path):
+    records = [
+        {"xyz": XYZ_H2O, "energy": 1.0, "charge": -1, "spin_multiplicity": 1},
+        {"xyz": XYZ_CO2, "energy": 2.0, "charge": 0, "spin_multiplicity": 3},
+    ]
+    return _write_jsonl(tmp_path / "charged_main.jsonl", records)
+
+
+def test_predict_charges_and_spins_are_attached(tmp_path, charged_main_file):
+    predict_records = [
+        {"xyz": XYZ_CH4, "charge": 2, "spin_multiplicity": 1},
+        {"xyz": XYZ_H2O, "charge": -2, "spin_multiplicity": 4},
+    ]
+    predict_file = _write_jsonl(tmp_path / "predict.jsonl", predict_records)
+
+    ds = DataSet(charged_main_file, "energy", predict_path=predict_file)
+
+    # the last two entries are the prediction molecules
+    assert list(ds.total_charges[-2:]) == [2, -2]
+    assert list(ds.spin_multiplicities[-2:]) == [1, 4]
+
+
+def test_predict_without_charge_column_uses_defaults(tmp_path, charged_main_file):
+    predict_file = _write_jsonl(tmp_path / "predict.jsonl", [{"xyz": XYZ_CH4}])
+
+    ds = DataSet(charged_main_file, "energy", predict_path=predict_file)
+
+    assert ds.total_charges[-1] == 0  # neutral
+    assert ds.spin_multiplicities[-1] == 1  # singlet
+
+
 # --- write_predictions_jsonl ---
 
 
