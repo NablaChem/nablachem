@@ -91,7 +91,7 @@ and the remaining molecules used as holdout/test data.
     "--alchemical",
     default=None,
     type=click.Path(exists=True),
-    help="JSON file with per-element-pair weights {\"Z1,Z2\": float} (Z1<=Z2). Requires local representation.",
+    help='JSON file with per-element-pair weights {"Z1,Z2": float} (Z1<=Z2). Requires local representation.',
 )
 @click.option(
     "--owl",
@@ -175,11 +175,15 @@ def main(
         try:
             mod = importlib.import_module(module_path)
         except ImportError as e:
-            error("Cannot import representation module", module=module_path, reason=str(e))
+            error(
+                "Cannot import representation module", module=module_path, reason=str(e)
+            )
         try:
             rep_class = getattr(mod, class_name)
         except AttributeError:
-            error("Class not found in module", module=module_path, class_name=class_name)
+            error(
+                "Class not found in module", module=module_path, class_name=class_name
+            )
         rep = rep_class()
     else:
         rep_class_map = {}
@@ -212,7 +216,12 @@ def main(
                 error("Alchemical weight key must be 'Z1,Z2'", key=key)
             z1, z2 = int(parts[0]), int(parts[1])
             if z1 > z2:
-                error("Alchemical weight keys must satisfy Z1 <= Z2", key=key, z1=z1, z2=z2)
+                error(
+                    "Alchemical weight keys must satisfy Z1 <= Z2",
+                    key=key,
+                    z1=z1,
+                    z2=z2,
+                )
             alchemical_weights[(z1, z2)] = abs(float(val))
 
     # Validate kernel name

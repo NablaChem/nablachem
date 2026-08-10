@@ -406,9 +406,7 @@ class DataSet:
         training_sizes = sorted([k for k in holdout_residuals.keys() if k > 1])
 
         # Cap iteration to the real holdout; skip appended prediction rows.
-        n_residuals = (
-            len(holdout_residuals[training_sizes[0]]) if training_sizes else 0
-        )
+        n_residuals = len(holdout_residuals[training_sizes[0]]) if training_sizes else 0
 
         with gzip.open(output_path, "wt") as f:
             for i, mol in enumerate(
@@ -438,7 +436,9 @@ class DataSet:
             )
 
         if len(predict_df) == 0:
-            warning("Prediction file is empty; nothing to predict", filename=predict_path)
+            warning(
+                "Prediction file is empty; nothing to predict", filename=predict_path
+            )
             return
 
         if "xyz" not in predict_df.columns:
@@ -464,11 +464,7 @@ class DataSet:
                 )
 
         unseen_elements = sorted(
-            {
-                int(z)
-                for mol in predict_molecules
-                for z in mol.get_atomic_numbers()
-            }
+            {int(z) for mol in predict_molecules for z in mol.get_atomic_numbers()}
             - known_elements
         )
         if unseen_elements:

@@ -7,4 +7,4 @@ testall:
 spacedb:
 	python maintenance/space_db.py
 format:
-	black src
+	black src tests

@@ -197,7 +197,6 @@ def test_local_test_batched(slatm_local_dataset):
     assert np.array_equal(actual, powers)
 
 
-
 def test_evaluate_models_uses_per_model_sigma():
     from nablachem.krr.krr import AutoKRR
 
@@ -272,12 +271,15 @@ def test_elemental_kernel_masks_cross_element_pairs():
     i.e. only same-element pairs contribute.
     """
     # atom features: rows are [H_mol0, C_mol0, H_mol1, C_mol1]
-    X = np.array([
-        [1.0, 0.0],   # H in mol 0
-        [0.0, 1.0],   # C in mol 0
-        [0.9, 0.1],   # H in mol 1
-        [0.1, 0.9],   # C in mol 1
-    ], dtype=float)
+    X = np.array(
+        [
+            [1.0, 0.0],  # H in mol 0
+            [0.0, 1.0],  # C in mol 0
+            [0.9, 0.1],  # H in mol 1
+            [0.1, 0.9],  # C in mol 1
+        ],
+        dtype=float,
+    )
     nuclear_charges = np.array([1, 6, 1, 6])
     counts = np.array([2, 2])
     sigma = 1.0
@@ -317,16 +319,22 @@ def test_elemental_kernel_masks_cross_element_pairs_holdout():
     K_test[0, i] must equal ( k(H_h, H_i) + k(C_h, C_i) ) / sqrt(self_h) / sqrt(self_i),
     i.e. only same-element pairs contribute.
     """
-    X_train = np.array([
-        [1.0, 0.0],  # H in mol0
-        [0.0, 1.0],  # C in mol0
-        [0.9, 0.1],  # H in mol1
-        [0.1, 0.9],  # C in mol1
-    ], dtype=float)
-    X_holdout = np.array([
-        [0.8, 0.2],  # H in holdout mol
-        [0.2, 0.8],  # C in holdout mol
-    ], dtype=float)
+    X_train = np.array(
+        [
+            [1.0, 0.0],  # H in mol0
+            [0.0, 1.0],  # C in mol0
+            [0.9, 0.1],  # H in mol1
+            [0.1, 0.9],  # C in mol1
+        ],
+        dtype=float,
+    )
+    X_holdout = np.array(
+        [
+            [0.8, 0.2],  # H in holdout mol
+            [0.2, 0.8],  # C in holdout mol
+        ],
+        dtype=float,
+    )
     train_charges = np.array([1, 6, 1, 6])
     holdout_charges = np.array([1, 6])
     train_counts = np.array([2, 2])
@@ -349,16 +357,24 @@ def test_elemental_kernel_masks_cross_element_pairs_holdout():
         np.sqrt(self_h) * np.sqrt(self_1)
     )
 
-    kmat = ElementalKernelMatrix(X_train, train_counts, kernel, nuclear_charges=train_charges)
-    K_test = kmat.compute_test_kernel_matrix(sigma, ntrain=2, X_batch=X_holdout, counts_batch=holdout_counts, nc_batch=holdout_charges)
+    kmat = ElementalKernelMatrix(
+        X_train, train_counts, kernel, nuclear_charges=train_charges
+    )
+    K_test = kmat.compute_test_kernel_matrix(
+        sigma,
+        ntrain=2,
+        X_batch=X_holdout,
+        counts_batch=holdout_counts,
+        nc_batch=holdout_charges,
+    )
 
     assert K_test.shape == (1, 2)
-    assert np.isclose(K_test[0, 0], expected_K_test_0), (
-        f"K_test[0,0]={K_test[0,0]:.6f} but expected {expected_K_test_0:.6f}"
-    )
-    assert np.isclose(K_test[0, 1], expected_K_test_1), (
-        f"K_test[0,1]={K_test[0,1]:.6f} but expected {expected_K_test_1:.6f}"
-    )
+    assert np.isclose(
+        K_test[0, 0], expected_K_test_0
+    ), f"K_test[0,0]={K_test[0,0]:.6f} but expected {expected_K_test_0:.6f}"
+    assert np.isclose(
+        K_test[0, 1], expected_K_test_1
+    ), f"K_test[0,1]={K_test[0,1]:.6f} but expected {expected_K_test_1:.6f}"
 
 
 # --- Blockwise local kernel matrix reference + tests --------------------------
@@ -385,8 +401,14 @@ def _reference_local_train_exact(X, counts, kernel_func, sigma, nuclear_charges=
 
 
 def _reference_local_test(
-    X_train, train_counts, X_batch, counts_batch, kernel_func, sigma,
-    train_charges=None, batch_charges=None,
+    X_train,
+    train_counts,
+    X_batch,
+    counts_batch,
+    kernel_func,
+    sigma,
+    train_charges=None,
+    batch_charges=None,
 ):
     train_counts = np.asarray(train_counts)
     counts_batch = np.asarray(counts_batch)
@@ -400,7 +422,9 @@ def _reference_local_test(
         z_batch = np.asarray(batch_charges)
         D2[z_batch[:, None] != z_train[None, :]] = np.inf
     K_atom = kernel_func.exact(np.sqrt(D2) / sigma)
-    K_test = _LocalKernelMatrix.aggregate_atomic_kernel(K_atom, counts_batch, train_counts)
+    K_test = _LocalKernelMatrix.aggregate_atomic_kernel(
+        K_atom, counts_batch, train_counts
+    )
 
     D2_tt = _LocalKernelMatrix._dist_squared(X_train)
     if train_charges is not None:
@@ -563,7 +587,9 @@ class TestLocalKernelMatrixBlockwise:
         K_got = ElementalKernelMatrix(
             X, counts, kf, nuclear_charges=charges
         ).compute_train_kernel_matrix_exact(sigma, len(counts))
-        K_ref = _reference_local_train_exact(X, counts, kf, sigma, nuclear_charges=charges)
+        K_ref = _reference_local_train_exact(
+            X, counts, kf, sigma, nuclear_charges=charges
+        )
 
         np.testing.assert_allclose(K_got, K_ref, **self.TOL)
 
@@ -588,8 +614,14 @@ class TestLocalKernelMatrixBlockwise:
             sigma, len(counts), X_test, counts_test, nc_batch=charges_test
         )
         K_ref = _reference_local_test(
-            X, counts, X_test, counts_test, kf, sigma,
-            train_charges=charges, batch_charges=charges_test,
+            X,
+            counts,
+            X_test,
+            counts_test,
+            kf,
+            sigma,
+            train_charges=charges,
+            batch_charges=charges_test,
         )
 
         np.testing.assert_allclose(K_got, K_ref, **self.TOL)
@@ -624,8 +656,14 @@ class TestLocalKernelMatrixBlockwise:
             sigma, len(counts), X_test, counts_test, nc_batch=charges_test
         )
         K_test_ref = _reference_local_test(
-            X, counts, X_test, counts_test, kf, sigma,
-            train_charges=charges, batch_charges=charges_test,
+            X,
+            counts,
+            X_test,
+            counts_test,
+            kf,
+            sigma,
+            train_charges=charges,
+            batch_charges=charges_test,
         )
         np.testing.assert_allclose(K_test_got, K_test_ref, **self.TOL)
 
@@ -741,9 +779,7 @@ def test_length_scale_elemental_matches_reference(seed, kernel_cls):
     # Only two elements → robust same-element sampling at every anchor.
     charges = rng.choice([1.0, 6.0], size=natoms)
 
-    kmat = ElementalKernelMatrix(
-        X, counts, kernel_cls(), nuclear_charges=charges
-    )
+    kmat = ElementalKernelMatrix(X, counts, kernel_cls(), nuclear_charges=charges)
     for anchor in [4, 8, 16]:
         got = kmat.length_scale(anchor)
         expected = _reference_length_scale(X, counts, anchor, charges=charges)

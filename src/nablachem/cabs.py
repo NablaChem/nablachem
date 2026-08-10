@@ -69,9 +69,7 @@ def form_basissets(mol, obs_basis, cabs_basis):
             return obs_basis[elem]
         return gto.basis.load(obs_basis, elem)
 
-    combined_basis = {
-        elem: _obs_shells(elem) + cabs_dict[elem] for elem in elements
-    }
+    combined_basis = {elem: _obs_shells(elem) + cabs_dict[elem] for elem in elements}
     mol_ri = mol.copy()
     mol_ri.basis = combined_basis
     mol_ri.build()

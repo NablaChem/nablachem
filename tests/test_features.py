@@ -135,6 +135,8 @@ def test_compatible_to_invariance(rep_name, mol_h2o, mol_hcn, mol_co2):
     rep_joint.build(_FakeDS([mol_h2o, mol_hcn, mol_co2]))
 
     rep_split = _rep_class_map[rep_name]()
-    rep_split.build(_FakeDS([mol_h2o]), compatible_to=[_FakeDS([mol_hcn]), _FakeDS([mol_co2])])
+    rep_split.build(
+        _FakeDS([mol_h2o]), compatible_to=[_FakeDS([mol_hcn]), _FakeDS([mol_co2])]
+    )
 
     np.testing.assert_array_equal(rep_split[0], rep_joint[0])

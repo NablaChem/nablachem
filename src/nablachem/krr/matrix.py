@@ -339,7 +339,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
 
             D2 = self._dist_squared(X_P)
             K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_P, z_P)
-            K[iP0:iP1, iP0:iP1] = self.aggregate_atomic_kernel(K_atom, counts_P, counts_P)
+            K[iP0:iP1, iP0:iP1] = self.aggregate_atomic_kernel(
+                K_atom, counts_P, counts_P
+            )
 
             for Q in range(P + 1, nbatches):
                 iQ0, iQ1 = int(batches[Q]), int(batches[Q + 1])
@@ -349,7 +351,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
                 counts_Q = counts_A[iQ0:iQ1]
 
                 D2 = self._dist_squared(X_Q, X_P)
-                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_P, z_Q)
+                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(
+                    z_P, z_Q
+                )
                 K_block = self.aggregate_atomic_kernel(K_atom, counts_P, counts_Q)
                 K[iP0:iP1, iQ0:iQ1] = K_block
                 K[iQ0:iQ1, iP0:iP1] = K_block.T
@@ -359,7 +363,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
         self._d_train_cache[(sigma, ntrain)] = d_train_sqrt
         return K
 
-    def compute_test_kernel_matrix(self, sigma, ntrain, X_batch, counts_batch, nc_batch=None):
+    def compute_test_kernel_matrix(
+        self, sigma, ntrain, X_batch, counts_batch, nc_batch=None
+    ):
         counts_A = np.asarray(self._train_counts[:ntrain])
         natoms_A = int(counts_A.sum())
         X_A = self._X[:natoms_A]
@@ -390,7 +396,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
                 counts_AQ = counts_A[iQ0:iQ1]
 
                 D2 = self._dist_squared(X_AQ, X_BP)
-                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(z_BP, z_AQ)
+                K_atom = self._kernel_func.exact(np.sqrt(D2) / sigma) * self._W(
+                    z_BP, z_AQ
+                )
                 K_test[iP0:iP1, iQ0:iQ1] = self.aggregate_atomic_kernel(
                     K_atom, counts_BP, counts_AQ
                 )
@@ -404,7 +412,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
                 z_i = z_A[atom_start : atom_start + count]
                 atoms_i = X_A[atom_start : atom_start + count]
                 d2 = self._dist_squared(atoms_i)
-                d_train[i] = (self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)).sum()
+                d_train[i] = (
+                    self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)
+                ).sum()
                 atom_start += count
             self._d_train_cache[cache_key] = np.sqrt(d_train)
         d_train_sqrt = self._d_train_cache[cache_key]
@@ -416,7 +426,9 @@ class AlchemicalKernelMatrix(_LocalKernelMatrix):
             z_i = z_B[atom_start : atom_start + count]
             atoms_i = X_B[atom_start : atom_start + count]
             d2 = self._dist_squared(atoms_i)
-            d_test[i] = (self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)).sum()
+            d_test[i] = (
+                self._kernel_func.exact(np.sqrt(d2) / sigma) * self._W(z_i, z_i)
+            ).sum()
             atom_start += count
         d_test_sqrt = np.sqrt(d_test)
 

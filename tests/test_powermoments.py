@@ -38,9 +38,7 @@ def _reference_build_power_moments(power_moments, Ds, atoms_per_mol, ncheby, gri
             for k in range(1, ncheby):
                 cum_moments[k, 1:] = np.cumsum(x**k)
 
-            select_indices = np.minimum(
-                np.searchsorted(x, grid, side="right"), len(x)
-            )
+            select_indices = np.minimum(np.searchsorted(x, grid, side="right"), len(x))
 
             power_moments[pair_idx, :, :] = cum_moments[:, select_indices]
             pair_idx += 1
@@ -119,13 +117,9 @@ class TestBuildPowerMoments:
             (25, 2, 8, 6),
         ],
     )
-    def test_matches_reference(
-        self, seed, power, nmols, atom_lo, atom_hi, nfeatures
-    ):
+    def test_matches_reference(self, seed, power, nmols, atom_lo, atom_hi, nfeatures):
         rng = np.random.default_rng(seed)
-        atoms_per_mol = rng.integers(
-            atom_lo, atom_hi + 1, size=nmols
-        ).astype(np.int64)
+        atoms_per_mol = rng.integers(atom_lo, atom_hi + 1, size=nmols).astype(np.int64)
         total_atoms = int(atoms_per_mol.sum())
         X = rng.uniform(size=(total_atoms, nfeatures))
 
