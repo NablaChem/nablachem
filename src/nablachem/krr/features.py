@@ -258,9 +258,10 @@ class FCHL19Local(_FCHL19):
 
 def _mulliken_weights(mol, mo: str) -> np.ndarray:
     """Per-atom Mulliken population of the HOMO or LUMO, summing to one."""
-    from tblite.interface import Calculator
+    if mo not in {"HOMO", "LUMO"}:
+        raise ValueError(f"mo must be 'HOMO' or 'LUMO', got {mo!r}")
 
-    charge = mol.info.get("charge", 0)
+    from tblite.interface import Calculator
     uhf = mol.info.get("spin_multiplicity", 1) - 1
     try:
         calc = Calculator(
