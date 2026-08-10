@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import ks_2samp, entropy, wasserstein_distance
+from scipy.stats import ks_2samp, entropy
 import re
 from collections import Counter
-from scipy.spatial.distance import jensenshannon
 from scipy.stats import entropy
 
 #1

@@ -1,7 +1,6 @@
 import os
 
 os.environ["OMP_NUM_THREADS"] = "1"
-import pyscf
 import pytest
 from nablachem.alchemy import MultiTaylor, Anygrad
 import pandas as pd

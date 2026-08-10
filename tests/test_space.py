@@ -1,4 +1,3 @@
-import pyparsing
 import pytest
 import nablachem.space as ncs
 import numpy as np
