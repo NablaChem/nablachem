@@ -94,6 +94,40 @@ def test_slice_invariance(rep_name, mol_h2o, mol_hcn, mol_co2):
     np.testing.assert_array_equal(alone_co2, together[2])
 
 
+class _Rows(features.BaseRepresenter):
+    """Local representation with one hand-picked row per atom."""
+
+    def compute(self, molecules: list) -> list:
+        return [np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]) for _ in molecules]
+
+
+def test_orbital_weighting_sums_weighted_rows(monkeypatch, mol_h2o):
+    monkeypatch.setattr(
+        features,
+        "_mulliken_weights",
+        lambda mol, mo: np.array([0.5, 0.25, 0.25]),
+    )
+    rep = features._OrbitalWeighted(_Rows(), "HOMO")
+    rep.build(_FakeDS([mol_h2o]))
+
+    np.testing.assert_allclose(rep[0], [0.75, 0.5])
+
+
+def test_orbital_weighting_rejects_global_representation(mol_h2o):
+    rep = features._OrbitalWeighted(features.SLATMGlobal(), "HOMO")
+    rep.build(_FakeDS([mol_h2o]))
+
+    with pytest.raises(ValueError, match="local representation"):
+        rep[0]
+
+
+def test_mulliken_weights_of_water_sit_on_oxygen(mol_h2o):
+    weights = features._mulliken_weights(mol_h2o, "HOMO")
+
+    assert weights.sum() == pytest.approx(1.0)
+    assert weights[0] > weights[1] + weights[2]  # the HOMO is an oxygen lone pair
+
+
 @pytest.mark.parametrize("rep_name", _available)
 def test_compatible_to_invariance(rep_name, mol_h2o, mol_hcn, mol_co2):
     """Feature vector must be identical whether the other molecule is in compatible_to or the same ds."""

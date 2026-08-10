@@ -256,6 +256,65 @@ class FCHL19Local(_FCHL19):
         super().__init__(local=True)
 
 
+def _mulliken_weights(mol, mo: str) -> np.ndarray:
+    """Per-atom Mulliken population of the HOMO or LUMO, summing to one."""
+    if mo not in {"HOMO", "LUMO"}:
+        raise ValueError(f"mo must be 'HOMO' or 'LUMO', got {mo!r}")
+
+    from tblite.interface import Calculator
+    charge = mol.info.get("charge", 0)
+    uhf = mol.info.get("spin_multiplicity", 1) - 1
+    try:
+        calc = Calculator(
+            "GFN2-xTB",
+            mol.get_atomic_numbers(),
+            mol.get_positions() * 1.8897259886,  # Angstrom to Bohr
+            charge=charge,
+            uhf=uhf,
+            logger=lambda _: None,
+        )
+        calc.set("save-integrals", 1)
+        res = calc.singlepoint()
+    except Exception as e:
+        raise RuntimeError(
+            f"GFN2-xTB failed for {mol.get_chemical_formula()} "
+            f"(charge={charge}, uhf={uhf}): {e}"
+        ) from e
+
+    occupied = np.where(res["orbital-occupations"] > 0.5)[0]
+    index = int(occupied[-1]) + (1 if mo == "LUMO" else 0)
+    coefficients = res["orbital-coefficients"][:, index]
+    populations = coefficients * (res["overlap-matrix"] @ coefficients)
+
+    shell_of_orbital = np.asarray(calc.get("orbital-map"), dtype=int)
+    atom_of_shell = np.asarray(calc.get("shell-map"), dtype=int)
+    weights = np.zeros(len(mol))
+    np.add.at(weights, atom_of_shell[shell_of_orbital], populations)
+    return weights
+
+
+class _OrbitalWeighted(BaseRepresenter):
+    """Turns a local representation global by weighting atoms with their MO population."""
+
+    def __init__(self, inner: BaseRepresenter, mo: str):
+        self._inner = inner
+        self._mo = mo
+
+    def _prepare(self, molecules: list) -> None:
+        self._inner._prepare(molecules)
+
+    def compute(self, molecules: list) -> list:
+        reps = []
+        for rep, mol in zip(self._inner.compute(molecules), molecules):
+            if rep.ndim != 2:
+                raise ValueError(
+                    f"orbital weighting needs a local representation, got {rep.ndim}D"
+                )
+            weights = _mulliken_weights(mol, self._mo)
+            reps.append((rep * weights[:, np.newaxis]).sum(axis=0))
+        return reps
+
+
 def list_available():
     """Return string names of all BaseRepresenter subclasses that don't start with underscore."""
     current_module = inspect.getmembers(

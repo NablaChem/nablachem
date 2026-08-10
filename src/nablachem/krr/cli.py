@@ -94,6 +94,14 @@ and the remaining molecules used as holdout/test data.
     help="JSON file with per-element-pair weights {\"Z1,Z2\": float} (Z1<=Z2). Requires local representation.",
 )
 @click.option(
+    "--owl",
+    default=None,
+    type=click.Choice(["HOMO", "LUMO"]),
+    help="Orbital-weighted learning: weight every atom of a local representation by "
+    "its Mulliken population in the given GFN2-xTB orbital, then sum into a "
+    "global representation.",
+)
+@click.option(
     "--archive", default="archive.json", help="Output file for KRR archive data"
 )
 @click.option(
@@ -123,6 +131,7 @@ def main(
     detrending,
     elemental,
     alchemical,
+    owl,
     holdout_residuals,
     archive,
     seed,
@@ -185,6 +194,9 @@ def main(
             )
 
         rep = rep_class_map[representation_name]()
+
+    if owl is not None:
+        rep = features._OrbitalWeighted(rep, owl)
     rep.build(ds)
     info("Prepared representation", first_entry_shape=ds.representations[0].shape)
 
@@ -230,6 +242,7 @@ def main(
         "detrending": list(detrending),
         "elemental": elemental,
         "alchemical": alchemical,
+        "owl": owl,
         "file_hash": hash,
         "file_path": jsonl_path,
         "column_name": column_name,
