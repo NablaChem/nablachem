@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nablachem"
-version = "26.5"
+version = "26.8"
 description = "Easy access to research code."
 authors = ["von Rudorff, Guido Falk <vonrudorff@uni-kassel.de>"]
 license = "LGPL"
@@ -31,7 +31,7 @@ pyscf = "^2.12.1"
 streamlit = ">=1.30.0"
 structlog = ">=24.0.0"
 pbr = "^7.0.3"
-setuptools = "^82.0.0"
+setuptools = "^83.0.0"
 tzdata = "^2025.3"
 psutil = "^7.2.2"
 mace-torch = "^0.3.15"
