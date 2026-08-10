@@ -24,6 +24,7 @@ def validate_metadata(datasets: dict):
         "kernel",
         "detrending",
         "elemental",
+        "owl",
         "file_hash",
         "column_name",
         "limit",
