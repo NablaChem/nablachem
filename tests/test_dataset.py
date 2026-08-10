@@ -160,7 +160,9 @@ def test_reservoir_mode_a_limit_equals_total(jsonl_file):
 
 
 def test_reservoir_mode_a_limit_more_than_total(jsonl_file):
-    df = DataSet._reservoir_sample(jsonl_file, N_TOTAL + 100, None, batch_size=BATCH_SIZE)
+    df = DataSet._reservoir_sample(
+        jsonl_file, N_TOTAL + 100, None, batch_size=BATCH_SIZE
+    )
     assert len(df) == N_TOTAL
 
 
@@ -323,9 +325,7 @@ def test_dataset_mode_d_select_c_molecules_have_hydrogen(jsonl_file):
 
 
 def test_dataset_mode_d_shuffled(jsonl_file):
-    label_sequences = [
-        tuple(DataSet(jsonl_file, "energy").labels) for _ in range(5)
-    ]
+    label_sequences = [tuple(DataSet(jsonl_file, "energy").labels) for _ in range(5)]
     assert len(set(label_sequences)) > 1
 
 
@@ -457,9 +457,9 @@ def test_reservoir_approximate_uniformity(jsonl_file):
             counts[idx] += 1
     expected = n_trials * limit / N_TOTAL
     for idx, count in counts.items():
-        assert expected * 0.5 <= count <= expected * 1.5, (
-            f"idx {idx}: count {count}, expected ~{expected:.0f}"
-        )
+        assert (
+            expected * 0.5 <= count <= expected * 1.5
+        ), f"idx {idx}: count {count}, expected ~{expected:.0f}"
 
 
 # --- charge and spin multiplicity ---

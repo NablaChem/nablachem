@@ -1,5 +1,4 @@
 import numpy as np
-from . import dataset
 import inspect
 
 
@@ -262,6 +261,7 @@ def _mulliken_weights(mol, mo: str) -> np.ndarray:
         raise ValueError(f"mo must be 'HOMO' or 'LUMO', got {mo!r}")
 
     from tblite.interface import Calculator
+
     charge = mol.info.get("charge", 0)
     uhf = mol.info.get("spin_multiplicity", 1) - 1
     try:

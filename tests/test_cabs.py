@@ -92,15 +92,16 @@ def test_dz_alchemy_co_to_n2():
 
     # LHS: CO with dZ raising both nuclei to Z=7 (O: 8 -> 7 is -1, C: 6 -> 7 is +1)
     co_atom = f"O {geom[0]}; C {geom[1]}"
-    e_hf_dz, e_singles_dz = CABS_singles_RHF(
-        co_atom, OBS_BASIS, CABS_GBS, dZ=(-1, +1)
-    )
+    e_hf_dz, e_singles_dz = CABS_singles_RHF(co_atom, OBS_BASIS, CABS_GBS, dZ=(-1, +1))
 
     # RHS: genuine N2 (Z=7,7) but in CO's asymmetric basis: O functions on the
     # atom-1 center, C functions on the atom-2 center (OBS and CABS alike).
     cabs = resolve_basis(CABS_GBS)
     ref_atom = f"N1 {geom[0]}; N2 {geom[1]}"
-    ref_obs = {"N1": gto.basis.load(OBS_BASIS, "O"), "N2": gto.basis.load(OBS_BASIS, "C")}
+    ref_obs = {
+        "N1": gto.basis.load(OBS_BASIS, "O"),
+        "N2": gto.basis.load(OBS_BASIS, "C"),
+    }
     ref_cabs = {"N1": cabs["O"], "N2": cabs["C"]}
     e_hf_ref, e_singles_ref = CABS_singles_RHF(ref_atom, ref_obs, ref_cabs)
 

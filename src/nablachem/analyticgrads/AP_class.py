@@ -5,8 +5,6 @@
 import numpy as np
 from pyscf import lib
 from pyscf import gto
-import pyscf
-import pyscf.hessian
 
 from pyscf.hessian.rhf import gen_vind
 

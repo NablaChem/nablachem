@@ -1,6 +1,5 @@
 import numpy as np
 import numba
-from copy import deepcopy
 
 root2, ipi = 2**0.5, np.pi * 1j
 half_rootpi = (np.pi**0.5) / 2

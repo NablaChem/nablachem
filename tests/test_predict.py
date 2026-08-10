@@ -249,9 +249,7 @@ def test_appended_predictions_do_not_change_holdout_metrics():
     with_predict = _run(X_pred, y_pred, n_predict=2)
 
     # Real-holdout residuals and metrics must be identical.
-    assert np.allclose(
-        baseline.holdout_residuals[8], with_predict.holdout_residuals[8]
-    )
+    assert np.allclose(baseline.holdout_residuals[8], with_predict.holdout_residuals[8])
     assert len(with_predict.holdout_residuals[8]) == N_REAL_HOLDOUT
     assert baseline.results[8]["test_rmse"] == pytest.approx(
         with_predict.results[8]["test_rmse"]
@@ -318,7 +316,7 @@ def test_evaluate_models_real_holdout_and_predict_tail_manual():
     assert len(krr.holdout_residuals[ntrain]) == N_REAL_HOLDOUT
     assert np.allclose(krr.holdout_residuals[ntrain], expected_real_resid)
     assert krr.results[ntrain]["test_rmse"] == pytest.approx(
-        float(np.sqrt(np.mean(expected_real_resid ** 2)))
+        float(np.sqrt(np.mean(expected_real_resid**2)))
     )
     assert krr.results[ntrain]["test_mae"] == pytest.approx(
         float(np.mean(np.abs(expected_real_resid)))

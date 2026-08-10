@@ -159,7 +159,6 @@ def JSONL_from_GDB_BSIE(outfile):
     import tarfile
     import pandas as pd
     import numpy as np
-    import json
     import gzip
     import os
 
