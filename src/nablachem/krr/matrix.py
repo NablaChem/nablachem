@@ -37,7 +37,14 @@ class KernelMatrix:
             "Subclasses must implement compute_train_kernel_matrix"
         )
 
-    def compute_test_kernel_matrix(self, sigma: float, ntrain: int) -> np.ndarray:
+    def compute_test_kernel_matrix(
+        self,
+        sigma: float,
+        ntrain: int,
+        X_batch: np.ndarray,
+        counts_batch: np.ndarray = None,
+        nc_batch: np.ndarray = None,
+    ) -> np.ndarray:
         """Compute test kernel matrix for given sigma and training size"""
         raise NotImplementedError(
             "Subclasses must implement compute_test_kernel_matrix"
