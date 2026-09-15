@@ -1,14 +1,33 @@
 {
+    "__reference_flags__": [
+        "--limit",
+        "--mincount",
+        "--maxcount",
+        "--select",
+        "--detrending",
+        "--holdout-residuals",
+        "--elemental",
+        "--no-elemental",
+        "--alchemical",
+        "--owl",
+        "--archive",
+        "--seed",
+        "--predict"
+    ],
     "__reference_global_representations__": [
         "FCHL19Global",
-        "MACEGlobal",
+        "MACEMPGlobal",
+        "MACEOFFGlobal",
+        "MACEOMolGlobal",
         "MBDFGlobal",
         "SLATMGlobal",
         "cMBDFGlobal"
     ],
     "__reference_local_representations__": [
         "FCHL19Local",
-        "MACELocal",
+        "MACEMPLocal",
+        "MACEOFFLocal",
+        "MACEOMolLocal",
         "MBDFLocal",
         "SLATMLocal",
         "cMBDFLocal"
@@ -59,12 +78,7 @@
                 "WuC4",
                 "WuC6"
             ],
-            "properties": [
-                "smiles",
-                "refcode",
-                "xyz",
-                "total_charge"
-            ],
+            "properties": [],
             "representations": []
         },
         "combinations": [

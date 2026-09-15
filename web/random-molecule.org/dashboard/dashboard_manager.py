@@ -5,11 +5,13 @@ import gzip
 import hashlib
 import uuid
 import sys
+import re
+import pandas as pd
 from nablachem.krr import features, kernels
-
-ARCHIVE_DIR = "Archieve"
-COMBINATIONS_DB = "combinations_db.json"
-RESULTS_DB = "results_db.json"
+                                
+ARCHIVE_DIR = "archive"
+DATASETS_DIR = "datasets"
+RESULTS_DATAFRAME = "results_dataframe.parquet"
 
 def get_file_hash(filepath):
     sha256_hash = hashlib.sha256()
@@ -35,28 +37,33 @@ def extract_properties(filepath):
         print(f"Error reading {filepath}: {e}", file=sys.stderr)
     return properties
 
+def is_power_of_two(n):
+    return (n != 0) and (n & (n - 1) == 0)
+
 def main():
-    if not os.path.exists(ARCHIVE_DIR):
-        print(f"Directory {ARCHIVE_DIR} does not exist. Please create it and add your dataset files.", file=sys.stderr)
+    if not os.path.exists(DATASETS_DIR):
+        os.makedirs(DATASETS_DIR)
+        print(f"Directory {DATASETS_DIR} created. Please add your dataset files there.", file=sys.stderr)
         sys.exit(1)
+        
+    if not os.path.exists(ARCHIVE_DIR):
+        os.makedirs(ARCHIVE_DIR)
 
     # 1. Discover datasets and properties
-    dataset_files = glob.glob(os.path.join(ARCHIVE_DIR, "*.jsonl")) + \
-                    glob.glob(os.path.join(ARCHIVE_DIR, "*.jsonl.gz"))
+    dataset_files = glob.glob(os.path.join(DATASETS_DIR, "*.jsonl")) + \
+                    glob.glob(os.path.join(DATASETS_DIR, "*.jsonl.gz"))
     
     datasets = {}
     for df in dataset_files:
         basename = os.path.basename(df)
-        dataset_name = basename.split('.jsonl')[0]
-        
-        # Create a subdirectory for the processed results
-        dataset_dir = os.path.join(ARCHIVE_DIR, dataset_name)
-        os.makedirs(dataset_dir, exist_ok=True)
+        if basename.endswith('.jsonl.gz'):
+            dataset_name = basename[:-9]
+        elif basename.endswith('.jsonl'):
+            dataset_name = basename[:-6]
         
         props = extract_properties(df)
         datasets[dataset_name] = {
             "file": df,
-            "dir": dataset_dir,
             "properties": props
         }
     
@@ -95,8 +102,22 @@ def main():
     if "combinations" not in exclusions:
         exclusions["combinations"] = default_exclusions["combinations"]
 
-    # Always put references at the top of the file
     settings = {
+        "__reference_flags__": [
+            "--limit",
+            "--mincount",
+            "--maxcount",
+            "--select",
+            "--detrending",
+            "--holdout-residuals",
+            "--elemental",
+            "--no-elemental",
+            "--alchemical",
+            "--owl",
+            "--archive",
+            "--seed",
+            "--predict"
+        ],
         "__reference_global_representations__": global_reps,
         "__reference_local_representations__": local_reps,
         "__reference_kernels__": available_kernels,
@@ -105,14 +126,12 @@ def main():
 
     settings_changed = False
     
-    # Check if reference lists or format changed
     if old_settings.get("__reference_global_representations__") != global_reps or \
        old_settings.get("__reference_local_representations__") != local_reps or \
        old_settings.get("__reference_kernels__") != available_kernels or \
        "datasets" in old_settings:
         settings_changed = True
 
-    # Always write out the file to enforce the key ordering
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=4)
 
@@ -142,104 +161,147 @@ def main():
                 return True
         return False
 
+    detrending_opts = ["atomic", "pairs", "charge", "spin", ""]
+    owl_opts_global = [""]
+    elemental_opts_local = [True, False]
+    elemental_opts_global = [False]
+    seed_opts = [1, 2, 3, 4, 5]
+
     for ds_name, ds_info in datasets.items():
         all_props = ds_info["properties"]
-
         for prop in all_props:
             if prop in excluded_props: continue
+            
+            prop_lower = prop.lower()
+            current_owl_opts_local = [""]
+            if re.search(r'homo|gap', prop_lower):
+                current_owl_opts_local.append("HOMO")
+            if re.search(r'lumo|gap', prop_lower):
+                current_owl_opts_local.append("LUMO")
             
             reps_to_process = [(r, False) for r in global_reps] + [(r, True) for r in local_reps]
             
             for rep, is_local in reps_to_process:
                 if rep in excluded_reps: continue
-                
                 for kernel in available_kernels:
                     if kernel in excluded_kernels: continue
-                    
-                    if is_combination_excluded(ds_name, prop, rep, kernel):
-                        continue
+                    if is_combination_excluded(ds_name, prop, rep, kernel): continue
                         
-                    combo = {
-                        "dataset": ds_name,
-                        "property": prop,
+                    for det in detrending_opts:
+                        for owl in (current_owl_opts_local if is_local else owl_opts_global):
+                            for ele in (elemental_opts_local if is_local else elemental_opts_global):
+                                for seed in seed_opts:
+                                    combo = {
+                                        "dataset": ds_name,
+                                        "property": prop,
+                                        "representation": rep,
+                                        "kernel": kernel,
+                                        "detrending": det,
+                                        "owl": owl,
+                                        "elemental": ele,
+                                        "seed": seed,
+                                        "is_local": is_local
+                                    }
+                                    all_combinations.append(combo)
+    # 5. Build Pandas DataFrame and keep existing metadata
+    data_rows = []
+    result_files = glob.glob(os.path.join(ARCHIVE_DIR, "**", "*.json"), recursive=True)
+    completed_runs = []
+    
+    for rf in result_files:
+        try:
+            with open(rf, 'r') as f:
+                data = json.load(f)
+                meta = data.get("metadata", {})
+                lc = data.get("learning_curve", [])
+                
+                rep = meta.get("representation")
+                kernel = meta.get("kernel")
+                col_name = meta.get("column_name")
+                dataset = meta.get("dataset")
+                
+                if "detrending" in meta:
+                    det_list = meta["detrending"]
+                    det = det_list[0] if det_list else ""
+                else:
+                    if meta.get("detrend_atomic"): det = "atomic"
+                    elif meta.get("detrend_pairs"): det = "pairs"
+                    else: det = "atomic"
+                    
+                owl = meta.get("owl", "")
+                if owl is None: owl = ""
+                
+                ele = meta.get("elemental", False)
+                seed = meta.get("seed", -1)
+                
+                file_hash = get_file_hash(rf)
+                
+                if rep and kernel and col_name and dataset:
+                    completed_runs.append({
+                        "dataset": dataset,
+                        "property": col_name,
                         "representation": rep,
                         "kernel": kernel,
-                        "is_local": is_local
-                    }
-                    all_combinations.append(combo)
-    
-    with open(COMBINATIONS_DB, 'w') as f:
-        json.dump(all_combinations, f, indent=2)
-
-    # 4. Scan existing results and rename them to hash if needed
-    completed_runs = []
-    for ds_name, ds_info in datasets.items():
-        result_files = glob.glob(os.path.join(ds_info["dir"], "*.json"))
-        for rf in result_files:
-            file_hash = get_file_hash(rf)
-            expected_name = f"{file_hash}.json"
-            expected_path = os.path.join(ds_info["dir"], expected_name)
-            
-            if rf != expected_path:
-                try:
-                    os.rename(rf, expected_path)
-                    rf = expected_path
-                except Exception as e:
-                    print(f"Failed to rename {rf} to {expected_name}: {e}", file=sys.stderr)
-                    continue
-            
-            # Read metadata
-            try:
-                with open(rf, 'r') as f:
-                    data = json.load(f)
-                    metadata = data.get("metadata", {})
+                        "detrending": det,
+                        "owl": owl,
+                        "elemental": ele,
+                        "seed": seed,
+                        "hash": file_hash,
+                        "file": rf
+                    })
                     
-                    rep = metadata.get("representation")
-                    kernel = metadata.get("kernel")
-                    prop = metadata.get("column_name")
-                    
-                    if rep and kernel and prop:
-                        completed_runs.append({
-                            "dataset": ds_name,
-                            "property": prop,
-                            "representation": rep,
-                            "kernel": kernel,
-                            "hash": file_hash,
-                            "file": rf
-                        })
-            except Exception as e:
-                print(f"Failed to read metadata from {rf}: {e}", file=sys.stderr)
+                    for step in lc:
+                        ntrain = step.get('ntrain', 0)
+                        if is_power_of_two(ntrain) and ntrain <= 20000:
+                            data_rows.append({
+                                'dataset': dataset,
+                                'column_name': col_name,
+                                'representation': rep,
+                                'kernel': kernel,
+                                'detrending': det,
+                                'owl': owl,
+                                'elemental': ele,
+                                'seed': seed,
+                                'ntrain': ntrain,
+                                'test_mae': step.get('test_mae'),
+                                'validation_mae': step.get('validation_mae', step.get('test_mae')),
+                                'uid': meta.get('uid', str(uuid.uuid4())),
+                                'hash': file_hash
+                            })
+        except Exception as e:
+            print(f"Error parsing {rf}: {e}", file=sys.stderr)
 
-    with open(RESULTS_DB, 'w') as f:
-        json.dump(completed_runs, f, indent=2)
+    df = pd.DataFrame(data_rows)
+    if not df.empty:
+        df.to_parquet(RESULTS_DATAFRAME)
 
-    # 5. Diff combinations vs completed runs
-    # Create a dict for fast lookup of completed runs count
-    completed_counts = {}
+    # 6. Diff combinations vs completed runs
+    completed_tuples = set()
     for run in completed_runs:
-        combo_tuple = (run["dataset"], run["property"], run["representation"], run["kernel"])
-        completed_counts[combo_tuple] = completed_counts.get(combo_tuple, 0) + 1
+        combo_tuple = (run["dataset"], run["property"], run["representation"], run["kernel"], run["detrending"], run["owl"], run["elemental"], run["seed"])
+        completed_tuples.add(combo_tuple)
 
     missing_commands = []
     for combo in all_combinations:
-        combo_tuple = (combo["dataset"], combo["property"], combo["representation"], combo["kernel"])
-        existing_runs = completed_counts.get(combo_tuple, 0)
-        runs_needed = max(0, 5 - existing_runs)
-        
-        for _ in range(runs_needed):
+        combo_tuple = (combo["dataset"], combo["property"], combo["representation"], combo["kernel"], combo["detrending"], combo["owl"], combo["elemental"], combo["seed"])
+        if combo_tuple not in completed_tuples:
             dataset_file = datasets[combo["dataset"]]["file"]
-            dataset_dir = datasets[combo["dataset"]]["dir"]
+            file_hash = uuid.uuid4().hex
+            sub_dir = file_hash[:2]
+            temp_filename = f"{file_hash}.json"
+            temp_filepath = os.path.join(ARCHIVE_DIR, sub_dir, temp_filename)
+            os.makedirs(os.path.join(ARCHIVE_DIR, sub_dir), exist_ok=True)
             
-            # Generate a temporary file name for this run
-            temp_filename = f"temp_run_{uuid.uuid4().hex[:8]}.json"
-            temp_filepath = os.path.join(dataset_dir, temp_filename)
+            owl_flag = f"--owl {combo['owl']} " if combo['owl'] else ""
+            detrend_flag = f"--detrending {combo['detrending']} " if combo['detrending'] else "--detrending '' "
+            elemental_flag = "--elemental " if combo['elemental'] else "--no-elemental "
+            if not combo['is_local']:
+                elemental_flag = ""
+            seed_flag = f"--seed {combo['seed']} "
             
-            # Add --no-detrend-atomic flag for local representations
-            detrend_flag = "--no-detrend-atomic " if combo.get("is_local", False) else ""
-            cmd = f"nc-krr {dataset_file} '{combo['property']}' {combo['representation']} {combo['kernel']} {detrend_flag}--archive {temp_filepath}"
+            cmd = f"nc-krr {dataset_file} '{combo['property']}' {combo['representation']} {combo['kernel']} {detrend_flag}{elemental_flag}{owl_flag}{seed_flag}--archive {temp_filepath}"
             missing_commands.append(cmd)
 
-    # 6. Output missing commands
     output_file = "missing_commands.txt"
     if missing_commands:
         print(f"# Missing {len(missing_commands)} combinations. Saving commands to {output_file}...")
@@ -249,7 +311,6 @@ def main():
         print(f"# Successfully generated {output_file}")
     else:
         print("# All combinations are complete!")
-        # If the file exists from a previous run but we're complete, clear it out.
         if os.path.exists(output_file):
             with open(output_file, "w") as f:
                 f.write("")
