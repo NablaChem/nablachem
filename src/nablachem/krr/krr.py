@@ -24,7 +24,11 @@ class AutoKRR:
         elemental: bool = False,
         alchemical_weights: dict | None = None,
         seed: int = -1,
+        cv_metric: str = "rmse",
     ) -> None:
+        if cv_metric not in ("rmse", "mae"):
+            utils.error("Unknown cv metric", cv_metric=cv_metric)
+        self._cv_metric = cv_metric
         if seed >= 0:
             np.random.seed(seed)
             utils.info("Random seed set", seed=seed)
@@ -383,14 +387,14 @@ class AutoKRR:
                 split_results[lam_idx]["train_rmse"].append(rmse_train)
                 split_results[lam_idx]["train_mae"].append(mae_train)
 
-                res = split_results[lam_idx]["rmse"]
+                res = split_results[lam_idx][self._cv_metric]
                 if len(res) > 5:
                     one = np.median(res[::2])
                     two = np.median(res[1::2])
                     if abs(one - two) / np.median(res) < 5e-2:
                         converged[lam_idx] = True
 
-        best_rmse, best_mae, best_lam = np.inf, None, None
+        best_score, best_rmse, best_mae, best_lam = np.inf, None, None, None
         for lam_idx, lam in enumerate(lam_grid):
             res = split_results[lam_idx]
             split_rmse = res["rmse"]
@@ -415,7 +419,9 @@ class AutoKRR:
 
             avg_rmse = np.median(split_rmse)
             avg_mae = np.median(split_mae)
-            if avg_rmse < best_rmse:
+            score = avg_mae if self._cv_metric == "mae" else avg_rmse
+            if score < best_score:
+                best_score = score
                 best_rmse = avg_rmse
                 best_mae = avg_mae
                 best_lam = lam
@@ -432,7 +438,8 @@ class AutoKRR:
         # cholesky updates
         # condition numbers could be estimated without full eigenvalue decomposition
         opt_start = time.time()
-        best_params, best_val_rmse, best_val_mae = None, np.inf, None
+        best_params, best_val_rmse, best_val_mae = None, None, None
+        best_score = np.inf
 
         # Loop: sigma outer, splits inner
         factors, lam_grid = self.get_hyperparameter_grid(ntrain)
@@ -467,8 +474,10 @@ class AutoKRR:
                 if run:
                     avg_rmse, avg_mae, lam = run
                 else:
-                    break
-                if avg_rmse < best_val_rmse:
+                    continue
+                score = avg_mae if self._cv_metric == "mae" else avg_rmse
+                if score < best_score:
+                    best_score = score
                     best_val_rmse = avg_rmse
                     best_val_mae = avg_mae
                     best_params = {"sigma": sigma, "lambda": lam}

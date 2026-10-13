@@ -119,6 +119,12 @@ and the remaining molecules used as holdout/test data.
     "appended as an extended holdout and predicted with the largest trained model; "
     "a 'property' column is written back into the file.",
 )
+@click.option(
+    "--cv-metric",
+    default="RMSE",
+    type=click.Choice(["RMSE", "MAE"], case_sensitive=False),
+    help="Validation metric used for hyperparameter selection in cross-validation",
+)
 def main(
     jsonl_path,
     column_name,
@@ -136,6 +142,7 @@ def main(
     archive,
     seed,
     predict_path,
+    cv_metric,
 ):
     info("Detrending terms", terms=list(detrending) or "none")
 
@@ -244,6 +251,7 @@ def main(
         elemental=elemental,
         alchemical_weights=alchemical_weights,
         seed=seed,
+        cv_metric=cv_metric.lower(),
     )
     metadata = {
         "representation": representation_name,
@@ -258,6 +266,7 @@ def main(
         "limit": limit,
         "select": select,
         "seed": seed,
+        "cv_metric": cv_metric.upper(),
     }
     autokrr.store_archive(archive, metadata)
 
