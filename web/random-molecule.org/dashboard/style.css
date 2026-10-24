@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap');
+
+#MainMenu, footer, header {
+    visibility: hidden;
+}
+
+.block-container {
+    padding-top: 0;
+}
+
+.stApp {
+    background-color: #F8F9FA !important;
+}
+
+/* Apply Nunito to all standard text elements without overriding icon spans */
+html, body, p, h1, h2, h3, h4, h5, h6, label {
+    font-family: 'Nunito', sans-serif !important;
+    color: #202124 !important;
+}
+
+div {
+    font-family: 'Nunito', sans-serif;
+    color: #202124;
+}
+
+/* Explicitly restore the Material Icons font family */
+span.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded' !important;
+}
+
+/* --- Container Card Styling --- */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+    border: 1px solid #e6e6e6;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Style multi-select and selectbox focus borders and tags with your palette */
+div[data-baseweb="select"] > div:hover,
+div[data-baseweb="select"] > div:focus-within {
+    border-color: #1F3664 !important;
+}
+
+/* Multiselect tag pills */
+span[data-baseweb="tag"] {
+    background-color: #1F3664 !important;
+    color: #FFFFFF !important;
+}
