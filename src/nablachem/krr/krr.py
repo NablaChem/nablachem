@@ -26,9 +26,8 @@ class AutoKRR:
         seed: int = -1,
         loss_func: str = "rmse",
     ) -> None:
-        if loss_func not in {"rmse", "mae"}:
-            raise ValueError("loss_func must be either 'rmse' or 'mae'")
-
+        if loss_func not in ("rmse", "mae"):
+            utils.error("Unknown loss function", loss_func=loss_func)
         if seed >= 0:
             np.random.seed(seed)
             utils.info("Random seed set", seed=seed)
@@ -404,7 +403,7 @@ class AutoKRR:
                 mae_train = np.abs(pred_train - y_shuf[:-validation]).mean()
                 split_results[lam_idx]["train_rmse"].append(rmse_train)
                 split_results[lam_idx]["train_mae"].append(mae_train)
-                
+
                 res = split_results[lam_idx][self._loss_func]
                 if len(res) > 5:
                     one = np.median(res[::2])
@@ -414,7 +413,7 @@ class AutoKRR:
                     if abs(one - two) / scale < 5e-2:
                         converged[lam_idx] = True
 
-        best_rmse, best_mae, best_lam = np.inf, np.inf, None
+        best_score, best_rmse, best_mae, best_lam = np.inf, None, None, None
         for lam_idx, lam in enumerate(lam_grid):
             res = split_results[lam_idx]
             split_rmse = res["rmse"]
@@ -437,19 +436,14 @@ class AutoKRR:
                 }
             )
 
-            avg_rmse = float(np.median(split_rmse))
-            avg_mae = float(np.median(split_mae))
-            
-            if self._loss_func == "rmse":
-                if avg_rmse < best_rmse:
-                    best_rmse = avg_rmse
-                    best_mae = avg_mae
-                    best_lam = lam
-            else:
-                if avg_mae < best_mae:
-                    best_rmse = avg_rmse
-                    best_mae = avg_mae
-                    best_lam = lam
+            avg_rmse = np.median(split_rmse)
+            avg_mae = np.median(split_mae)
+            score = avg_mae if self._loss_func == "mae" else avg_rmse
+            if score < best_score:
+                best_score = score
+                best_rmse = avg_rmse
+                best_mae = avg_mae
+                best_lam = lam
 
         if best_lam is None:
             return
@@ -463,7 +457,8 @@ class AutoKRR:
         # cholesky updates
         # condition numbers could be estimated without full eigenvalue decomposition
         opt_start = time.time()
-        best_params, best_val_rmse, best_val_mae = None, np.inf, np.inf
+        best_params, best_val_rmse, best_val_mae = None, None, None
+        best_score = np.inf
 
         # Loop: sigma outer, splits inner
         factors, lam_grid = self.get_hyperparameter_grid(ntrain)
@@ -498,13 +493,10 @@ class AutoKRR:
                 if run:
                     avg_rmse, avg_mae, lam = run
                 else:
-                    break
-                if self._loss_func == "rmse":
-                    better = avg_rmse < best_val_rmse
-                else:
-                    better = avg_mae < best_val_mae
-
-                if better:
+                    continue
+                score = avg_mae if self._loss_func == "mae" else avg_rmse
+                if score < best_score:
+                    best_score = score
                     best_val_rmse = avg_rmse
                     best_val_mae = avg_mae
                     best_params = {"sigma": sigma, "lambda": lam}
