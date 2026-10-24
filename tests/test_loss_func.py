@@ -51,12 +51,12 @@ def _run(**kwargs):
 
 
 def test_default_is_rmse():
-    assert _run().results == _run(cv_metric="rmse").results
+    assert _run().results == _run(loss_func="rmse").results
 
 
 @pytest.mark.parametrize("metric", ["rmse", "mae"])
 def test_selection_is_argmin_of_metric(metric):
-    krr = _run(cv_metric=metric)
+    krr = _run(loss_func=metric)
     for ntrain in (32, 64):
         entries = [e for e in krr._archive["hyperopt"] if e["ntrain"] == ntrain]
         best = min(entries, key=lambda e: np.median(e[f"val_{metric}"]))
@@ -71,4 +71,4 @@ def test_selection_is_argmin_of_metric(metric):
 
 def test_unknown_metric_errors():
     with pytest.raises(SystemExit):
-        _run(cv_metric="foo")
+        _run(loss_func="foo")

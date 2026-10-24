@@ -24,11 +24,10 @@ class AutoKRR:
         elemental: bool = False,
         alchemical_weights: dict | None = None,
         seed: int = -1,
-        cv_metric: str = "rmse",
+        loss_func: str = "rmse",
     ) -> None:
-        if cv_metric not in ("rmse", "mae"):
-            utils.error("Unknown cv metric", cv_metric=cv_metric)
-        self._cv_metric = cv_metric
+        if loss_func not in ("rmse", "mae"):
+            utils.error("Unknown loss function", loss_func=loss_func)
         if seed >= 0:
             np.random.seed(seed)
             utils.info("Random seed set", seed=seed)
@@ -39,6 +38,7 @@ class AutoKRR:
         self._detrending = set(detrending)
         self._elemental = elemental
         self._alchemical_weights = alchemical_weights
+        self._loss_func = loss_func
 
         self._create_holdout_split(elemental, alchemical=alchemical_weights is not None)
 
@@ -76,7 +76,7 @@ class AutoKRR:
                 utils.error("--alchemical is not supported for global representations")
             self._kernel_matrix = matrix.GlobalKernelMatrix(self._X_train, kernel_func)
 
-        last_rmse = None
+        last_loss = None
         last_size = None
         best_cases = {}
 
@@ -96,22 +96,39 @@ class AutoKRR:
             best_cases[ntrain] = best_parameters
 
             improvement = {}
-            if last_rmse is not None:
+            if self._loss_func == "rmse":
+                current_loss = best_val_rmse
+            else:
+                current_loss = best_val_mae
+
+            if (
+                last_loss is not None
+                and last_size is not None
+                and current_loss > 0
+                and last_loss > 0
+            ):
                 improvement["validation_slope"] = float(
-                    np.log(best_val_rmse / last_rmse) / np.log(ntrain / last_size)
+                    np.log(current_loss / last_loss) / np.log(ntrain / last_size)
                 )
             else:
                 improvement["validation_slope"] = None
+            if self._loss_func == "rmse":
+                utils.info(
+                    "Training size completed",
+                    ntrain=ntrain,
+                    validation_rmse=float(best_val_rmse),
+                    **improvement,
+                )
+            else:
+                utils.info(
+                    "Training size completed",
+                    ntrain=ntrain,
+                    validation_mae=float(best_val_mae),
+                    **improvement,
+                )
 
-            last_rmse = best_val_rmse
+            last_loss = current_loss
             last_size = ntrain
-
-            utils.info(
-                "Training size completed",
-                ntrain=ntrain,
-                validation_rmse=float(best_val_rmse),
-                **improvement,
-            )
 
             self.results[ntrain] = {
                 "parameters": best_parameters,
@@ -387,11 +404,13 @@ class AutoKRR:
                 split_results[lam_idx]["train_rmse"].append(rmse_train)
                 split_results[lam_idx]["train_mae"].append(mae_train)
 
-                res = split_results[lam_idx][self._cv_metric]
+                res = split_results[lam_idx][self._loss_func]
                 if len(res) > 5:
                     one = np.median(res[::2])
                     two = np.median(res[1::2])
-                    if abs(one - two) / np.median(res) < 5e-2:
+                    median_loss = abs(np.median(res))
+                    scale = median_loss if median_loss > 0 else np.finfo(float).tiny
+                    if abs(one - two) / scale < 5e-2:
                         converged[lam_idx] = True
 
         best_score, best_rmse, best_mae, best_lam = np.inf, None, None, None
@@ -419,7 +438,7 @@ class AutoKRR:
 
             avg_rmse = np.median(split_rmse)
             avg_mae = np.median(split_mae)
-            score = avg_mae if self._cv_metric == "mae" else avg_rmse
+            score = avg_mae if self._loss_func == "mae" else avg_rmse
             if score < best_score:
                 best_score = score
                 best_rmse = avg_rmse
@@ -475,7 +494,7 @@ class AutoKRR:
                     avg_rmse, avg_mae, lam = run
                 else:
                     continue
-                score = avg_mae if self._cv_metric == "mae" else avg_rmse
+                score = avg_mae if self._loss_func == "mae" else avg_rmse
                 if score < best_score:
                     best_score = score
                     best_val_rmse = avg_rmse

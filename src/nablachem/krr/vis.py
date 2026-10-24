@@ -81,6 +81,7 @@ def process_hyperopt_data(hyperopt_data):
 
         # Calculate max of training and validation RMSE
         max_rmse_median = max(train_rmse_median, val_rmse_median)
+        max_mae_median = max(train_mae_median, val_mae_median)
 
         processed_data[ntrain].append(
             {
@@ -91,6 +92,7 @@ def process_hyperopt_data(hyperopt_data):
                 "train_rmse_median": train_rmse_median,
                 "train_mae_median": train_mae_median,
                 "max_rmse_median": max_rmse_median,
+                "max_mae_median": max_mae_median,
                 "log_sigma": np.log10(sigma),
                 "log_lambda": np.log10(lambda_val),
                 "log_val_rmse_median": np.log10(val_rmse_median),
@@ -98,6 +100,7 @@ def process_hyperopt_data(hyperopt_data):
                 "log_train_rmse_median": np.log10(train_rmse_median),
                 "log_train_mae_median": np.log10(train_mae_median),
                 "log_max_rmse_median": np.log10(max_rmse_median),
+                "log_max_mae_median": np.log10(max_mae_median),
             }
         )
 
@@ -116,6 +119,7 @@ def create_heatmap_plot(
         "train_rmse": "train_rmse_median",
         "train_mae": "train_mae_median",
         "max_rmse": "max_rmse_median",
+        "max_mae": "max_mae_median",
     }
 
     metric_to_log_key = {
@@ -124,6 +128,7 @@ def create_heatmap_plot(
         "train_rmse": "log_train_rmse_median",
         "train_mae": "log_train_mae_median",
         "max_rmse": "log_max_rmse_median",
+        "max_mae": "log_max_mae_median",
     }
 
     median_key = metric_to_median_key[metric_key]
@@ -284,11 +289,13 @@ def create_learning_curve_plot(learning_curve_data):
     val_mae = []
     test_mae = []
     nullmodel_rmse = None
+    nullmodel_mae = None
 
     for entry in learning_curve_data:
         ntrain = entry["ntrain"]
         if ntrain == 1:  # nullmodel
             nullmodel_rmse = entry["test_rmse"]
+            nullmodel_mae = entry["test_mae"]
         else:
             training_sizes.append(ntrain)
             val_rmse.append(entry["val_rmse"])
@@ -345,7 +352,7 @@ def create_learning_curve_plot(learning_curve_data):
     )
 
     # Add nullmodel horizontal line
-    if nullmodel_rmse and training_sizes:
+    if nullmodel_rmse is not None and training_sizes:
         min_training_size = min(training_sizes)
         max_training_size = max(training_sizes)
         fig.add_shape(
@@ -360,7 +367,27 @@ def create_learning_curve_plot(learning_curve_data):
         fig.add_annotation(
             x=max_training_size * 0.9,
             y=nullmodel_rmse * 1.05,
-            text="nullmodel",
+            text="nullmodel RMSE",
+            showarrow=False,
+            font=dict(color="gray", size=10),
+        )
+
+    if nullmodel_mae is not None and training_sizes:
+        min_training_size = min(training_sizes)
+        max_training_size = max(training_sizes)
+        fig.add_shape(
+            type="line",
+            x0=min_training_size * 0.9,
+            x1=max_training_size * 1.2,
+            y0=nullmodel_mae,
+            y1=nullmodel_mae,
+            line=dict(color="gray", width=1, dash="dash"),
+            opacity=0.5,
+        )
+        fig.add_annotation(
+            x=max_training_size * 0.9,
+            y=nullmodel_mae * 1.05,
+            text="nullmodel MAE",
             showarrow=False,
             font=dict(color="gray", size=10),
         )
@@ -375,11 +402,10 @@ def create_learning_curve_plot(learning_curve_data):
 
         # Tight bounds with minimal padding
         y_lower_bound = min_error * 0.9
-        y_upper_bound = (
-            max(nullmodel_rmse, max_error) * 1.05
-            if nullmodel_rmse
-            else max_error * 1.05
-        )
+        nullmodel_errors = [
+            error for error in (nullmodel_rmse, nullmodel_mae) if error is not None
+        ]
+        y_upper_bound = max(max_error, *nullmodel_errors) * 1.05
 
         fig.update_layout(
             xaxis=dict(
@@ -628,6 +654,8 @@ def main():
 
     # Single-file view (unchanged)
     data = datasets[selected_path]
+    loss_func = data.get("metadata", {}).get("loss_func", "rmse")
+    st.caption(f"Hyperparameters selected using validation {loss_func.upper()}.")
     hyperopt_data = data["hyperopt"]
     spectrum_data = data.get("spectrum", {})
     learning_curve_data = data["learning_curve"]
@@ -711,6 +739,7 @@ def main():
                 "Training RMSE": "train_rmse",
                 "Training MAE": "train_mae",
                 "Max(Training RMSE, Validation RMSE)": "max_rmse",
+                "Max(Training MAE, Validation MAE)": "max_mae",
             }
 
             # Create side-by-side columns for plots
@@ -734,6 +763,7 @@ def main():
                     "train_rmse": "log_train_rmse_median",
                     "train_mae": "log_train_mae_median",
                     "max_rmse": "log_max_rmse_median",
+                    "max_mae": "log_max_mae_median",
                 }
                 log_key = metric_to_log_key[selected_metric_key]
 
@@ -773,6 +803,7 @@ def main():
                 "train_rmse": "train_rmse_median",
                 "train_mae": "train_mae_median",
                 "max_rmse": "max_rmse_median",
+                "max_mae": "max_mae_median",
             }
             median_key = metric_to_median_key[selected_metric_key]
 

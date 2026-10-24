@@ -111,6 +111,13 @@ and the remaining molecules used as holdout/test data.
     help="Random seed for numpy. Use -1 (default) for non-deterministic runs, or a non-negative integer for reproducible shuffles.",
 )
 @click.option(
+    "--loss-func",
+    type=click.Choice(["rmse", "mae"], case_sensitive=False),
+    default="rmse",
+    show_default=True,
+    help="Validation loss used to select KRR hyperparameters.",
+)
+@click.option(
     "--predict",
     "predict_path",
     default=None,
@@ -118,12 +125,6 @@ and the remaining molecules used as holdout/test data.
     help="JSONL file with an 'xyz' column to predict in place. Its molecules are "
     "appended as an extended holdout and predicted with the largest trained model; "
     "a 'property' column is written back into the file.",
-)
-@click.option(
-    "--cv-metric",
-    default="RMSE",
-    type=click.Choice(["RMSE", "MAE"], case_sensitive=False),
-    help="Validation metric used for hyperparameter selection in cross-validation",
 )
 def main(
     jsonl_path,
@@ -141,8 +142,8 @@ def main(
     holdout_residuals,
     archive,
     seed,
+    loss_func,
     predict_path,
-    cv_metric,
 ):
     info("Detrending terms", terms=list(detrending) or "none")
 
@@ -251,7 +252,7 @@ def main(
         elemental=elemental,
         alchemical_weights=alchemical_weights,
         seed=seed,
-        cv_metric=cv_metric.lower(),
+        loss_func=loss_func.lower(),
     )
     metadata = {
         "representation": representation_name,
@@ -266,12 +267,13 @@ def main(
         "limit": limit,
         "select": select,
         "seed": seed,
-        "cv_metric": cv_metric.upper(),
+        "loss_func": loss_func.lower(),
     }
     autokrr.store_archive(archive, metadata)
 
     # Print learning curve table
     print("\nLearning Curve Results:")
+    print(f"Hyperparameter selection objective: validation {loss_func.upper()}")
     print("-" * 100)
     print(
         f"{'ntrain':>7} {'val_rmse':>10} {'test_rmse':>11} {'val_mae':>10} {'test_mae':>11} {'sigma':>12} {'lambda':>12}"
