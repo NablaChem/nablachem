@@ -82,7 +82,7 @@ def process_hyperopt_data(hyperopt_data):
         # Calculate max of training and validation RMSE
         max_rmse_median = max(train_rmse_median, val_rmse_median)
         max_mae_median = max(train_mae_median, val_mae_median)
-        
+
         processed_data[ntrain].append(
             {
                 "sigma": sigma,
@@ -403,9 +403,7 @@ def create_learning_curve_plot(learning_curve_data):
         # Tight bounds with minimal padding
         y_lower_bound = min_error * 0.9
         nullmodel_errors = [
-            error
-            for error in (nullmodel_rmse, nullmodel_mae)
-            if error is not None
+            error for error in (nullmodel_rmse, nullmodel_mae) if error is not None
         ]
         y_upper_bound = max(max_error, *nullmodel_errors) * 1.05
 
