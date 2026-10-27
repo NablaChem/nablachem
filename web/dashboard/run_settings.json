@@ -1,0 +1,93 @@
+{
+    "__reference_flags__": [
+        "--limit",
+        "--mincount",
+        "--maxcount",
+        "--select",
+        "--detrending",
+        "--holdout-residuals",
+        "--elemental",
+        "--no-elemental",
+        "--alchemical",
+        "--owl",
+        "--archive",
+        "--seed",
+        "--predict"
+    ],
+    "__reference_global_representations__": [
+        "FCHL19Global",
+        "MACEMPGlobal",
+        "MACEOFFGlobal",
+        "MACEOMolGlobal",
+        "MBDFGlobal",
+        "SLATMGlobal",
+        "cMBDFGlobal"
+    ],
+    "__reference_local_representations__": [
+        "FCHL19Local",
+        "MACEMPLocal",
+        "MACEOFFLocal",
+        "MACEOMolLocal",
+        "MBDFLocal",
+        "SLATMLocal",
+        "cMBDFLocal"
+    ],
+    "__reference_kernels__": [
+        "Bump",
+        "Exponential",
+        "Gaussian",
+        "GeneralizedCauchy",
+        "InverseMultiquadric",
+        "InverseQuadratic",
+        "Matern32",
+        "Matern52",
+        "MaternGeneral",
+        "Polynomial",
+        "Power",
+        "RationalQuadratic",
+        "Sigmoid",
+        "WendlandK0",
+        "WendlandK1",
+        "WendlandK2",
+        "WendlandK3",
+        "WendlandK4",
+        "WuC2",
+        "WuC4",
+        "WuC6"
+    ],
+    "exclusions": {
+        "general": {
+            "kernels": [
+                "Bump",
+                "GeneralizedCauchy",
+                "InverseMultiquadric",
+                "InverseQuadratic",
+                "Matern32",
+                "Matern52",
+                "MaternGeneral",
+                "Polynomial",
+                "Power",
+                "RationalQuadratic",
+                "Sigmoid",
+                "WendlandK0",
+                "WendlandK1",
+                "WendlandK2",
+                "WendlandK3",
+                "WendlandK4",
+                "WuC2",
+                "WuC4",
+                "WuC6"
+            ],
+            "properties": [],
+            "representations": []
+        },
+        "combinations": [
+            {
+                "dataset": "example_dataset_name",
+                "kernel": "example_kernel_name",
+                "representation": "example_rep_name",
+                "property": "example_property_name"
+            }
+        ]
+    }
+}
