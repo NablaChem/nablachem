@@ -23,14 +23,23 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
-      - name: Cache dependencies
+      # Runners have no GPU, and the default torch wheel preloads CUDA
+      # libraries that crash with "Illegal instruction". Resolve torch from
+      # the CPU-only index instead (only in this CI checkout; nothing is committed).
+      - name: Use CPU-only torch
+        run: |
+          poetry source add --priority=explicit pytorch-cpu https://download.pytorch.org/whl/cpu
+          poetry add --lock torch --source pytorch-cpu
+
+      - name: Cache virtualenv
         uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ hashFiles('pyproject.toml') }}
+          key: venv-${{ runner.os }}-py3.11-cpu-${{ hashFiles('poetry.lock') }}
+          restore-keys: venv-${{ runner.os }}-py3.11-cpu-
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry sync --no-interaction
 
       - name: Run tests
         run: poetry run pytest tests/ -m "not expensive"
